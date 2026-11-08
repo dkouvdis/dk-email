@@ -30,7 +30,7 @@ The full details for every task are in [todo.md](todo.md).
 ### Phase 1: Foundation and de-risking
 - [x] T1: Scaffold the module with a `--version` flag, `.gitignore`, and CI
 - [x] T2: Config loading, paths, and the config-folder `.gitignore`
-- [ ] T3: Password resolution (`password_cmd` and keychain)
+- [x] T3: Password resolution (`password_cmd` and keychain)
 - [ ] T4: Mail domain types, the `Mailbox` interface, and a fake
 - [ ] T5: IMAP connect + `Folders` (memserver tests + live read-only Gmail check)
 
@@ -100,6 +100,7 @@ T1 ── T15 (needs a runnable binary; lands after T14)
 | Gmail behaves differently from other IMAP servers (special-use folders, `\Flagged` = Starred, archiving as a move to All Mail) | Med | Live read-only check in T5. Live write checks in Checkpoint 3 use a throwaway test email only. Archive-folder resolution is table-tested in T16. |
 | Bubble Tea v2, Bubbles v2 and Lip Gloss v2 are new and differ from v1 | Med | Read the v2 docs and examples before T8. teatest golden files lock in the layouts. |
 | `op read` blocks waiting on Touch ID | Med | Run it asynchronously with a 60s timeout. The status line shows "Waiting for 1Password…". |
+| `op` behaves differently when run by dk-email (own process group, no stdin) than in a terminal | Med | T5's live check resolves the password through the real `op read` before any UI work. |
 | Threads split across a 200-message page boundary | Low | Re-thread the whole loaded set whenever another page arrives (T10). |
 | A textual config append corrupts an unusual file (no trailing newline, CRLF line endings) | Med | Covered by the fixture tests in T20. The result is parsed back after writing, and the original is restored if parsing fails. |
 | macOS quarantines the unsigned binary installed via Homebrew | Low | The cask clears it with `postflight_steps`, and the README documents the `xattr` fallback. |

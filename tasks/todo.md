@@ -55,21 +55,21 @@ Every task also meets the standing bar before it counts as done:
 ### T3: Password resolution (`password_cmd` and keychain)
 
 **Description:** Add an `internal/secret` package with `Resolve(ctx, account) (string, error)`.
-- If `password_cmd` is set, run it with `sh -c` using the inherited environment and a 60s context, and use its trimmed stdout.
+- If `password_cmd` is set, run it with `sh -c` using the inherited environment and a 60s context, and use the first line of its stdout.
 - Otherwise read the keychain entry for service `dk-email` under the account name.
 - Also provide `Store(account, pw)` to save a password to the keychain.
 - The command runner is injectable so tests can fake it.
 
 **Acceptance criteria:**
-- [ ] A command that fails, prints nothing, or times out returns a typed error that includes stderr but **never the password**.
-- [ ] A missing keychain entry returns the error `ErrNoPassword`, which the UI later shows as "needs password".
-- [ ] No log or error string ever contains the password, and a test asserts this.
+- [x] A command that fails, prints nothing, or times out returns a typed error that includes stderr but **never the password**.
+- [x] A missing keychain entry returns the error `ErrNoPassword`, which the UI later shows as "needs password".
+- [x] No log or error string ever contains the password, and a test asserts this.
 
 **Verification:**
-- [ ] `go test -race ./internal/secret/...` passes with at least 80% coverage, using `keyring.MockInit()` and a fake runner.
+- [x] `go test -race ./internal/secret/...` passes with at least 80% coverage, using `keyring.MockInit()` and a fake runner.
 
 **Dependencies:** T1
-**Files:** `internal/secret/secret.go`, `internal/secret/runner.go`, `internal/secret/secret_test.go`
+**Files:** `internal/secret/secret.go`, `internal/secret/runner_unix.go`, `internal/secret/runner_other.go`, `internal/secret/secret_test.go`, `internal/secret/runner_unix_test.go`
 **Scope:** S
 
 ### T4: Mail domain types, the `Mailbox` interface, and a fake
