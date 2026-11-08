@@ -19,17 +19,17 @@ Every task also meets the standing bar before it counts as done:
 - Add the repo `.gitignore` and a CI workflow.
 
 **Acceptance criteria:**
-- [ ] `dk-email --version` prints `dk-email dev (unknown, unknown)` for an untagged build. Building with `-ldflags "-X main.version=0.1.0-beta.1 …"` prints the injected values.
-- [ ] `.gitignore` covers `bin/`, `dist/`, `coverage.out`, `*.db`, `debug.log`, `tmp/`, and any `*.eml` outside `testdata/`.
-- [ ] `ci.yml` runs test, vet and gofmt on push and pull request.
+- [x] `dk-email --version` prints `dk-email dev (<commit>[-dirty], <date>)` for an untagged build, taken from the git info Go embeds, or `dk-email dev (unknown, unknown)` when there's none. Building with `-ldflags "-X main.version=0.1.0-beta.1 …"` prints the injected values.
+- [x] `.gitignore` covers `bin/`, `dist/`, `coverage.out`, `*.db`, `debug.log`, `tmp/`, and any `*.eml` outside `testdata/`.
+- [x] `ci.yml` runs test, vet and gofmt on push and pull request.
 
 **Verification:**
-- [ ] `go test -race ./...` (the version formatting test) passes.
-- [ ] `go build -o bin/dk-email ./cmd/dk-email && ./bin/dk-email --version` prints the dev version.
-- [ ] `git check-ignore bin/x dist/x coverage.out tmp/a.eml` lists all four paths, and `git check-ignore internal/render/testdata/a.eml` lists nothing.
+- [x] `go test -race ./...` (the version formatting test) passes.
+- [x] `go build -o bin/dk-email ./cmd/dk-email && ./bin/dk-email --version` prints the dev version.
+- [x] `git check-ignore bin/x dist/x coverage.out tmp/a.eml` lists all four paths, and `git check-ignore internal/render/testdata/a.eml` lists nothing.
 
 **Dependencies:** None
-**Files:** `go.mod`, `cmd/dk-email/main.go`, `cmd/dk-email/version.go`, `cmd/dk-email/version_test.go`, `.gitignore`, `.github/workflows/ci.yml`
+**Files:** `go.mod`, `cmd/dk-email/main.go`, `cmd/dk-email/main_test.go`, `cmd/dk-email/version.go`, `cmd/dk-email/version_test.go`, `.gitignore`, `.github/workflows/ci.yml`
 **Scope:** M
 
 ### T2: Config loading, paths, and the config-folder `.gitignore`

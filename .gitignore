@@ -1,0 +1,13 @@
+# Build output
+/bin/
+/dist/
+/tmp/
+
+# Test and debug artifacts
+coverage.out
+debug.log
+*.db
+
+# Real mail must never be committed; synthetic fixtures under testdata/ are allowed
+*.eml
+!**/testdata/**/*.eml
