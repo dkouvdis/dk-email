@@ -41,15 +41,15 @@ Every task also meets the standing bar before it counts as done:
 - honours the `--config` override
 
 **Acceptance criteria:**
-- [ ] A missing file yields an empty config with defaults and no error, and invalid TOML returns an error that includes the line.
-- [ ] Validation rejects duplicate account names, a missing host or user, and an unknown `tls` value. A `password` key is rejected with a hint to use `password_cmd`.
-- [ ] The `.gitignore` is created once, never overwritten, and has the exact content from the spec.
+- [x] A missing file yields an empty config with defaults and no error, and invalid TOML returns an error that includes the line.
+- [x] Validation rejects duplicate account names, a missing host or user, and an unknown `tls` value. A `password` key is rejected with a hint to use `password_cmd`.
+- [x] The `.gitignore` is created once, never overwritten, and has the exact content from the spec.
 
 **Verification:**
-- [ ] `go test -race ./internal/config/...` passes with at least 80% coverage, using table tests with `t.Setenv("XDG_CONFIG_HOME", t.TempDir())`.
+- [x] `go test -race ./internal/config/...` passes with at least 80% coverage, using table tests with `t.Setenv("XDG_CONFIG_HOME", t.TempDir())`.
 
 **Dependencies:** T1
-**Files:** `internal/config/config.go`, `internal/config/paths.go`, `internal/config/gitignore.go`, `internal/config/config_test.go`, `internal/config/testdata/*.toml`
+**Files:** `internal/config/config.go`, `internal/config/paths.go`, `internal/config/gitignore.go`, `internal/config/*_test.go`, `internal/config/testdata/full.toml`, `cmd/dk-email/main.go`, `cmd/dk-email/main_test.go`
 **Scope:** M
 
 ### T3: Password resolution (`password_cmd` and keychain)

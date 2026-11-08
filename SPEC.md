@@ -160,6 +160,12 @@ password_cmd = "op read op://Personal/Gmail/app-password"   # omit to use the ke
 # archive_folder = "[Gmail]/All Mail"                       # optional override
 ```
 
+- **Defaults and validation:**
+  - `tls` defaults to `implicit`. `imap_port` defaults to 993 for `implicit` and 143 for `starttls`. `username` defaults to `email`.
+  - Unknown keys are rejected, so a typo such as `pasword_cmd` can't silently fall back to the keychain. A `password` key is rejected with a hint to use `password_cmd`.
+  - `[ui]` limits: `wide_breakpoint` ≥ 80, `list_width` between 10 and 90, `refresh_interval` positive.
+  - All problems in a file are reported together.
+  - The config dir and its `.gitignore` are only created for the default location, never next to a custom `--config` path.
 - **Password resolution:** if `password_cmd` is set, run it with `sh -c` and use the trimmed stdout. The command inherits the user's environment; if `op` isn't on that `PATH`, use its absolute path. Otherwise read from the keychain (service `dk-email`, key = account `name`). If neither yields a password, the account is shown as "needs password", and pressing a key re-opens the connect popup to supply one.
 - **The connect-account popup appends** a new `[[account]]` block to the file as text, so the user's comments and formatting are preserved. It never re-encodes the whole file. When the address ends in `@gmail.com` / `@googlemail.com`, the popup pre-fills `imap.gmail.com:993 implicit`. Its password source is either a 1Password reference (stored as `password_cmd = "op read <ref>"`) or "enter once → keychain".
 - **Config-dir `.gitignore`**, written on first run if missing:

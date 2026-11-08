@@ -29,7 +29,7 @@ The full details for every task are in [todo.md](todo.md).
 
 ### Phase 1: Foundation and de-risking
 - [x] T1: Scaffold the module with a `--version` flag, `.gitignore`, and CI
-- [ ] T2: Config loading, paths, and the config-folder `.gitignore`
+- [x] T2: Config loading, paths, and the config-folder `.gitignore`
 - [ ] T3: Password resolution (`password_cmd` and keychain)
 - [ ] T4: Mail domain types, the `Mailbox` interface, and a fake
 - [ ] T5: IMAP connect + `Folders` (memserver tests + live read-only Gmail check)

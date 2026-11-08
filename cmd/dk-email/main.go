@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+
+	"github.com/dkouvdis/dk-email/internal/config"
 )
 
 func main() {
@@ -33,7 +35,28 @@ func run(args []string, stdout, stderr io.Writer) error {
 		return nil
 	}
 
-	_ = *configPath // consumed once config loading lands (T2/T8)
-	fmt.Fprintln(stderr, "dk-email: the terminal interface is not implemented yet")
+	cfg, err := loadConfig(*configPath)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(stderr, "dk-email: loaded %d account(s) from %s; the terminal interface is not implemented yet\n", len(cfg.Accounts), cfg.Path)
 	return nil
+}
+
+// loadConfig loads the config from an explicit --config path, or from the
+// default config dir, creating that dir and its .gitignore on first run.
+func loadConfig(path string) (*config.Config, error) {
+	if path == "" {
+		dir, err := config.Dir()
+		if err != nil {
+			return nil, err
+		}
+		if err := config.EnsureDir(dir); err != nil {
+			return nil, err
+		}
+		if path, err = config.DefaultPath(); err != nil {
+			return nil, err
+		}
+	}
+	return config.Load(path)
 }
