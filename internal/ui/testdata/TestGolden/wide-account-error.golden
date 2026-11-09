@@ -1,0 +1,24 @@
+╭──────────────────────╮╭──────────────────────────────────────╮╭──────────────────────────────────────────────────────────────────────────╮
+│ Personal             ││ Threads                              ││ Message                                                                  │
+│ ▶ Inbox            2 ││                                      ││                                                                          │
+│   Sent Mail          ││ 3 messages loaded.                   ││ No message selected.                                                     │
+│   All Mail           ││                                      ││                                                                          │
+│   Receipts         1 ││                                      ││                                                                          │
+│                      ││                                      ││                                                                          │
+│ Work                 ││                                      ││                                                                          │
+│   login to account   ││                                      ││                                                                          │
+│   "Work"             ││                                      ││                                                                          │
+│   (mail.example.com: ││                                      ││                                                                          │
+│   993) failed:       ││                                      ││                                                                          │
+│   invalid            ││                                      ││                                                                          │
+│   credentials        ││                                      ││                                                                          │
+│                      ││                                      ││                                                                          │
+│                      ││                                      ││                                                                          │
+│                      ││                                      ││                                                                          │
+│                      ││                                      ││                                                                          │
+│                      ││                                      ││                                                                          │
+│                      ││                                      ││                                                                          │
+│                      ││                                      ││                                                                          │
+╰──────────────────────╯╰──────────────────────────────────────╯╰──────────────────────────────────────────────────────────────────────────╯
+Work: login to account "Work" (mail.example.com:993) failed: invalid credentials                                                        wide
+k/↑ up • j/↓ down • enter open • space expand • u read/unread • s star • e archive • d delete • m move • tab next pane • … • ? help • q quit

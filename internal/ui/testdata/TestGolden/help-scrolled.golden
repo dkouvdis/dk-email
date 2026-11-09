@@ -1,13 +1,13 @@
 ╭──────────────────────╮╭───────────────────────────────╮╭─────────────────────────────────────────────────────────────╮
-│ Folders              ││ Threads      ╭───────────────────────────────────────╮                                       │
-│                      ││              │ Keys                       esc close  │                                       │
-│ ▸ Personal           ││ Threads appea│                                       │                                       │
-│   not connected      ││              │ Threads                               │                                       │
-│ ▸ Work               ││              │   enter       open                    │                                       │
-│   not connected      ││              │   space       expand                  │                                       │
-│                      ││              │   u           read/unread             │                                       │
-│                      ││              │   s           star                    │                                       │
-│                      ││              │   e           archive                 │                                       │
+│ Personal             ││ Threads      ╭───────────────────────────────────────╮                                       │
+│ ▶ Inbox            2 ││              │ Keys                       esc close  │                                       │
+│   Sent Mail          ││ 3 messages lo│                                       │                                       │
+│   All Mail           ││              │ Threads                               │                                       │
+│   Receipts         1 ││              │   enter       open                    │                                       │
+│                      ││              │   space       expand                  │                                       │
+│ Work                 ││              │   u           read/unread             │                                       │
+│   Inbox            1 ││              │   s           star                    │                                       │
+│   Archive            ││              │   e           archive                 │                                       │
 │                      ││              │   d           delete                  │                                       │
 │                      ││              │   m           move                  ┃ │                                       │
 │                      ││              │   r           refresh               ┃ │                                       │

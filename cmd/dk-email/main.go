@@ -1,15 +1,21 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/dkouvdis/dk-email/internal/config"
+	"github.com/dkouvdis/dk-email/internal/mail"
+	"github.com/dkouvdis/dk-email/internal/mail/imap"
+	"github.com/dkouvdis/dk-email/internal/secret"
 	"github.com/dkouvdis/dk-email/internal/ui"
 )
 
@@ -56,8 +62,37 @@ func startUI(cfg *config.Config) error {
 	}
 	defer closeLog()
 
-	_, err = tea.NewProgram(ui.New(*cfg, log)).Run()
+	final, err := tea.NewProgram(ui.New(*cfg, newConnector(secret.New(), log), log)).Run()
+	if m, ok := final.(ui.Model); ok {
+		_ = m.Close()
+	}
 	return err
+}
+
+// passwordResolver is the part of *secret.Resolver the connector uses.
+type passwordResolver interface {
+	Resolve(ctx context.Context, acct config.Account) (string, error)
+}
+
+// newConnector resolves each account's password, then logs in over IMAP.
+// The debug log times both phases, never recording the password.
+func newConnector(pw passwordResolver, log *slog.Logger) ui.Connector {
+	return func(ctx context.Context, acct config.Account) (mail.Mailbox, error) {
+		start := time.Now()
+		password, err := pw.Resolve(ctx, acct)
+		log.Debug("password resolved", "account", acct.Name, "ok", err == nil, "took", time.Since(start).Round(time.Millisecond))
+		if err != nil {
+			return nil, err
+		}
+
+		start = time.Now()
+		c, err := imap.Dial(ctx, acct, password)
+		log.Debug("imap login", "account", acct.Name, "ok", err == nil, "took", time.Since(start).Round(time.Millisecond))
+		if err != nil {
+			return nil, err
+		}
+		return c, nil
+	}
 }
 
 // loadConfig loads the config from an explicit --config path, or from the

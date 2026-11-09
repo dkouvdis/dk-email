@@ -1,5 +1,6 @@
 // Package ui is the root Bubble Tea model: layout, focus, keys, the status
-// line, the hint bar and popups. Panes are placeholders until T9–T12.
+// line, the hint bar and popups. The thread list and reader are placeholders
+// until T10–T12.
 package ui
 
 import (
@@ -10,12 +11,15 @@ import (
 
 	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/dkouvdis/dk-email/internal/config"
+	"github.com/dkouvdis/dk-email/internal/mail"
 	"github.com/dkouvdis/dk-email/internal/ui/popup"
+	"github.com/dkouvdis/dk-email/internal/ui/sidebar"
 )
 
 // Below this size only a "too small" notice is drawn.
@@ -46,8 +50,14 @@ func (p Pane) String() string {
 }
 
 type Model struct {
-	ui            config.UI
-	accounts      []string
+	ui      config.UI
+	accts   []config.Account
+	connect Connector
+	// boxes holds each account's mailbox once connected, by account index.
+	boxes []mail.Mailbox
+	side  sidebar.Model
+	open  openFolder
+
 	log           *slog.Logger
 	keys          KeyMap
 	styles        styles
@@ -59,10 +69,12 @@ type Model struct {
 	focus         Pane
 	showHelp      bool
 	status        string
+	statusErr     bool
 }
 
-// New builds the root model. log receives metadata only and may be nil.
-func New(cfg config.Config, log *slog.Logger) Model {
+// New builds the root model. Init connects every account with connect. log
+// receives metadata only and may be nil.
+func New(cfg config.Config, connect Connector, log *slog.Logger) Model {
 	if log == nil {
 		log = slog.New(slog.DiscardHandler)
 	}
@@ -70,30 +82,45 @@ func New(cfg config.Config, log *slog.Logger) Model {
 	if cfg.UI.DefaultLayout == config.LayoutList {
 		mode = ModeList
 	}
-	accounts := make([]string, 0, len(cfg.Accounts))
+	names := make([]string, 0, len(cfg.Accounts))
 	for _, a := range cfg.Accounts {
-		accounts = append(accounts, a.Name)
+		names = append(names, a.Name)
 	}
 	keys := DefaultKeyMap()
 	m := Model{
-		ui:       cfg.UI,
-		accounts: accounts,
-		log:      log,
-		keys:     keys,
-		styles:   defaultStyles(),
-		help:     help.New(),
-		helpPop:  popup.NewHelp(keys.HelpSections()),
-		mode:     mode,
-		focus:    PaneList,
+		ui:      cfg.UI,
+		accts:   slices.Clone(cfg.Accounts),
+		connect: connect,
+		boxes:   make([]mail.Mailbox, len(cfg.Accounts)),
+		side:    sidebar.New(names),
+		open:    openFolder{account: -1},
+		log:     log,
+		keys:    keys,
+		styles:  defaultStyles(),
+		help:    help.New(),
+		helpPop: popup.NewHelp(keys.HelpSections()),
+		mode:    mode,
+		focus:   PaneList,
 	}
-	if len(accounts) == 0 {
+	if len(names) == 0 {
 		m.status = "No accounts configured yet."
 	}
-	log.Debug("start", "accounts", len(accounts), "mode", mode)
+	log.Debug("start", "accounts", len(names), "mode", mode)
 	return m
 }
 
-func (m Model) Init() tea.Cmd { return nil }
+// Init connects every account at once; each reports back on its own.
+func (m Model) Init() tea.Cmd {
+	if len(m.accts) == 0 || m.connect == nil {
+		return nil
+	}
+	cmds := []tea.Cmd{m.side.Tick()}
+	for i, a := range m.accts {
+		m.log.Debug("connecting", "account", a.Name)
+		cmds = append(cmds, connectAccount(m.connect, i, a))
+	}
+	return tea.Batch(cmds...)
+}
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -101,6 +128,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.resize(msg.Width, msg.Height)
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
+	case spinner.TickMsg:
+		var cmd tea.Cmd
+		m.side, cmd = m.side.Update(msg)
+		return m, cmd
+	case accountMsg:
+		return m.handleAccount(msg)
+	case sidebar.SelectedMsg:
+		return m.openFolder(msg.Account, msg.Folder)
+	case summariesMsg:
+		return m.handleSummaries(msg)
 	}
 	return m, nil
 }
@@ -117,6 +154,7 @@ func (m *Model) resize(w, h int) {
 func (m *Model) relayout() {
 	m.panes = Layout(m.width, m.height, m.mode, m.ui)
 	m.helpPop.SetSize(m.panes.Popup.W, m.panes.Popup.H)
+	m.side = m.side.SetHeight(max(m.panes.Sidebar.H-m.styles.pane.GetVerticalFrameSize(), 0))
 	if !slices.Contains(m.visiblePanes(), m.focus) {
 		m.focus = PaneList
 	}
@@ -136,6 +174,9 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if key.Matches(msg, m.keys.Quit) {
 		m.log.Debug("quit")
 		return m, tea.Quit
+	}
+	if m.statusErr {
+		m.status, m.statusErr = "", false
 	}
 	if m.showHelp {
 		if key.Matches(msg, m.keys.Back, m.keys.Help) {
@@ -162,6 +203,10 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.moveFocus(-1, false)
 	case key.Matches(msg, m.keys.ToggleView):
 		m.toggleMode()
+	case m.focus == PaneSidebar:
+		var cmd tea.Cmd
+		m.side, cmd = m.side.Update(msg)
+		return m, cmd
 	}
 	return m, nil
 }
@@ -183,7 +228,7 @@ func (m *Model) moveFocus(step int, wrap bool) {
 
 func (m *Model) toggleMode() {
 	if m.width < listForcedBelow {
-		m.status = fmt.Sprintf("List mode is forced below %d columns.", listForcedBelow)
+		m.setStatus(fmt.Sprintf("List mode is forced below %d columns.", listForcedBelow))
 		return
 	}
 	if m.mode == ModeSplit {
@@ -191,7 +236,6 @@ func (m *Model) toggleMode() {
 	} else {
 		m.mode = ModeSplit
 	}
-	m.status = ""
 	m.relayout()
 	m.log.Debug("mode", "mode", m.mode, "kind", m.panes.Kind)
 }
@@ -213,11 +257,11 @@ func (m Model) render() string {
 	p := m.panes
 	var cols []string
 	if p.Sidebar.W > 0 {
-		cols = append(cols, m.renderPane(PaneSidebar, p.Sidebar, m.sidebarLines()))
+		cols = append(cols, m.renderPane(PaneSidebar, p.Sidebar, m.side.View))
 	}
-	cols = append(cols, m.renderPane(PaneList, p.List, m.listLines()))
+	cols = append(cols, m.renderPane(PaneList, p.List, lines(m.listLines())))
 	if p.Reader.W > 0 {
-		cols = append(cols, m.renderPane(PaneReader, p.Reader, m.readerLines()))
+		cols = append(cols, m.renderPane(PaneReader, p.Reader, lines(m.readerLines())))
 	}
 	screen := lipgloss.JoinVertical(lipgloss.Left,
 		lipgloss.JoinHorizontal(lipgloss.Top, cols...),
@@ -239,25 +283,20 @@ func (m Model) render() string {
 	return screen
 }
 
-func (m Model) renderPane(pane Pane, r Rect, lines []string) string {
+// renderPane draws a bordered pane whose content is rendered for its inner size.
+func (m Model) renderPane(pane Pane, r Rect, content func(w, h int) string) string {
 	style := m.styles.pane
 	if pane == m.focus {
 		style = m.styles.paneFocused
 	}
-	innerW := r.W - style.GetHorizontalFrameSize()
-	innerH := r.H - style.GetVerticalFrameSize()
-	return style.Width(r.W).Height(r.H).Render(fitLines(lines, innerW, innerH))
+	innerW := max(r.W-style.GetHorizontalFrameSize(), 0)
+	innerH := max(r.H-style.GetVerticalFrameSize(), 0)
+	body := fitLines(strings.Split(content(innerW, innerH), "\n"), innerW, innerH)
+	return style.Width(r.W).Height(r.H).Render(body)
 }
 
-func (m Model) sidebarLines() []string {
-	lines := []string{m.styles.title.Render("Folders"), ""}
-	if len(m.accounts) == 0 {
-		return append(lines, m.styles.dim.Render("No accounts"))
-	}
-	for _, name := range m.accounts {
-		lines = append(lines, "▸ "+name, m.styles.dim.Render("  not connected"))
-	}
-	return lines
+func lines(l []string) func(w, h int) string {
+	return func(int, int) string { return strings.Join(l, "\n") }
 }
 
 // listLines shows the account › folder header outside wide mode, where
@@ -265,13 +304,24 @@ func (m Model) sidebarLines() []string {
 func (m Model) listLines() []string {
 	title := m.styles.title.Render("Threads")
 	if m.panes.Kind != KindWide {
-		account := "No account"
-		if len(m.accounts) > 0 {
-			account = m.accounts[0]
+		switch {
+		case m.open.account >= 0:
+			title = m.styles.title.Render(m.accts[m.open.account].Name) + m.styles.dim.Render(" › "+m.open.label)
+		case len(m.accts) > 0:
+			title = m.styles.title.Render(m.accts[0].Name) + m.styles.dim.Render(" › no folder")
+		default:
+			title = m.styles.title.Render("No account")
 		}
-		title = m.styles.title.Render(account) + m.styles.dim.Render(" › no folder")
 	}
-	return []string{title, "", m.styles.dim.Render("Threads appear here once a folder is open.")}
+	body := "Threads appear here once a folder is open."
+	switch {
+	case m.open.account < 0:
+	case m.open.loading:
+		body = "Loading…"
+	default:
+		body = fmt.Sprintf("%d messages loaded.", len(m.open.summaries))
+	}
+	return []string{title, "", m.styles.dim.Render(body)}
 }
 
 func (m Model) readerLines() []string {
@@ -284,7 +334,11 @@ func (m Model) renderStatus() string {
 		right += " (forced)"
 	}
 	right = m.styles.dim.Render(right)
-	left := ansi.Truncate(m.styles.status.Render(m.status), m.width-lipgloss.Width(right)-1, "…")
+	style := m.styles.status
+	if m.statusErr {
+		style = m.styles.statusErr
+	}
+	left := ansi.Truncate(style.Render(m.status), m.width-lipgloss.Width(right)-1, "…")
 	gap := max(m.width-lipgloss.Width(left)-lipgloss.Width(right), 0)
 	return left + strings.Repeat(" ", gap) + right
 }
@@ -320,6 +374,20 @@ func (m Model) renderHints() string {
 	line := strings.Join(append(head, tail), sep)
 	line = ansi.Truncate(line, m.width, "")
 	return line + strings.Repeat(" ", max(m.width-lipgloss.Width(line), 0))
+}
+
+// setStatus shows progress or info. It never replaces an error, which stays
+// until the next key press dismisses it.
+func (m *Model) setStatus(s string) {
+	if !m.statusErr {
+		m.status = s
+	}
+}
+
+// setError shows err in the status line. Only its text is shown, which
+// never includes passwords (see secret and imap).
+func (m *Model) setError(err error) {
+	m.status, m.statusErr = err.Error(), true
 }
 
 // fitLines cuts content to w columns and h lines so a pane never grows.

@@ -2,6 +2,7 @@ package ui
 
 import (
 	"bytes"
+	"errors"
 	"log/slog"
 	"strings"
 	"testing"
@@ -56,7 +57,7 @@ func plain(m Model) string { return ansi.Strip(m.View().Content) }
 
 func TestModel_ViewFillsTerminalExactly(t *testing.T) {
 	for _, s := range [][2]int{{60, 20}, {79, 24}, {80, 24}, {119, 30}, {120, 30}, {200, 50}} {
-		m := send(t, New(testConfig(), nil), size(s[0], s[1]))
+		m := send(t, New(testConfig(), nil, nil), size(s[0], s[1]))
 		for _, help := range []bool{false, true} {
 			if help {
 				m = send(t, m, press("?"))
@@ -70,7 +71,7 @@ func TestModel_ViewFillsTerminalExactly(t *testing.T) {
 }
 
 func TestModel_ResizeSwitchesLayoutLive(t *testing.T) {
-	m := New(testConfig(), nil)
+	m := New(testConfig(), nil, nil)
 
 	steps := []struct {
 		w    int
@@ -87,7 +88,7 @@ func TestModel_ResizeSwitchesLayoutLive(t *testing.T) {
 }
 
 func TestModel_ToggleView(t *testing.T) {
-	m := send(t, New(testConfig(), nil), size(130, 30), press("v"))
+	m := send(t, New(testConfig(), nil, nil), size(130, 30), press("v"))
 	if m.panes.Kind != KindList || m.mode != ModeList {
 		t.Fatalf("after v at 130 cols: kind %v mode %v, want list", m.panes.Kind, m.mode)
 	}
@@ -112,7 +113,7 @@ func TestModel_DefaultLayoutList(t *testing.T) {
 	cfg := testConfig()
 	cfg.UI.DefaultLayout = config.LayoutList
 
-	m := send(t, New(cfg, nil), size(200, 30))
+	m := send(t, New(cfg, nil, nil), size(200, 30))
 
 	if m.panes.Kind != KindList {
 		t.Errorf("Kind = %v, want list from default_layout", m.panes.Kind)
@@ -120,7 +121,7 @@ func TestModel_DefaultLayoutList(t *testing.T) {
 }
 
 func TestModel_FocusCycling(t *testing.T) {
-	m := send(t, New(testConfig(), nil), size(150, 30))
+	m := send(t, New(testConfig(), nil, nil), size(150, 30))
 	if m.focus != PaneList {
 		t.Fatalf("initial focus = %v, want list", m.focus)
 	}
@@ -147,7 +148,7 @@ func TestModel_FocusCycling(t *testing.T) {
 }
 
 func TestModel_FocusMovesOffHiddenPane(t *testing.T) {
-	m := send(t, New(testConfig(), nil), size(150, 30), press("h"))
+	m := send(t, New(testConfig(), nil, nil), size(150, 30), press("h"))
 	if m.focus != PaneSidebar {
 		t.Fatalf("focus = %v, want sidebar", m.focus)
 	}
@@ -167,7 +168,7 @@ func TestModel_FocusMovesOffHiddenPane(t *testing.T) {
 }
 
 func TestModel_HintsFollowFocus(t *testing.T) {
-	m := send(t, New(testConfig(), nil), size(200, 30))
+	m := send(t, New(testConfig(), nil, nil), size(200, 30))
 	hints := func() string { return ansi.Strip(m.renderHints()) }
 
 	if !strings.Contains(hints(), "archive") || strings.Contains(hints(), "accounts") {
@@ -189,7 +190,7 @@ func TestModel_HintsFollowFocus(t *testing.T) {
 
 func TestModel_HintBarAlwaysFitsAndEndsWithHelpAndQuit(t *testing.T) {
 	for w := 20; w <= 220; w++ {
-		m := send(t, New(testConfig(), nil), size(w, 30))
+		m := send(t, New(testConfig(), nil, nil), size(w, 30))
 		for range m.visiblePanes() {
 			bar := m.renderHints()
 			if got := lipgloss.Width(bar); got != w {
@@ -204,7 +205,7 @@ func TestModel_HintBarAlwaysFitsAndEndsWithHelpAndQuit(t *testing.T) {
 }
 
 func TestModel_HelpPopup(t *testing.T) {
-	m := send(t, New(testConfig(), nil), size(120, 30), press("?"))
+	m := send(t, New(testConfig(), nil, nil), size(120, 30), press("?"))
 	if !m.showHelp || !strings.Contains(plain(m), "esc close") {
 		t.Fatal("? didn't open the help popup")
 	}
@@ -234,7 +235,7 @@ func TestModel_HelpPopup(t *testing.T) {
 func TestModel_Quit(t *testing.T) {
 	for _, k := range []string{"q", "ctrl+c"} {
 		for _, help := range []bool{false, true} {
-			m := send(t, New(testConfig(), nil), size(120, 30))
+			m := send(t, New(testConfig(), nil, nil), size(120, 30))
 			if help {
 				m = send(t, m, press("?"))
 			}
@@ -250,17 +251,17 @@ func TestModel_Quit(t *testing.T) {
 }
 
 func TestModel_TinyTerminal(t *testing.T) {
-	m := send(t, New(testConfig(), nil), size(15, 4))
+	m := send(t, New(testConfig(), nil, nil), size(15, 4))
 	if !strings.Contains(plain(m), "Terminal too small") {
 		t.Errorf("view = %q, want a too-small notice", plain(m))
 	}
-	if New(testConfig(), nil).View().Content != "" {
+	if New(testConfig(), nil, nil).View().Content != "" {
 		t.Error("view before the first resize should be empty")
 	}
 }
 
 func TestModel_NoAccountsStatus(t *testing.T) {
-	m := send(t, New(config.Default(), nil), size(120, 30))
+	m := send(t, New(config.Default(), nil, nil), size(120, 30))
 	if !strings.Contains(plain(m), "No accounts configured yet.") {
 		t.Error("status line doesn't say there are no accounts")
 	}
@@ -270,7 +271,7 @@ func TestModel_DebugLogRecordsMetadata(t *testing.T) {
 	var buf bytes.Buffer
 	log := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
-	send(t, New(testConfig(), log), size(200, 30), size(201, 30), size(100, 30), press("tab"), press("?"), press("esc"))
+	send(t, New(testConfig(), nil, log), size(200, 30), size(201, 30), size(100, 30), press("tab"), press("?"), press("esc"))
 
 	out := buf.String()
 	for _, want := range []string{"msg=start accounts=2", "kind=wide", "kind=narrow", "pane=reader", "popup opened", "popup closed"} {
@@ -283,25 +284,36 @@ func TestModel_DebugLogRecordsMetadata(t *testing.T) {
 	}
 }
 
-// The golden tests run the model in a real teatest program at fixed sizes
-// and compare the final screen without ANSI styling. Update them with
-// go test ./internal/ui/ -run Golden -update
+// The golden tests connect fake accounts synchronously (so spinner and
+// load timing can't change the output), then run the model in a real
+// teatest program at fixed sizes and compare the final screen without ANSI
+// styling. Update them with go test ./internal/ui/ -run Golden -update
 func TestGolden(t *testing.T) {
 	tests := []struct {
-		name string
-		w, h int
-		keys []string
+		name     string
+		w, h     int
+		workFail bool
+		keys     []string
 	}{
-		{"wide", 140, 24, nil},
-		{"narrow", 100, 24, nil},
-		{"list", 70, 20, nil},
-		{"help", 120, 30, []string{"?"}},
-		{"help-scrolled", 120, 30, []string{"?", "G"}},
-		{"help-fits", 120, 50, []string{"?"}},
+		{"wide", 140, 24, false, nil},
+		{"wide-sidebar-focused", 140, 24, false, []string{"h", "j"}},
+		{"wide-account-error", 140, 24, true, nil},
+		{"narrow", 100, 24, false, nil},
+		{"list", 70, 20, false, nil},
+		{"help", 120, 30, false, []string{"?"}},
+		{"help-scrolled", 120, 30, false, []string{"?", "G"}},
+		{"help-fits", 120, 50, false, []string{"?"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tm := teatest.NewTestModel(t, New(testConfig(), nil), teatest.WithInitialTermSize(tt.w, tt.h))
+			f := newFixture()
+			if tt.workFail {
+				f.errs["Work"] = errors.New(`login to account "Work" (mail.example.com:993) failed: invalid credentials`)
+			}
+			m := started(t, f, tt.w, tt.h)
+			m.connect = nil // already connected; Init must not reconnect
+
+			tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(tt.w, tt.h))
 			for _, k := range tt.keys {
 				tm.Send(press(k))
 			}

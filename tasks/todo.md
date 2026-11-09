@@ -214,11 +214,19 @@ Every task also meets the standing bar before it counts as done:
 - `enter` selects a folder and sends the event that triggers loading its summaries.
 
 **Acceptance criteria:**
-- [ ] With two fake accounts, both appear with their unread counts. A failing account shows its error without blocking the other.
-- [ ] Keys continue to work while an account is connecting (a fake with a delay proves this).
+- [x] With two fake accounts, both appear with their unread counts. A failing account shows its error without blocking the other.
+- [x] Keys continue to work while an account is connecting (a fake with a delay proves this).
 
 **Verification:**
-- [ ] `go test -race ./internal/ui/...` passes, including update-level tests with `mailtest.Fake`.
+- [x] `go test -race ./internal/ui/...` passes, including update-level tests with `mailtest.Fake` (stable over 3 runs; sidebar coverage 90%).
+
+**Notes:**
+- `ui.New(cfg, connect, log)` takes a `ui.Connector`, so the UI never imports `secret` or `imap`. `main` passes the real one: `password_cmd`/keychain, then `imap.Dial`, with each phase timed in the debug log. Tests pass `mailtest.Fake`s.
+- Each account connects in its own `tea.Cmd` with a 90s timeout, which covers a 1Password prompt plus login and `LIST`/`STATUS`.
+- Once the first account connects, its Inbox opens automatically. `enter` on a sidebar folder opens that folder instead. Opening a folder loads its newest 200 summaries; the list pane shows "N messages loaded." until T10, and responses for a folder that's no longer open are dropped.
+- Folder labels are "Inbox" or the last part of the path (`[Gmail]/Sent Mail` → "Sent Mail"). Role order is Inbox, Drafts, Sent, Archive, All Mail, Trash, Junk, then the rest alphabetically.
+- The sidebar shows up to 6 wrapped lines of a connect error, and the status line shows `Account: error`. Errors stay in the status line until the next key press; progress messages don't replace them.
+- `Model.Close()` closes every mailbox (IMAP LOGOUT) after the program exits.
 
 **Dependencies:** T8, T5
 **Files:** `internal/ui/sidebar/sidebar.go`, `internal/ui/sidebar/sidebar_test.go`, `internal/ui/model.go`, `internal/ui/accounts.go`

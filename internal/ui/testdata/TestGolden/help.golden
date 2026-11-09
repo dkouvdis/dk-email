@@ -1,13 +1,13 @@
 ╭──────────────────────╮╭───────────────────────────────╮╭─────────────────────────────────────────────────────────────╮
-│ Folders              ││ Threads      ╭───────────────────────────────────────╮                                       │
-│                      ││              │ Keys                       esc close  │                                       │
-│ ▸ Personal           ││ Threads appea│                                       │                                       │
-│   not connected      ││              │ Navigation                          ┃ │                                       │
-│ ▸ Work               ││              │   k/↑         up                    ┃ │                                       │
-│   not connected      ││              │   j/↓         down                  ┃ │                                       │
-│                      ││              │   g           top                   ┃ │                                       │
-│                      ││              │   G           bottom                ┃ │                                       │
-│                      ││              │   h/←         left pane             ┃ │                                       │
+│ Personal             ││ Threads      ╭───────────────────────────────────────╮                                       │
+│ ▶ Inbox            2 ││              │ Keys                       esc close  │                                       │
+│   Sent Mail          ││ 3 messages lo│                                       │                                       │
+│   All Mail           ││              │ Navigation                          ┃ │                                       │
+│   Receipts         1 ││              │   k/↑         up                    ┃ │                                       │
+│                      ││              │   j/↓         down                  ┃ │                                       │
+│ Work                 ││              │   g           top                   ┃ │                                       │
+│   Inbox            1 ││              │   G           bottom                ┃ │                                       │
+│   Archive            ││              │   h/←         left pane             ┃ │                                       │
 │                      ││              │   l/→         right pane            ┃ │                                       │
 │                      ││              │   tab         next pane             ┃ │                                       │
 │                      ││              │   shift+tab   previous pane         ┃ │                                       │

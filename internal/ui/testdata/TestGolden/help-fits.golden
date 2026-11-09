@@ -1,13 +1,13 @@
 ╭──────────────────────╮╭───────────────────────────────╮╭─────────────────────────────────────────────────────────────╮
-│ Folders              ││ Threads                       ││ Message                                                     │
-│                      ││                               ││                                                             │
-│ ▸ Personal           ││ Threads appear here once a f… ││ No message selected.                                        │
-│   not connected      ││                               ││                                                             │
-│ ▸ Work               ││                               ││                                                             │
-│   not connected      ││               ╭──────────────────────────────────────╮                                       │
-│                      ││               │ Keys                      esc close  │                                       │
-│                      ││               │                                      │                                       │
-│                      ││               │ Navigation                           │                                       │
+│ Personal             ││ Threads                       ││ Message                                                     │
+│ ▶ Inbox            2 ││                               ││                                                             │
+│   Sent Mail          ││ 3 messages loaded.            ││ No message selected.                                        │
+│   All Mail           ││                               ││                                                             │
+│   Receipts         1 ││                               ││                                                             │
+│                      ││               ╭──────────────────────────────────────╮                                       │
+│ Work                 ││               │ Keys                      esc close  │                                       │
+│   Inbox            1 ││               │                                      │                                       │
+│   Archive            ││               │ Navigation                           │                                       │
 │                      ││               │   k/↑         up                     │                                       │
 │                      ││               │   j/↓         down                   │                                       │
 │                      ││               │   g           top                    │                                       │
