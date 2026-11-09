@@ -258,5 +258,32 @@ func (c *Client) loginError(err error) error {
 	if c.password != "" {
 		text = strings.ReplaceAll(text, c.password, "***")
 	}
-	return fmt.Errorf("login to account %q failed: %s", c.acct.Name, text)
+	msg := fmt.Sprintf("login to account %q failed: %s", c.acct.Name, text)
+	if hint := loginHint(c.acct.IMAPHost, serverErr.Code, text); hint != "" {
+		msg += ". Hint: " + hint
+	}
+	return errors.New(msg)
+}
+
+// loginHint returns actionable advice for known Gmail login failures, or "".
+func loginHint(host string, code goimap.ResponseCode, text string) string {
+	lower := strings.ToLower(text)
+	switch {
+	case strings.Contains(lower, "application-specific password required"):
+		return "Gmail requires an app password when 2-Step Verification is on. " +
+			"Create one at https://myaccount.google.com/apppasswords, store it in 1Password, " +
+			"and point password_cmd at it (passkeys can't be used for IMAP)"
+	case isGmailHost(host) && (strings.EqualFold(string(code), string(goimap.ResponseCodeAuthenticationFailed)) ||
+		strings.Contains(lower, "invalid credentials")):
+		return "For Gmail use an app password from https://myaccount.google.com/apppasswords, " +
+			"not your Google password. Google Workspace (work/school) accounts don't allow app passwords " +
+			"and need OAuth, which dk-email doesn't support yet"
+	case strings.Contains(lower, "web login required"):
+		return "sign in to this account once in a web browser to clear Google's security check, then retry"
+	}
+	return ""
+}
+
+func isGmailHost(host string) bool {
+	return strings.EqualFold(host, "imap.gmail.com") || strings.EqualFold(host, "imap.googlemail.com")
 }

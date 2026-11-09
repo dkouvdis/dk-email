@@ -183,6 +183,9 @@ func TestDial_RejectsBadPasswordWithClearError(t *testing.T) {
 			if strings.Contains(msg, wrong) {
 				t.Errorf("error %q contains the password", msg)
 			}
+			if strings.Contains(msg, "Hint:") {
+				t.Errorf("error %q has a Gmail hint for a non-Gmail host", msg)
+			}
 		})
 	}
 }
@@ -210,6 +213,66 @@ func TestLoginError_RedactsPasswordEchoedByServer(t *testing.T) {
 	}
 	if want := `login to account "Personal" failed: bad login for ***`; got != want {
 		t.Errorf("loginError() = %q, want %q", got, want)
+	}
+}
+
+func TestLoginError_AppendsHintAfterMessageWithoutPassword(t *testing.T) {
+	c := New(config.Account{Name: "Personal", IMAPHost: "imap.gmail.com"}, "hunter2")
+	serverErr := &goimap.Error{
+		Type: goimap.StatusResponseTypeNo,
+		Code: goimap.ResponseCodeAuthenticationFailed,
+		Text: "Invalid credentials hunter2",
+	}
+
+	got := c.loginError(serverErr).Error()
+
+	if strings.Contains(got, "hunter2") {
+		t.Errorf("loginError() = %q, contains the password", got)
+	}
+	prefix := `login to account "Personal" failed: Invalid credentials ***. Hint: For Gmail use an app password`
+	if !strings.HasPrefix(got, prefix) {
+		t.Errorf("loginError() = %q, want prefix %q", got, prefix)
+	}
+}
+
+func TestLoginHint(t *testing.T) {
+	const (
+		appPasswordHint = "Gmail requires an app password when 2-Step Verification is on. " +
+			"Create one at https://myaccount.google.com/apppasswords, store it in 1Password, " +
+			"and point password_cmd at it (passkeys can't be used for IMAP)"
+		gmailHint = "For Gmail use an app password from https://myaccount.google.com/apppasswords, " +
+			"not your Google password. Google Workspace (work/school) accounts don't allow app passwords " +
+			"and need OAuth, which dk-email doesn't support yet"
+		webLoginHint = "sign in to this account once in a web browser to clear Google's security check, then retry"
+	)
+	tests := []struct {
+		name string
+		host string
+		code goimap.ResponseCode
+		text string
+		want string
+	}{
+		{"app password required on Gmail", "imap.gmail.com", "", "Application-specific password required: https://support.google.com/accounts/answer/185833 (Failure)", appPasswordHint},
+		{"app password required on any host", "mail.example.com", "ALERT", "Application-specific password required", appPasswordHint},
+		{"app password text is case-insensitive", "mail.example.com", "", "APPLICATION-SPECIFIC PASSWORD REQUIRED", appPasswordHint},
+		{"app password wins over invalid credentials", "imap.gmail.com", goimap.ResponseCodeAuthenticationFailed, "Invalid credentials: Application-specific password required", appPasswordHint},
+		{"Gmail with authentication failed code", "imap.gmail.com", goimap.ResponseCodeAuthenticationFailed, "Authentication failed", gmailHint},
+		{"Gmail with invalid credentials text", "imap.gmail.com", "", "Invalid credentials (Failure)", gmailHint},
+		{"Googlemail host", "imap.googlemail.com", goimap.ResponseCodeAuthenticationFailed, "nope", gmailHint},
+		{"Gmail host is case-insensitive", "IMAP.Gmail.COM", "", "invalid CREDENTIALS", gmailHint},
+		{"non-Gmail host with invalid credentials", "mail.example.com", "", "Invalid credentials", ""},
+		{"non-Gmail host with authentication failed code", "mail.example.com", goimap.ResponseCodeAuthenticationFailed, "Authentication failed", ""},
+		{"Gmail host with unrelated failure", "imap.gmail.com", "", "Too many simultaneous connections", ""},
+		{"web login required", "imap.gmail.com", "WEBALERT", "Web login required.", webLoginHint},
+		{"web login text is case-insensitive", "mail.example.com", "", "WEB LOGIN REQUIRED", webLoginHint},
+		{"no hint otherwise", "mail.example.com", "", "bad login", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := loginHint(tt.host, tt.code, tt.text); got != tt.want {
+				t.Errorf("loginHint(%q, %q, %q) = %q, want %q", tt.host, tt.code, tt.text, got, tt.want)
+			}
+		})
 	}
 }
 
