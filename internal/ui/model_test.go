@@ -313,6 +313,7 @@ func TestGolden(t *testing.T) {
 		{"wide-reading", 140, 24, false, []string{"enter"}},
 		{"narrow", 100, 24, false, nil},
 		{"narrow-picker", 100, 24, false, []string{"a", "j"}},
+		{"wide-move-picker", 140, 24, false, []string{"m"}},
 		{"list", 70, 20, false, nil},
 		{"list-reader-popup", 70, 24, false, []string{"enter"}},
 		{"help", 120, 30, false, []string{"?"}},

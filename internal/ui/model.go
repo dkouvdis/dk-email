@@ -76,6 +76,8 @@ type Model struct {
 	// readerPopup shows the reader in a popup over the list (list mode).
 	readerPopup bool
 	picker      popup.Picker[pick]
+	// moveTargets is set while the picker chooses where to move them.
+	moveTargets []mail.Summary
 	status      string
 	statusErr   bool
 }
@@ -301,7 +303,7 @@ func (m *Model) closeTopPopup() bool {
 	case m.showHelp:
 		m.showHelp, name = false, "help"
 	case m.showPicker:
-		m.showPicker, name = false, "picker"
+		m.showPicker, m.moveTargets, name = false, nil, "picker"
 	case m.readerPopup:
 		m.readerPopup, name = false, "reader"
 	default:

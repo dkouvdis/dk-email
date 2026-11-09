@@ -197,6 +197,12 @@ func (m Model) AdjustUnread(account int, name string, delta int) Model {
 	return m
 }
 
+// Role is a folder's role, or RoleNone if it isn't known.
+func (m Model) Role(account int, name string) mail.Role {
+	f, _ := m.Folder(account, name)
+	return f.Role
+}
+
 // Folder looks up a folder by account and name.
 func (m Model) Folder(account int, name string) (mail.Folder, bool) {
 	if account < 0 || account >= len(m.accounts) {

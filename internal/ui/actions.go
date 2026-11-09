@@ -11,6 +11,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/dkouvdis/dk-email/internal/mail"
+	"github.com/dkouvdis/dk-email/internal/ui/sidebar"
 )
 
 const moveTimeout = 60 * time.Second
@@ -33,7 +34,8 @@ type moveMsg struct {
 	uids     []mail.UID
 	removed  []mail.Summary
 	unread   int
-	verb     string // "archive" or "delete", for messages
+	verb     string // "archive", "delete" or "move", for messages
+	label    string // the destination's display name
 	err      error
 }
 
@@ -55,9 +57,9 @@ func moveMessages(mb mail.Mailbox, msg moveMsg) tea.Cmd {
 	}
 }
 
-// isTriageKey reports the u/s/e/d keys.
+// isTriageKey reports the u/s/e/d/m keys.
 func (m Model) isTriageKey(msg tea.KeyPressMsg) bool {
-	return key.Matches(msg, m.keys.ToggleRead, m.keys.Star, m.keys.Archive, m.keys.Delete)
+	return key.Matches(msg, m.keys.ToggleRead, m.keys.Star, m.keys.Archive, m.keys.Delete, m.keys.Move)
 }
 
 // triage runs u, s, e or d on the target messages: the whole thread on a
@@ -82,6 +84,8 @@ func (m Model) triage(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m.moveTo(targets, "archive")
 	case key.Matches(msg, m.keys.Delete):
 		return m.moveTo(targets, "delete")
+	case key.Matches(msg, m.keys.Move):
+		return m.openMovePicker(targets)
 	}
 	return m, nil
 }
@@ -207,11 +211,22 @@ func (m Model) moveTo(targets []mail.Summary, verb string) (Model, tea.Cmd) {
 	case to == from:
 		m.setStatus("Already in Trash; dk-email never deletes mail permanently.")
 		return m, nil
-	case m.boxes[account] == nil:
+	}
+	label := to
+	if f, ok := m.side.Folder(account, to); ok {
+		label = sidebar.Label(f)
+	}
+	return m.startMove(targets, to, label, verb)
+}
+
+// startMove removes targets from the UI at once and moves them to the
+// folder to on the server in the background.
+func (m Model) startMove(targets []mail.Summary, to, label, verb string) (Model, tea.Cmd) {
+	account, from := m.open.account, m.open.folder
+	if m.boxes[account] == nil || to == from {
 		return m, nil
 	}
-
-	msg := moveMsg{account: account, from: from, to: to, verb: verb, removed: targets}
+	msg := moveMsg{account: account, from: from, to: to, verb: verb, label: label, removed: targets}
 	for _, s := range targets {
 		msg.uids = append(msg.uids, s.UID)
 		if !s.Seen {
@@ -228,13 +243,17 @@ func (m Model) moveTo(targets []mail.Summary, verb string) (Model, tea.Cmd) {
 	}
 	m.side = m.side.AdjustUnread(account, from, -msg.unread)
 	m.setStatus(progressive(verb) + "…")
-	m.log.Debug("move", "verb", verb, "count", len(msg.uids))
+	m.log.Debug("move", "verb", verb, "count", len(msg.uids), "role", m.side.Role(account, to))
 	return m, moveMessages(m.boxes[account], msg)
 }
 
 func (m Model) handleMove(msg moveMsg) (Model, tea.Cmd) {
 	if msg.err == nil {
-		m.setStatus(fmt.Sprintf("%s %s.", past(msg.verb), plural(len(msg.uids), "message")))
+		done := fmt.Sprintf("%s %s", past(msg.verb), plural(len(msg.uids), "message"))
+		if msg.verb == "move" {
+			done += " to " + msg.label
+		}
+		m.setStatus(done + ".")
 		return m, nil
 	}
 	if m.open.account == msg.account && m.open.folder == msg.from {
@@ -249,15 +268,21 @@ func (m Model) handleMove(msg moveMsg) (Model, tea.Cmd) {
 }
 
 func progressive(verb string) string {
-	if verb == "archive" {
+	switch verb {
+	case "archive":
 		return "Archiving"
+	case "move":
+		return "Moving"
 	}
 	return "Deleting"
 }
 
 func past(verb string) string {
-	if verb == "archive" {
+	switch verb {
+	case "archive":
 		return "Archived"
+	case "move":
+		return "Moved"
 	}
 	return "Deleted"
 }

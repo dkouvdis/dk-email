@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/x/ansi"
+
 	"github.com/dkouvdis/dk-email/internal/mail"
 	"github.com/dkouvdis/dk-email/internal/mail/mailtest"
 )
@@ -248,5 +250,113 @@ func TestTriage_IgnoredInSidebarAndWhileLoading(t *testing.T) {
 	m = next
 	if next2, cmd := m.Update(press("d")); cmd != nil || len(next2.(Model).status) > 0 && next2.(Model).statusErr {
 		t.Error("d acted while the folder was loading")
+	}
+}
+
+func TestMove_PickerListsOtherFoldersOfThisAccountOnly(t *testing.T) {
+	m := started(t, newFixture(), 160, 30)
+
+	m = pressSettled(t, m, "m")
+
+	if !m.showPicker {
+		t.Fatal("m didn't open the picker")
+	}
+	v := ansi.Strip(m.picker.View())
+	for _, want := range []string{"Move 2 messages to", "Sent Mail", "All Mail", "Trash", "Receipts"} {
+		if !strings.Contains(v, want) {
+			t.Errorf("picker missing %q:\n%s", want, v)
+		}
+	}
+	if strings.Contains(v, "Work") || strings.Contains(v, "Archive") || strings.Contains(v, "Inbox") {
+		t.Errorf("picker lists another account's folder or the current one:\n%s", v)
+	}
+}
+
+func TestMove_ThreadToChosenFolder(t *testing.T) {
+	f := newFixture()
+	m := started(t, f, 160, 30)
+
+	// Sent Mail, All Mail, Trash, Receipts.
+	for _, k := range []string{"m", "j", "j", "j"} {
+		m = pressSettled(t, m, k)
+	}
+	next, cmd := m.Update(press("enter"))
+	m = next.(Model)
+	if m.showPicker || strings.Contains(plain(m), "Re: Plan") {
+		t.Errorf("picker open %v, or the thread wasn't removed at once:\n%s", m.showPicker, plain(m))
+	}
+	m = settle(t, m, cmd)
+
+	if c := lastCall(t, f.personal, mailtest.MethodMove); c.To != "Receipts" || !slices.Equal(c.UIDs, []mail.UID{1, 3}) {
+		t.Errorf("Move = %+v, want UIDs 1 and 3 to Receipts", c)
+	}
+	if got := subjects(f.personal, "Receipts"); len(got) != 3 {
+		t.Errorf("Receipts holds %v, want the receipt plus the Plan thread", got)
+	}
+	if m.status != "Moved 2 messages to Receipts." || unread(m, "INBOX") != 1 {
+		t.Errorf("status %q, unread %d", m.status, unread(m, "INBOX"))
+	}
+}
+
+func TestMove_MessageScopeAndEscCancels(t *testing.T) {
+	f := newFixture()
+	m := started(t, f, 160, 30)
+	m = pressSettled(t, m, "space")
+	m = pressSettled(t, m, "j") // Alice's message only
+
+	m = pressSettled(t, m, "m")
+	if !strings.Contains(plain(m), "Move 1 message to") {
+		t.Errorf("picker title wrong:\n%s", plain(m))
+	}
+	m = pressSettled(t, m, "esc")
+	if m.showPicker || m.moveTargets != nil || len(calls(f.personal, mailtest.MethodMove)) != 0 {
+		t.Fatal("esc should close the picker without moving")
+	}
+
+	m = pressSettled(t, m, "m")
+	m = pressSettled(t, m, "enter") // Sent Mail
+	if c := lastCall(t, f.personal, mailtest.MethodMove); c.To != "[Gmail]/Sent Mail" || !slices.Equal(c.UIDs, []mail.UID{1}) {
+		t.Errorf("Move = %+v, want UID 1 to Sent Mail", c)
+	}
+	if !strings.Contains(plain(m), "Re: Plan") || strings.Contains(plain(m), "Re: Plan (2)") {
+		t.Errorf("the thread should remain with one message:\n%s", plain(m))
+	}
+}
+
+func TestMove_FailureRollsBack(t *testing.T) {
+	f := newFixture()
+	f.personal.Fail(mailtest.MethodMove, errors.New("MOVE refused"))
+	m := started(t, f, 160, 30)
+
+	for _, k := range []string{"m", "enter"} {
+		m = pressSettled(t, m, k)
+	}
+
+	if !strings.Contains(plain(m), "Re: Plan (2)") || m.status != "move: MOVE refused" {
+		t.Errorf("status %q, view:\n%s", m.status, plain(m))
+	}
+}
+
+func TestMove_FromReaderPopup(t *testing.T) {
+	f := newFixture()
+	m := started(t, f, 70, 24)
+	m = pressSettled(t, m, "enter") // popup on Bob's message (3)
+
+	m = pressSettled(t, m, "m")
+	if !m.showPicker || !m.readerPopup || !strings.Contains(plain(m), "Move 1 message to") {
+		t.Fatalf("m in the popup: picker %v, reader popup %v", m.showPicker, m.readerPopup)
+	}
+	m = pressSettled(t, m, "q") // closes the picker only
+	if m.showPicker || !m.readerPopup {
+		t.Fatal("q should close the move picker and keep the reader popup")
+	}
+	for _, k := range []string{"m", "G", "enter"} { // last folder: Receipts
+		m = pressSettled(t, m, k)
+	}
+	if c := lastCall(t, f.personal, mailtest.MethodMove); c.To != "Receipts" || !slices.Equal(c.UIDs, []mail.UID{3}) {
+		t.Errorf("Move = %+v, want UID 3 to Receipts", c)
+	}
+	if !m.readerPopup || m.read.Current() != 1 {
+		t.Errorf("popup %v current %d; want Alice's message still shown", m.readerPopup, m.read.Current())
 	}
 }

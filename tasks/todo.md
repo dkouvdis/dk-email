@@ -495,11 +495,16 @@ Every task also meets the standing bar before it counts as done:
 
 **Acceptance criteria:**
 
-- [ ] The picker shows only the current account's folders. A completed move removes the thread from the list, and `esc` cancels.
+- [x] The picker shows only the current account's folders. A completed move removes the thread from the list, and `esc` cancels.
 
 **Verification:**
 
-- [ ] `go test -race ./internal/ui/...` passes.
+- [x] `go test -race ./internal/ui/...` passes (stable over 3 runs; golden `wide-move-picker`).
+
+**Notes:**
+
+- `m` uses the same targets as T17 (collapsed thread, expanded message row, or the reader's current message) and works in the list, reader and reader popup. The picker is titled "Move N messages to", lists the open account's folders except the current one, and `esc` or `q` closes it without moving.
+- Choosing a folder runs T17's optimistic move (`startMove`): removed at once, restored with `move: …` on failure. The status line ends with "Moved N messages to <folder>." As with archive, only the source folder's unread count changes until T19 refreshes.
 
 **Dependencies:** T17
 **Files:** `internal/ui/actions.go`, `internal/ui/popup/picker.go`, `internal/ui/actions_test.go`
