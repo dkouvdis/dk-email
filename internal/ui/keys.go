@@ -1,6 +1,10 @@
 package ui
 
-import "charm.land/bubbles/v2/key"
+import (
+	"charm.land/bubbles/v2/key"
+
+	"github.com/dkouvdis/dk-email/internal/ui/popup"
+)
 
 // KeyMap is the fixed v1 keymap from the spec.
 type KeyMap struct {
@@ -46,13 +50,13 @@ func DefaultKeyMap() KeyMap {
 	}
 }
 
-// FullHelp groups every key for the ? popup.
-func (k KeyMap) FullHelp() [][]key.Binding {
-	return [][]key.Binding{
-		{k.Up, k.Down, k.Top, k.Bottom, k.Open, k.Expand},
-		{k.NextPane, k.PrevPane, k.Left, k.Right, k.Picker, k.ToggleView},
-		{k.ToggleRead, k.Star, k.Archive, k.Delete, k.Move, k.Refresh},
-		{k.Connect, k.Help, k.Back, k.Quit},
+// HelpSections groups every key for the ? popup.
+func (k KeyMap) HelpSections() []popup.Section {
+	return []popup.Section{
+		{Title: "Navigation", Keys: []key.Binding{k.Up, k.Down, k.Top, k.Bottom, k.Left, k.Right, k.NextPane, k.PrevPane}},
+		{Title: "Threads", Keys: []key.Binding{k.Open, k.Expand, k.ToggleRead, k.Star, k.Archive, k.Delete, k.Move, k.Refresh}},
+		{Title: "Accounts & view", Keys: []key.Binding{k.Picker, k.Connect, k.ToggleView}},
+		{Title: "General", Keys: []key.Binding{k.Help, k.Back, k.Quit}},
 	}
 }
 

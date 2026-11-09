@@ -46,13 +46,13 @@ func (p Pane) String() string {
 }
 
 type Model struct {
-	ui       config.UI
-	accounts []string
-	log      *slog.Logger
-	keys     KeyMap
-	styles   styles
-	help     help.Model
-
+	ui            config.UI
+	accounts      []string
+	log           *slog.Logger
+	keys          KeyMap
+	styles        styles
+	help          help.Model
+	helpPop       popup.Help
 	width, height int
 	mode          Mode
 	panes         Panes
@@ -74,13 +74,15 @@ func New(cfg config.Config, log *slog.Logger) Model {
 	for _, a := range cfg.Accounts {
 		accounts = append(accounts, a.Name)
 	}
+	keys := DefaultKeyMap()
 	m := Model{
 		ui:       cfg.UI,
 		accounts: accounts,
 		log:      log,
-		keys:     DefaultKeyMap(),
+		keys:     keys,
 		styles:   defaultStyles(),
 		help:     help.New(),
+		helpPop:  popup.NewHelp(keys.HelpSections()),
 		mode:     mode,
 		focus:    PaneList,
 	}
@@ -114,6 +116,7 @@ func (m *Model) resize(w, h int) {
 
 func (m *Model) relayout() {
 	m.panes = Layout(m.width, m.height, m.mode, m.ui)
+	m.helpPop.SetSize(m.panes.Popup.W, m.panes.Popup.H)
 	if !slices.Contains(m.visiblePanes(), m.focus) {
 		m.focus = PaneList
 	}
@@ -138,13 +141,16 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if key.Matches(msg, m.keys.Back, m.keys.Help) {
 			m.showHelp = false
 			m.log.Debug("popup closed", "popup", "help")
+			return m, nil
 		}
+		m.helpPop = m.helpPop.Update(msg)
 		return m, nil
 	}
 
 	switch {
 	case key.Matches(msg, m.keys.Help):
 		m.showHelp = true
+		m.helpPop.Reset()
 		m.log.Debug("popup opened", "popup", "help")
 	case key.Matches(msg, m.keys.NextPane):
 		m.moveFocus(1, true)
@@ -220,10 +226,13 @@ func (m Model) render() string {
 	)
 
 	if m.showHelp {
-		if pop := popup.Help(m.keys.FullHelp(), p.Popup.W, p.Popup.H); pop != "" {
+		if pop := m.helpPop.View(); pop != "" {
+			body := m.height - footerRows
+			x := max((m.width-lipgloss.Width(pop))/2, 0)
+			y := max((body-lipgloss.Height(pop))/2, 0)
 			screen = lipgloss.NewCompositor(
 				lipgloss.NewLayer(screen),
-				lipgloss.NewLayer(pop).X(p.Popup.X).Y(p.Popup.Y).Z(1),
+				lipgloss.NewLayer(pop).X(x).Y(y).Z(1),
 			).Render()
 		}
 	}

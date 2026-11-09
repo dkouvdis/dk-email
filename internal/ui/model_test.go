@@ -205,7 +205,7 @@ func TestModel_HintBarAlwaysFitsAndEndsWithHelpAndQuit(t *testing.T) {
 
 func TestModel_HelpPopup(t *testing.T) {
 	m := send(t, New(testConfig(), nil), size(120, 30), press("?"))
-	if !m.showHelp || !strings.Contains(plain(m), "esc or ? to close") {
+	if !m.showHelp || !strings.Contains(plain(m), "esc close") {
 		t.Fatal("? didn't open the help popup")
 	}
 
@@ -214,9 +214,18 @@ func TestModel_HelpPopup(t *testing.T) {
 		t.Error("keys leaked through the help popup")
 	}
 
+	m = send(t, m, press("G"))
+	if v := plain(m); !strings.Contains(v, "General") || strings.Contains(v, "Navigation") {
+		t.Errorf("G didn't scroll the help popup to the bottom:\n%s", v)
+	}
+	m = send(t, m, press("esc"), press("?"))
+	if v := plain(m); !strings.Contains(v, "Navigation") {
+		t.Errorf("reopened help popup isn't scrolled back to the top:\n%s", v)
+	}
+
 	for _, k := range []string{"esc", "?"} {
 		m = send(t, m, press("?"), press(k))
-		if m.showHelp || strings.Contains(plain(m), "esc or ? to close") {
+		if m.showHelp || strings.Contains(plain(m), "esc close") {
 			t.Errorf("%s didn't close the help popup", k)
 		}
 	}
@@ -287,6 +296,8 @@ func TestGolden(t *testing.T) {
 		{"narrow", 100, 24, nil},
 		{"list", 70, 20, nil},
 		{"help", 120, 30, []string{"?"}},
+		{"help-scrolled", 120, 30, []string{"?", "G"}},
+		{"help-fits", 120, 50, []string{"?"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

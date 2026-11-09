@@ -1,0 +1,30 @@
+╭──────────────────────╮╭───────────────────────────────╮╭─────────────────────────────────────────────────────────────╮
+│ Folders              ││ Threads      ╭───────────────────────────────────────╮                                       │
+│                      ││              │ Keys                       esc close  │                                       │
+│ ▸ Personal           ││ Threads appea│                                       │                                       │
+│   not connected      ││              │ Threads                               │                                       │
+│ ▸ Work               ││              │   enter       open                    │                                       │
+│   not connected      ││              │   space       expand                  │                                       │
+│                      ││              │   u           read/unread             │                                       │
+│                      ││              │   s           star                    │                                       │
+│                      ││              │   e           archive                 │                                       │
+│                      ││              │   d           delete                  │                                       │
+│                      ││              │   m           move                  ┃ │                                       │
+│                      ││              │   r           refresh               ┃ │                                       │
+│                      ││              │                                     ┃ │                                       │
+│                      ││              │ Accounts & view                     ┃ │                                       │
+│                      ││              │   a           accounts              ┃ │                                       │
+│                      ││              │   A           connect account       ┃ │                                       │
+│                      ││              │   v           split/list            ┃ │                                       │
+│                      ││              │                                     ┃ │                                       │
+│                      ││              │ General                             ┃ │                                       │
+│                      ││              │   ?           help                  ┃ │                                       │
+│                      ││              │   esc         back                  ┃ │                                       │
+│                      ││              │   q           quit                  ┃ │                                       │
+│                      ││              │                                       │                                       │
+│                      ││              │ scroll j/k/↑↓/pgup/pgdn · close esc/? │                                       │
+│                      ││              ╰───────────────────────────────────────╯                                       │
+│                      ││                               ││                                                             │
+╰──────────────────────╯╰───────────────────────────────╯╰─────────────────────────────────────────────────────────────╯
+                                                                                                                    wide
+k/↑ up • j/↓ down • enter open • space expand • u read/unread • s star • e archive • d delete • … • ? help • q quit

@@ -1,29 +1,29 @@
 ╭──────────────────────╮╭───────────────────────────────╮╭─────────────────────────────────────────────────────────────╮
-│ Fold╭──────────────────────────────────────────────────────────────────────────────────────────────────────────╮     │
-│     │ Keys                                                                                                     │     │
-│ ▸ Pe│                                                                                                          │     │
-│   no│ k/↑   up       tab       next pane       u read/unread   A   connect account                             │     │
-│ ▸ Wo│ j/↓   down     shift+tab previous pane   s star          ?   help                                        │     │
-│   no│ g     top      h/←       left pane       e archive       esc back                                        │     │
-│     │ G     bottom   l/→       right pane      d delete        q   quit                                        │     │
-│     │ enter open     a         accounts        m move                                                          │     │
-│     │ space expand   v         split/list      r refresh                                                       │     │
-│     │                                                                                                          │     │
-│     │                                                                                                          │     │
-│     │                                                                                                          │     │
-│     │                                                                                                          │     │
-│     │                                                                                                          │     │
-│     │                                                                                                          │     │
-│     │                                                                                                          │     │
-│     │                                                                                                          │     │
-│     │                                                                                                          │     │
-│     │                                                                                                          │     │
-│     │                                                                                                          │     │
-│     │                                                                                                          │     │
-│     │                                                                                                          │     │
-│     │                                                                                                          │     │
-│     │ esc or ? to close                                                                                        │     │
-│     ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────╯     │
+│ Folders              ││ Threads      ╭───────────────────────────────────────╮                                       │
+│                      ││              │ Keys                       esc close  │                                       │
+│ ▸ Personal           ││ Threads appea│                                       │                                       │
+│   not connected      ││              │ Navigation                          ┃ │                                       │
+│ ▸ Work               ││              │   k/↑         up                    ┃ │                                       │
+│   not connected      ││              │   j/↓         down                  ┃ │                                       │
+│                      ││              │   g           top                   ┃ │                                       │
+│                      ││              │   G           bottom                ┃ │                                       │
+│                      ││              │   h/←         left pane             ┃ │                                       │
+│                      ││              │   l/→         right pane            ┃ │                                       │
+│                      ││              │   tab         next pane             ┃ │                                       │
+│                      ││              │   shift+tab   previous pane         ┃ │                                       │
+│                      ││              │                                     ┃ │                                       │
+│                      ││              │ Threads                             ┃ │                                       │
+│                      ││              │   enter       open                  ┃ │                                       │
+│                      ││              │   space       expand                  │                                       │
+│                      ││              │   u           read/unread             │                                       │
+│                      ││              │   s           star                    │                                       │
+│                      ││              │   e           archive                 │                                       │
+│                      ││              │   d           delete                  │                                       │
+│                      ││              │   m           move                    │                                       │
+│                      ││              │   r           refresh                 │                                       │
+│                      ││              │                                       │                                       │
+│                      ││              │ scroll j/k/↑↓/pgup/pgdn · close esc/? │                                       │
+│                      ││              ╰───────────────────────────────────────╯                                       │
 │                      ││                               ││                                                             │
 ╰──────────────────────╯╰───────────────────────────────╯╰─────────────────────────────────────────────────────────────╯
                                                                                                                     wide
