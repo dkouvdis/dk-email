@@ -101,11 +101,11 @@ Every task also meets the standing bar before it counts as done:
 **Acceptance criteria:**
 - [x] The memserver integration test logs in, lists seeded folders with the correct roles and counts, and rejects a bad password with a clear error.
 - [x] Every call respects context cancellation and timeouts.
-- [ ] The live test against your Gmail lists `INBOX`, `[Gmail]/All Mail` (role `All`), `[Gmail]/Trash` (role `Trash`) and the others.
+- [x] The live test against your Gmail lists `INBOX`, `[Gmail]/All Mail` (role `All`), the Trash folder (role `Trash`; it's `[Gmail]/Bin` on UK-locale accounts) and the others.
 
 **Verification:**
 - [x] `go test -race ./internal/mail/imap/...` passes (94.7% coverage, stable over 3 runs).
-- [ ] `DK_EMAIL_LIVE_ACCOUNT=Personal go test -tags live -run TestLiveFolders ./internal/mail/imap/ -v` passes. You run this manually.
+- [x] `DK_EMAIL_LIVE_ACCOUNT=Personal go test -tags live -run TestLiveFolders ./internal/mail/imap/ -v` passes. You run this manually. (Passed 2026-11-09: 12 folders, with roles inbox/all/trash/drafts/sent/junk all detected and `[Gmail]/Starred` correctly getting no role. It took 25.6s end to end, including `op read`.)
 
 **Notes:**
 - go-imap v2.0.0-beta.8's `imapmemserver` ignores `CreateOptions.SpecialUse`, so the test server in `server_test.go` overrides `List` to report roles. Only the live check proves real role parsing.
@@ -116,8 +116,8 @@ Every task also meets the standing bar before it counts as done:
 **Scope:** M
 
 ### ✅ Checkpoint 1: Foundation
-- [ ] All tests pass and CI is green.
-- [ ] The live check lists real Gmail folders through `op read`. This proves the go-imap v2 beta works with Gmail.
+- [x] All tests pass locally. (CI runs once the local commits are pushed.)
+- [x] The live check lists real Gmail folders through `op read`. This proves the go-imap v2 beta works with Gmail.
 - [ ] You review before Phase 2.
 
 ---
