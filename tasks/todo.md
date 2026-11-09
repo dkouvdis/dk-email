@@ -122,7 +122,7 @@ Every task also meets the standing bar before it counts as done:
 
 ---
 
-## Phase 2: Read-only client → `v0.1.0-beta.1`
+## Phase 2: Read-only client
 
 ### T6: Threading package
 
@@ -360,35 +360,10 @@ Every task also meets the standing bar before it counts as done:
 **Files:** `internal/ui/model.go`, `internal/ui/popup/overlay.go`, `internal/ui/model_test.go`
 **Scope:** S
 
-### T15: Release pipeline (GoReleaser, `release.yml`, Homebrew cask)
-
-**Description:** Write `.goreleaser.yaml` (`version: 2`) with:
-- builds for darwin and linux on arm64 and amd64 with `CGO_ENABLED=0`, using linker flags for version, commit and date
-- `tar.gz` archives and checksums
-- a changelog grouped by Conventional Commit type
-- `release.prerelease: auto`
-- a `homebrew_casks` entry for `dkouvdis/homebrew-tap` using `HOMEBREW_TAP_GITHUB_TOKEN`, with `skip_upload: auto` and `postflight_steps` that clear the quarantine attribute
-
-Add `release.yml`, triggered by `v*` tags, which runs the tests and then `goreleaser/goreleaser-action`. Add `goreleaser check` to `ci.yml`.
-
-**Acceptance criteria:**
-- [ ] `goreleaser check` passes and the config uses no deprecated keys.
-- [ ] `goreleaser release --snapshot --clean` produces four archives whose binaries print the snapshot version.
-- [ ] Pre-release tags never update the tap (`skip_upload: auto`).
-
-**Verification:**
-- [ ] CI is green, including `goreleaser check`.
-- [ ] Local snapshot build, if `goreleaser` is installed, or a manual run of the workflow on a branch with `--snapshot`.
-
-**Dependencies:** T1, T14 (so the first beta is useful)
-**Prerequisites (yours):** the `dkouvdis/homebrew-tap` repo exists and the `HOMEBREW_TAP_GITHUB_TOKEN` secret is set on `dkouvdis/dk-email`.
-**Files:** `.goreleaser.yaml`, `.github/workflows/release.yml`, `.github/workflows/ci.yml`
-**Scope:** S
-
 ### ✅ Checkpoint 2: Read-only client
 - [ ] All tests pass and CI is green.
 - [ ] Manual check against real Gmail: browse folders and read threads in the wide, narrow and list + popup layouts, across two accounts.
-- [ ] **You approve tagging `v0.1.0-beta.1`.** After it's tagged, a GitHub pre-release with four archives exists and the tap is untouched.
+- [ ] **You review the read-only client.** No tag yet: the release pipeline (T15) moved to Phase 5.
 
 ---
 
@@ -491,7 +466,7 @@ Add `release.yml`, triggered by `v*` tags, which runs the tests and then `gorele
 ### ✅ Checkpoint 3: Triage
 - [ ] All tests pass and CI is green.
 - [ ] Spec success criteria 5–7 are verified on real Gmail.
-- [ ] **You approve tagging `v0.1.0-beta.2`.**
+- [ ] **You review triage.** No tag yet: releases start in Phase 5.
 
 ---
 
@@ -544,6 +519,31 @@ How it behaves:
 
 ## Phase 5: Release v0.1.0
 
+### T15: Release pipeline (GoReleaser, `release.yml`, Homebrew cask)
+
+**Description:** Write `.goreleaser.yaml` (`version: 2`) with:
+- builds for darwin and linux on arm64 and amd64 with `CGO_ENABLED=0`, using linker flags for version, commit and date
+- `tar.gz` archives and checksums
+- a changelog grouped by Conventional Commit type
+- `release.prerelease: auto`
+- a `homebrew_casks` entry for `dkouvdis/homebrew-tap` using `HOMEBREW_TAP_GITHUB_TOKEN`, with `skip_upload: auto` and `postflight_steps` that clear the quarantine attribute
+
+Add `release.yml`, triggered by `v*` tags, which runs the tests and then `goreleaser/goreleaser-action`. Add `goreleaser check` to `ci.yml`.
+
+**Acceptance criteria:**
+- [ ] `goreleaser check` passes and the config uses no deprecated keys.
+- [ ] `goreleaser release --snapshot --clean` produces four archives whose binaries print the snapshot version.
+- [ ] Pre-release tags never update the tap (`skip_upload: auto`).
+
+**Verification:**
+- [ ] CI is green, including `goreleaser check`.
+- [ ] Local snapshot build, if `goreleaser` is installed, or a manual run of the workflow on a branch with `--snapshot`.
+
+**Dependencies:** T1, T21 (moved to Phase 5 at your request: the pipeline lands once the client is feature-complete)
+**Prerequisites (yours):** the `dkouvdis/homebrew-tap` repo exists and the `HOMEBREW_TAP_GITHUB_TOKEN` secret is set on `dkouvdis/dk-email`.
+**Files:** `.goreleaser.yaml`, `.github/workflows/release.yml`, `.github/workflows/ci.yml`
+**Scope:** S
+
 ### T22: README (install, config, keys, quarantine fallback)
 
 **Description:** Write a README covering:
@@ -559,10 +559,11 @@ How it behaves:
 **Verification:**
 - [ ] Manual review.
 
-**Dependencies:** T21
+**Dependencies:** T21, T15 (the README documents the release process)
 **Files:** `README.md`
 **Scope:** XS
 
 ### ✅ Checkpoint 5: v0.1.0
 - [ ] All of spec success criteria 1–9 are met.
+- [ ] **You approve tagging `v0.1.0-beta.1`.** After it's tagged, a GitHub pre-release with four archives exists and the tap is untouched (spec success criterion 9).
 - [ ] **You approve tagging `v0.1.0-rc.1`, then `v0.1.0`.** Afterwards, `brew install dkouvdis/tap/dk-email && dk-email --version` prints `dk-email 0.1.0 (…)`.

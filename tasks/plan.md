@@ -8,7 +8,7 @@ Build the v1 spec as `v0.1.0`: a Go + Bubble Tea terminal client for triaging se
 
 The order follows dependencies:
 1. Start with the riskiest parts: go-imap v2 is a beta library, and Gmail behaves differently from other IMAP servers.
-2. Next, deliver a **read-only client** that's usable against real Gmail. It ships as `v0.1.0-beta.1`.
+2. Next, deliver a **read-only client** that's usable against real Gmail.
 3. Then add triage actions, the in-app account onboarding, and the stable release.
 
 ## Architecture Decisions
@@ -20,7 +20,7 @@ The order follows dependencies:
 - **Optimistic UI for triage actions:** the list updates immediately and rolls back if the server returns an error, which is shown in the status line.
 - **Layout is a pure function** of terminal width and mode (`ui.Layout(width, height, mode) → pane rects`), so the 120 and 80 column breakpoints can be table-tested.
 - **The config is written by appending text, never re-encoded,** to keep the user's comments.
-- **The release pipeline lands at the end of Phase 2,** so betas can be cut as soon as the client can read mail.
+- **The release pipeline lands in Phase 5,** once the client is feature-complete (moved from Phase 2 at your request). The first tag, `v0.1.0-beta.1`, is cut then.
 - **Library APIs are checked against current docs before use.** Bubble Tea v2 and go-imap v2 changed their APIs from v1, so code is written against their current documentation, not remembered v1 patterns.
 
 ## Task List
@@ -36,7 +36,7 @@ The full details for every task are in [todo.md](todo.md).
 
 **Checkpoint 1:** foundation tests pass, and real Gmail folders are listed through `op read`.
 
-### Phase 2: Read-only client → `v0.1.0-beta.1`
+### Phase 2: Read-only client
 - [x] T6: Threading package
 - [x] T7: IMAP `Summaries` with UID paging
 - [x] T8: UI shell (layout engine, hint bar, status line, help, debug log)
@@ -46,9 +46,7 @@ The full details for every task are in [todo.md](todo.md).
 - [x] T12: IMAP `Message` fetch + reader pane + mark read on open
 - [x] T13: Narrow mode header + account/folder picker (`a`)
 - [x] T14: List + popup mode (`v`, forced below 80 columns)
-- [ ] T15: Release pipeline (GoReleaser, `release.yml`, Homebrew cask)
-
-**Checkpoint 2:** read-only use against real Gmail works in all three layouts. You approve, then `v0.1.0-beta.1` is tagged.
+**Checkpoint 2:** read-only use against real Gmail works in all three layouts. You review; no tag yet.
 
 ### Phase 3: Triage
 - [ ] T16: IMAP `SetFlag` + `Move` + archive/Trash folder resolution
@@ -57,7 +55,7 @@ The full details for every task are in [todo.md](todo.md).
 - [ ] T19: Auto-refresh (120s) + `r`
 - [ ] T23: Filter in the `?` help popup (`/`); added after T8 review, lands before the README
 
-**Checkpoint 3:** spec success criteria 5–7 are verified on real Gmail. You approve, then `v0.1.0-beta.2` is tagged.
+**Checkpoint 3:** spec success criteria 5–7 are verified on real Gmail. You review; no tag yet.
 
 ### Phase 4: Account onboarding
 - [ ] T20: Append an account to the config without re-encoding the file
@@ -66,9 +64,10 @@ The full details for every task are in [todo.md](todo.md).
 **Checkpoint 4:** spec success criteria 1–3 are verified.
 
 ### Phase 5: Release v0.1.0
+- [ ] T15: Release pipeline (GoReleaser, `release.yml`, Homebrew cask)
 - [ ] T22: README (install, config, keys, quarantine fallback)
 
-**Checkpoint 5:** all of spec success criteria 1–9 are met. You approve, then `v0.1.0-rc.1` is tagged, followed by `v0.1.0`.
+**Checkpoint 5:** all of spec success criteria 1–9 are met. You approve tagging `v0.1.0-beta.1` (checks that pre-releases skip the tap), then `v0.1.0-rc.1`, then `v0.1.0`.
 
 ## Dependency Graph
 
@@ -81,7 +80,7 @@ T1 ─┬─ T2 ─────────────┬───────�
            ├─ T6 ┼─────┤           └─ T19
            └─ T8 ┴─ T9 ┴─ T10 ─┬─ T13
                                 └─ T14
-T1 ── T15 (needs a runnable binary; lands after T14)
+T1 ── T15 (moved to Phase 5: lands after T21, before the README T22)
 T8 ── T23 (help filter; any time after T8, before T22 so the README covers it)
 ```
 
