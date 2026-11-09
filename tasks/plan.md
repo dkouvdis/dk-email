@@ -42,7 +42,7 @@ The full details for every task are in [todo.md](todo.md).
 - [x] T8: UI shell (layout engine, hint bar, status line, help, debug log)
 - [x] T9: Sidebar with folder selection (wide mode)
 - [x] T10: Thread list (expand/collapse, navigation, paging)
-- [ ] T11: Render package (MIME → text)
+- [x] T11: Render package (MIME → text)
 - [ ] T12: IMAP `Message` fetch + reader pane + mark read on open
 - [ ] T13: Narrow mode header + account/folder picker (`a`)
 - [ ] T14: List + popup mode (`v`, forced below 80 columns)

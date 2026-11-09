@@ -11,6 +11,7 @@ require (
 	github.com/charmbracelet/x/exp/teatest/v2 v2.0.0-20261101151554-27ecf3e4d454
 	github.com/emersion/go-imap/v2 v2.0.0-beta.8
 	github.com/emersion/go-message v0.18.2
+	github.com/k3a/html2text v1.5.1
 	github.com/zalando/go-keyring v0.2.8
 )
 
@@ -34,4 +35,5 @@ require (
 	github.com/xo/terminfo v1.0.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/text v0.14.0 // indirect
 )

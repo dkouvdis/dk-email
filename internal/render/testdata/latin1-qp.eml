@@ -1,0 +1,7 @@
+From: a@example.com
+Subject: Latin-1
+Content-Type: text/plain; charset=ISO-8859-1
+Content-Transfer-Encoding: quoted-printable
+
+Caf=E9 cr=E8me br=FBl=E9e, a long line that is soft=
+ wrapped.

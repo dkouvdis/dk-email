@@ -1,0 +1,8 @@
+From: a@example.com
+Subject: Broken
+Content-Type: multipart/mixed; boundary="never-closed"
+
+--never-closed
+Content-Type: text/plain; charset=utf-8
+
+Text before the end of the world

@@ -1,0 +1,8 @@
+From: News <news@example.com>
+Subject: Weekly digest
+Content-Type: text/html; charset=utf-8
+
+<html><head><style>p { color: red; }</style><script>alert(1)</script></head>
+<body><p>Hello &amp; welcome!</p>
+<p>Read <a href="https://example.com/post">the post</a> today.</p>
+<ul><li>One</li><li>Two</li></ul></body></html>

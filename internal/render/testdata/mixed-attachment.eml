@@ -1,0 +1,28 @@
+From: a@example.com
+Subject: Report
+Content-Type: multipart/mixed; boundary="mix"
+
+--mix
+Content-Type: multipart/alternative; boundary="alt"
+
+--alt
+Content-Type: text/plain; charset=utf-8
+
+Report attached.
+--alt
+Content-Type: text/html; charset=utf-8
+
+<p>Report attached.</p>
+--alt--
+--mix
+Content-Type: application/pdf; name="report.pdf"
+Content-Disposition: attachment; filename="report.pdf"
+Content-Transfer-Encoding: base64
+
+JVBERi0xLjQKJcOkw7zDtsOfCjIgMCBvYmoKPDwvTGVuZ3RoIDMgMCBSPj4Kc3RyZWFtCg==
+--mix
+Content-Type: image/png; name="logo.png"
+Content-Transfer-Encoding: base64
+
+iVBORw0KGgo=
+--mix--

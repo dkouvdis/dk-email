@@ -1,0 +1,13 @@
+Message-ID: <b@example.com>
+In-Reply-To: <a@example.com>
+References: <root@example.com> <a@example.com>
+From: Jane Doe <jane@example.com>
+To: Bob <bob@example.com>, carol@example.com
+Cc: =?UTF-8?Q?Andr=C3=A9?= <andre@example.com>
+Subject: =?UTF-8?B?Q2Fmw6kg4piVIHBsYW5z?=
+Date: Mon, 02 Nov 2026 10:00:00 +0000
+Content-Type: text/plain; charset=utf-8
+
+Hi Bob,
+
+See you at the café.

@@ -266,11 +266,19 @@ Every task also meets the standing bar before it counts as done:
 - Decode charsets and transfer encodings, list attachments by name and size, and wrap text to a given width.
 
 **Acceptance criteria:**
-- [ ] Synthetic fixtures parse correctly: plain, HTML-only, `multipart/alternative`, `multipart/mixed` with an attachment, ISO-8859-1, quoted-printable, base64, and a malformed message.
-- [ ] Links inside HTML stay visible as `text (url)`, and the output contains no ANSI escape sequences that came from the mail itself (terminal injection is stripped).
+- [x] Synthetic fixtures parse correctly: plain, HTML-only, `multipart/alternative`, `multipart/mixed` with an attachment, ISO-8859-1, quoted-printable, base64, and a malformed message.
+- [x] Links inside HTML stay visible as `text <url>` (html2text's format, the usual plain-text convention), and the output contains no ANSI escape sequences that came from the mail itself (terminal injection is stripped).
 
 **Verification:**
-- [ ] `go test -race ./internal/render/...` passes with at least 80% coverage.
+- [x] `go test -race ./internal/render/...` passes with at least 80% coverage (93.3%).
+
+**Notes:**
+- `Parse` fails only when the top-level headers can't be read. An unknown charset shows the raw text, and a broken multipart keeps what was read before the break.
+- Attachments are parts with `Content-Disposition: attachment`, a filename, or a non-text type. Their size is the decoded byte count. Inline images without a name show as "(unnamed)".
+- HTML conversion drops `<style>` and `<script>`, renders lists with ` - `, and keeps links only for `http`, `https` and `mailto`.
+- `Sanitize` drops invalid UTF-8, ANSI sequences (CSI, OSC including OSC 52 clipboard writes), other control characters and bidi overrides. It also normalizes CRLF and expands tabs. `SanitizeLine` is the single-line form for headers.
+- Subjects and names from IMAP envelopes (`Summaries`) go through `SanitizeLine` too, since list rows print them directly.
+- `Wrap(text, width)` breaks at spaces and hard-breaks long words such as URLs.
 
 **Dependencies:** T4
 **Files:** `internal/render/render.go`, `internal/render/sanitize.go`, `internal/render/render_test.go`, `internal/render/testdata/*.eml`

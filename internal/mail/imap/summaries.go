@@ -16,6 +16,7 @@ import (
 	"github.com/emersion/go-message/textproto"
 
 	"github.com/dkouvdis/dk-email/internal/mail"
+	"github.com/dkouvdis/dk-email/internal/render"
 )
 
 // Summaries returns up to limit messages with UIDs below before (0 means
@@ -140,7 +141,7 @@ func newSummary(m *imapclient.FetchMessageBuffer) mail.Summary {
 		for _, a := range env.To {
 			s.To = append(s.To, newAddress(a))
 		}
-		s.Subject = env.Subject
+		s.Subject = render.SanitizeLine(env.Subject)
 		if !env.Date.IsZero() {
 			s.Date = env.Date
 		}
@@ -150,8 +151,9 @@ func newSummary(m *imapclient.FetchMessageBuffer) mail.Summary {
 	return s
 }
 
+// newAddress sanitizes as well, since list rows print names directly.
 func newAddress(a goimap.Address) mail.Address {
-	return mail.Address{Name: a.Name, Email: a.Addr()}
+	return mail.Address{Name: render.SanitizeLine(a.Name), Email: render.SanitizeLine(a.Addr())}
 }
 
 // parseReferences reads message ids from a fetched References header. A

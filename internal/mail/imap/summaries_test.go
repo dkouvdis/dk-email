@@ -292,3 +292,29 @@ func TestParseReferences(t *testing.T) {
 		})
 	}
 }
+
+func TestSummaries_StripsTerminalEscapesFromEnvelope(t *testing.T) {
+	srv := startServer(t, modeImplicit, capsListStatus)
+	srv.createMailbox(t, "Evil")
+	srv.appendRaw(t, "Evil", "From: Mallory <m@example.com>\nSubject: Hi\x1b]0;pwned\x07 there\n\nbody\n", base(1))
+	c := srv.newClient(t, modeImplicit)
+
+	got, err := c.Summaries(timeoutCtx(t, 10*time.Second), "Evil", 0, 10)
+
+	if err != nil || len(got) != 1 {
+		t.Fatalf("Summaries() = %v, %v", got, err)
+	}
+	if got[0].Subject != "Hi there" || got[0].From.Name != "Mallory" {
+		t.Errorf("subject %q, from %q; want escapes stripped", got[0].Subject, got[0].From.Name)
+	}
+}
+
+// memserver drops addresses whose names hold control characters, so names
+// are checked here rather than end to end.
+func TestNewAddress_StripsTerminalEscapes(t *testing.T) {
+	got := newAddress(goimap.Address{Name: "Mal\x1b[31mlory\u202e", Mailbox: "m\x07", Host: "example.com"})
+
+	if got != (mail.Address{Name: "Mallory", Email: "m@example.com"}) {
+		t.Errorf("newAddress = %+v, want escapes stripped", got)
+	}
+}

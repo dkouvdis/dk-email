@@ -1,0 +1,13 @@
+From: a@example.com
+Subject: Both
+Content-Type: multipart/alternative; boundary="alt"
+
+--alt
+Content-Type: text/plain; charset=utf-8
+
+Plain version wins.
+--alt
+Content-Type: text/html; charset=utf-8
+
+<p>HTML version loses.</p>
+--alt--
