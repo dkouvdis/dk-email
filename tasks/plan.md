@@ -32,7 +32,7 @@ The full details for every task are in [todo.md](todo.md).
 - [x] T2: Config loading, paths, and the config-folder `.gitignore`
 - [x] T3: Password resolution (`password_cmd` and keychain)
 - [x] T4: Mail domain types, the `Mailbox` interface, and a fake
-- [ ] T5: IMAP connect + `Folders` (memserver tests + live read-only Gmail check)
+- [ ] T5: IMAP connect + `Folders` (memserver tests + live read-only Gmail check). Code and tests are done; your live check is pending.
 
 **Checkpoint 1:** foundation tests pass, and real Gmail folders are listed through `op read`.
 

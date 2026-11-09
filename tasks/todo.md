@@ -99,16 +99,20 @@ Every task also meets the standing bar before it counts as done:
 - Also add a read-only live test, behind the build tag `live`, that resolves the password with `secret` and lists the folders.
 
 **Acceptance criteria:**
-- [ ] The memserver integration test logs in, lists seeded folders with the correct roles and counts, and rejects a bad password with a clear error.
-- [ ] Every call respects context cancellation and timeouts.
+- [x] The memserver integration test logs in, lists seeded folders with the correct roles and counts, and rejects a bad password with a clear error.
+- [x] Every call respects context cancellation and timeouts.
 - [ ] The live test against your Gmail lists `INBOX`, `[Gmail]/All Mail` (role `All`), `[Gmail]/Trash` (role `Trash`) and the others.
 
 **Verification:**
-- [ ] `go test -race ./internal/mail/imap/...` passes.
+- [x] `go test -race ./internal/mail/imap/...` passes (94.7% coverage, stable over 3 runs).
 - [ ] `DK_EMAIL_LIVE_ACCOUNT=Personal go test -tags live -run TestLiveFolders ./internal/mail/imap/ -v` passes. You run this manually.
 
+**Notes:**
+- go-imap v2.0.0-beta.8's `imapmemserver` ignores `CreateOptions.SpecialUse`, so the test server in `server_test.go` overrides `List` to report roles. Only the live check proves real role parsing.
+- `Client.do` reconnects and retries once when an existing connection has dropped, so every operation passed to it must be safe to repeat (see T16).
+
 **Dependencies:** T2, T3, T4
-**Files:** `internal/mail/imap/client.go`, `internal/mail/imap/folders.go`, `internal/mail/imap/client_test.go`, `internal/mail/imap/live_test.go`
+**Files:** `internal/mail/imap/client.go`, `internal/mail/imap/folders.go`, `internal/mail/imap/client_test.go`, `internal/mail/imap/folders_test.go`, `internal/mail/imap/server_test.go`, `internal/mail/imap/live_test.go`
 **Scope:** M
 
 ### ✅ Checkpoint 1: Foundation
@@ -330,6 +334,7 @@ Add `release.yml`, triggered by `v*` tags, which runs the tests and then `gorele
 **Description:**
 - `SetFlag` uses `UID STORE ±FLAGS` for `\Seen` and `\Flagged`.
 - `Move` uses `UID MOVE`, falling back to `COPY` + `\Deleted` + `UID EXPUNGE` of only those UIDs when the server lacks the MOVE capability.
+- Both run through `Client.do`, which may retry once after a dropped connection. `±FLAGS` and `UID MOVE` are safe to repeat (moved UIDs no longer exist in the source). The COPY fallback is not, so it must skip UIDs already gone from the source before copying again.
 - Resolve each account's archive folder in this order: the config's `archive_folder`, then the `\Archive` role, then the `\All` role, otherwise none.
 - Resolve its trash folder from the `\Trash` role.
 
