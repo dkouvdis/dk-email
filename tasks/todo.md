@@ -191,7 +191,7 @@ Every task also meets the standing bar before it counts as done:
 
 **Verification:**
 - [x] `go test -race ./internal/ui/...` passes (stable over 3 runs).
-- [ ] Manual: `go run ./cmd/dk-email`, resize the terminal, and press `?`, `tab` and `q`. (A pty smoke test of the built binary passed: the help popup opened and closed, a resize to 70 columns forced list mode, `q` exited 0, and the debug log held metadata only. Your check in a real terminal is still needed.)
+- [x] Manual: `go run ./cmd/dk-email`, resize the terminal, and press `?`, `tab` and `q`. (Confirmed by you 2026-11-09.) (A pty smoke test of the built binary passed: the help popup opened and closed, a resize to 70 columns forced list mode, `q` exited 0, and the debug log held metadata only. Your check in a real terminal is still needed.)
 
 **Notes:**
 - The golden files (`internal/ui/testdata/TestGolden/*.golden`, including one for the help popup) hold the final screen **without ANSI styling**, so they don't depend on the terminal's colour support. Regenerate them with `go test ./internal/ui/ -run Golden -update`.

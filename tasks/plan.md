@@ -39,7 +39,7 @@ The full details for every task are in [todo.md](todo.md).
 ### Phase 2: Read-only client → `v0.1.0-beta.1`
 - [x] T6: Threading package
 - [x] T7: IMAP `Summaries` with UID paging
-- [ ] T8: UI shell (layout engine, hint bar, status line, help, debug log)
+- [x] T8: UI shell (layout engine, hint bar, status line, help, debug log)
 - [ ] T9: Sidebar with folder selection (wide mode)
 - [ ] T10: Thread list (expand/collapse, navigation, paging)
 - [ ] T11: Render package (MIME → text)
