@@ -473,7 +473,7 @@ Every task also meets the standing bar before it counts as done:
 **Verification:**
 
 - [x] `go test -race ./internal/ui/...` passes (stable over 3 runs).
-- [ ] **Live (you approve first):** run `u`, `s`, `e` and `d` on a throwaway email sent to yourself, and confirm the result in the Gmail web UI.
+- [x] **Live (you approve first):** run `u`, `s`, `e` and `d` on a throwaway email sent to yourself, and confirm the result in the Gmail web UI. (Confirmed by you 2026-11-09.)
 
 **Notes:**
 
