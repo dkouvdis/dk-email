@@ -162,7 +162,7 @@ Every task also meets the standing bar before it counts as done:
 
 **Verification:**
 - [x] `go test -race ./internal/mail/imap/...` passes (94.9% coverage, stable over 3 runs).
-- [ ] The live test `TestLiveSummaries` shows the 200 newest INBOX subjects. You run this manually: `DK_EMAIL_LIVE_ACCOUNT=Personal go test -tags live -run TestLiveSummaries ./internal/mail/imap/ -v`. It also fails if the INBOX unread count drops.
+- [x] The live test `TestLiveSummaries` shows the 200 newest INBOX subjects (passed 2026-11-09). You run this manually: `DK_EMAIL_LIVE_ACCOUNT=Personal go test -tags live -run TestLiveSummaries ./internal/mail/imap/ -v`. It also fails if the INBOX unread count drops.
 
 **Notes:**
 - Each call runs `EXAMINE` → `UID SEARCH UID 1:before-1` (or `ALL`) → one `UID FETCH` of the envelope, flags, internal date and `BODY.PEEK[HEADER.FIELDS (References)]`. Date falls back to the internal date when the message has no `Date:` header.
