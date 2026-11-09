@@ -46,6 +46,7 @@ Messages in the conversation are stacked oldest to newest. The latest (or first 
 8. **Archive moves mail to the account's archive folder.** That's the folder with IMAP's special-use marker `\Archive`, or else `\All` (Gmail's All Mail), unless `archive_folder` overrides it in config. If none of these exist, archive is disabled for that account and a message explains why.
 9. **Keybindings and themes are fixed in v1.** `keys.toml` and `themes/` are reserved names (and whitelisted in the config `.gitignore`) but aren't read yet.
 10. **go-imap v2 is still in beta (v2.0.0-beta.8).** I'm accepting this because the v1 library is no longer maintained. The dependency is isolated behind the `mail` interface.
+11. **Gmail needs an app password.** With 2-Step Verification (including passkeys), Gmail rejects the normal Google password over IMAP. Users create an app password at https://myaccount.google.com/apppasswords and point `password_cmd` at it. Login errors include this hint. **Google Workspace accounts** don't allow app passwords and need OAuth, so they aren't supported in v1.
 
 ## Tech Stack
 

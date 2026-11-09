@@ -4,7 +4,9 @@ package imap
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -38,8 +40,13 @@ func TestLiveFolders(t *testing.T) {
 		}
 	}
 	if acct == nil {
-		t.Fatalf("no account named %q in %s", name, path)
+		names := make([]string, 0, len(cfg.Accounts))
+		for _, a := range cfg.Accounts {
+			names = append(names, fmt.Sprintf("%q", a.Name))
+		}
+		t.Fatalf("no account named %q in %s; available accounts: %s", name, path, strings.Join(names, ", "))
 	}
+	t.Logf("config %s: account %q -> %s:%d (tls %s) as %s", path, acct.Name, acct.IMAPHost, acct.IMAPPort, acct.TLS, acct.Username)
 
 	// 1Password may prompt, so allow time for approval.
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)

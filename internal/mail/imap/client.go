@@ -250,15 +250,16 @@ func (c *Client) newTLSConfig() *tls.Config {
 }
 
 func (c *Client) loginError(err error) error {
+	server := net.JoinHostPort(c.acct.IMAPHost, strconv.Itoa(c.acct.IMAPPort))
 	var serverErr *goimap.Error
 	if !errors.As(err, &serverErr) {
-		return fmt.Errorf("login to account %q failed: %w", c.acct.Name, err)
+		return fmt.Errorf("login to account %q (%s) failed: %w", c.acct.Name, server, err)
 	}
 	text := serverErr.Text
 	if c.password != "" {
 		text = strings.ReplaceAll(text, c.password, "***")
 	}
-	msg := fmt.Sprintf("login to account %q failed: %s", c.acct.Name, text)
+	msg := fmt.Sprintf("login to account %q (%s) failed: %s", c.acct.Name, server, text)
 	if hint := loginHint(c.acct.IMAPHost, serverErr.Code, text); hint != "" {
 		msg += ". Hint: " + hint
 	}

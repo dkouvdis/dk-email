@@ -4,8 +4,10 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"net"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -174,8 +176,10 @@ func TestDial_RejectsBadPasswordWithClearError(t *testing.T) {
 				t.Fatal("Dial() error = nil, want login failure")
 			}
 			msg := err.Error()
-			if !strings.Contains(msg, `login to account "Test" failed`) {
-				t.Errorf("error %q does not name the account and the failed login", msg)
+			acct := srv.account(mode)
+			server := net.JoinHostPort(acct.IMAPHost, strconv.Itoa(acct.IMAPPort))
+			if want := fmt.Sprintf(`login to account "Test" (%s) failed`, server); !strings.Contains(msg, want) {
+				t.Errorf("error %q does not contain %q (account, host:port and failed login)", msg, want)
 			}
 			if !strings.Contains(msg, "Authentication failed") {
 				t.Errorf("error %q does not include the server's response text", msg)
@@ -197,13 +201,15 @@ func TestFolders_BadPasswordErrorFromLazyConnect(t *testing.T) {
 
 	_, err := c.Folders(timeoutCtx(t, 10*time.Second))
 
-	if err == nil || !strings.Contains(err.Error(), `login to account "Test" failed`) {
-		t.Errorf("Folders() error = %v, want a login failure naming the account", err)
+	acct := srv.account(modeImplicit)
+	server := net.JoinHostPort(acct.IMAPHost, strconv.Itoa(acct.IMAPPort))
+	if want := fmt.Sprintf(`login to account "Test" (%s) failed`, server); err == nil || !strings.Contains(err.Error(), want) {
+		t.Errorf("Folders() error = %v, want a login failure containing %q", err, want)
 	}
 }
 
 func TestLoginError_RedactsPasswordEchoedByServer(t *testing.T) {
-	c := New(config.Account{Name: "Personal"}, "hunter2")
+	c := New(config.Account{Name: "Personal", IMAPHost: "imap.example.com", IMAPPort: 993}, "hunter2")
 	serverErr := &goimap.Error{Type: goimap.StatusResponseTypeNo, Text: "bad login for hunter2"}
 
 	got := c.loginError(serverErr).Error()
@@ -211,13 +217,31 @@ func TestLoginError_RedactsPasswordEchoedByServer(t *testing.T) {
 	if strings.Contains(got, "hunter2") {
 		t.Errorf("loginError() = %q, contains the password", got)
 	}
-	if want := `login to account "Personal" failed: bad login for ***`; got != want {
+	if want := `login to account "Personal" (imap.example.com:993) failed: bad login for ***`; got != want {
 		t.Errorf("loginError() = %q, want %q", got, want)
 	}
 }
 
+func TestLoginError_NonServerErrorNamesHostAndPort(t *testing.T) {
+	c := New(config.Account{Name: "Personal", IMAPHost: "imap.example.com", IMAPPort: 993}, "hunter2")
+	cause := errors.New("connection reset")
+
+	err := c.loginError(cause)
+
+	got := err.Error()
+	if strings.Contains(got, "hunter2") {
+		t.Errorf("loginError() = %q, contains the password", got)
+	}
+	if want := `login to account "Personal" (imap.example.com:993) failed: connection reset`; got != want {
+		t.Errorf("loginError() = %q, want %q", got, want)
+	}
+	if !errors.Is(err, cause) {
+		t.Errorf("loginError() = %v, does not wrap the cause", err)
+	}
+}
+
 func TestLoginError_AppendsHintAfterMessageWithoutPassword(t *testing.T) {
-	c := New(config.Account{Name: "Personal", IMAPHost: "imap.gmail.com"}, "hunter2")
+	c := New(config.Account{Name: "Personal", IMAPHost: "imap.gmail.com", IMAPPort: 993}, "hunter2")
 	serverErr := &goimap.Error{
 		Type: goimap.StatusResponseTypeNo,
 		Code: goimap.ResponseCodeAuthenticationFailed,
@@ -229,7 +253,7 @@ func TestLoginError_AppendsHintAfterMessageWithoutPassword(t *testing.T) {
 	if strings.Contains(got, "hunter2") {
 		t.Errorf("loginError() = %q, contains the password", got)
 	}
-	prefix := `login to account "Personal" failed: Invalid credentials ***. Hint: For Gmail use an app password`
+	prefix := `login to account "Personal" (imap.gmail.com:993) failed: Invalid credentials ***. Hint: For Gmail use an app password`
 	if !strings.HasPrefix(got, prefix) {
 		t.Errorf("loginError() = %q, want prefix %q", got, prefix)
 	}
