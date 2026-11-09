@@ -2,6 +2,7 @@ package threadlist
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -456,5 +457,58 @@ func TestRemove_EverythingLeavesEmptyList(t *testing.T) {
 
 	if _, ok := m.CursorUID(); ok || !strings.Contains(lines(m, 40)[0], "No messages.") {
 		t.Error("removing every message should leave an empty list")
+	}
+}
+
+func TestMerge_AddsUpdatesAndDropsWithoutMovingCursor(t *testing.T) {
+	m := New(clock).SetSummaries(inbox(), true) // Plan (14,12,10), Lunch (11), Old news (5)
+	m, _ = send(m, "j", "space")                // Lunch expanded, cursor on it
+
+	fresh := inbox()
+	fresh = slices.DeleteFunc(fresh, func(s mail.Summary) bool { return s.UID == 12 }) // moved away elsewhere
+	fresh[0].Seen = true                                                               // read elsewhere
+	fresh = append(fresh, sum(20, "Zed", "Brand new", now, "n1"))
+
+	m = m.Merge(fresh)
+
+	got := lines(m, 70)
+	if !strings.Contains(got[0], "Brand new") {
+		t.Errorf("new mail not on top:\n%s", strings.Join(got, "\n"))
+	}
+	if !strings.Contains(got[1], "Re: Plan (2)") || strings.Contains(got[1], "●") {
+		t.Errorf("Plan row = %q, want 2 messages, read", got[1])
+	}
+	if uid := cursorUID(t, m); uid != 11 {
+		t.Errorf("cursor on %d, want it to stay on Lunch (11)", uid)
+	}
+	if len(got) != 5 { // 4 threads + Lunch's one message row
+		t.Errorf("got %d rows, want Lunch still expanded:\n%s", len(got), strings.Join(got, "\n"))
+	}
+}
+
+func TestMerge_KeepsOlderPagesAndHandlesEmpty(t *testing.T) {
+	m := New(clock).SetSummaries(inbox(), true)
+
+	m = m.Merge(inbox()[:2]) // a newest page covering only UIDs ≥ 12
+
+	if n := len(lines(m, 70)); n != 3 {
+		t.Errorf("older messages below the page were dropped: %d rows", n)
+	}
+	if got := New(clock).Merge(inbox()); len(lines(got, 70)) != 3 {
+		t.Error("merging into an empty list should add everything")
+	}
+	if got := m.Merge(nil); len(lines(got, 70)) != 3 {
+		t.Error("an empty refresh must not clear the list")
+	}
+}
+
+func TestMerge_CursorMessageGoneMovesToNextThread(t *testing.T) {
+	m := New(clock).SetSummaries(inbox(), false)
+	m, _ = send(m, "j") // Lunch
+
+	m = m.Merge(slices.DeleteFunc(inbox(), func(s mail.Summary) bool { return s.UID == 11 }))
+
+	if uid := cursorUID(t, m); uid != 5 {
+		t.Errorf("cursor on %d, want the next thread (5)", uid)
 	}
 }

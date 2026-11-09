@@ -59,8 +59,15 @@ type Model struct {
 	boxes []mail.Mailbox
 	side  sidebar.Model
 	open  openFolder
-	list  threadlist.Model
-	read  reader.Model
+	// every schedules the next refresh tick; tests replace it.
+	every   func(time.Duration) tea.Cmd
+	refresh refreshState
+	// writes counts flag changes and moves started; inflight counts those
+	// still waiting for the server. A refresh uses them to spot results
+	// that could undo an optimistic change.
+	writes, inflight int
+	list             threadlist.Model
+	read             reader.Model
 
 	log           *slog.Logger
 	keys          KeyMap
@@ -104,6 +111,7 @@ func New(cfg config.Config, connect Connector, log *slog.Logger) Model {
 		boxes:   make([]mail.Mailbox, len(cfg.Accounts)),
 		side:    sidebar.New(names),
 		open:    openFolder{account: -1},
+		every:   tick,
 		list:    threadlist.New(time.Now),
 		read:    reader.New(time.Now),
 		log:     log,
@@ -126,7 +134,7 @@ func (m Model) Init() tea.Cmd {
 	if len(m.accts) == 0 || m.connect == nil {
 		return nil
 	}
-	cmds := []tea.Cmd{m.side.Tick()}
+	cmds := []tea.Cmd{m.side.Tick(), m.every(m.ui.RefreshInterval.Duration)}
 	for i, a := range m.accts {
 		m.log.Debug("connecting", "account", a.Name)
 		cmds = append(cmds, connectAccount(m.connect, i, a))
@@ -158,6 +166,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleFlag(msg)
 	case moveMsg:
 		return m.handleMove(msg)
+	case refreshTickMsg:
+		return m.handleTick()
+	case refreshMsg:
+		return m.handleRefresh(msg)
 	}
 	return m, nil
 }
@@ -272,6 +284,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.toggleMode()
 	case key.Matches(msg, m.keys.Picker):
 		return m.openPicker()
+	case key.Matches(msg, m.keys.Refresh):
+		return m.startRefresh(true)
 	case m.focus == PaneSidebar:
 		var cmd tea.Cmd
 		m.side, cmd = m.side.Update(msg)

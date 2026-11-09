@@ -52,7 +52,7 @@ The full details for every task are in [todo.md](todo.md).
 - [x] T16: IMAP `SetFlag` + `Move` + archive/Trash folder resolution
 - [x] T17: Triage keys `u` / `s` / `e` / `d` with optimistic update
 - [x] T18: Move-to-folder picker (`m`)
-- [ ] T19: Auto-refresh (120s) + `r`
+- [x] T19: Auto-refresh (120s) + `r`
 - [x] T24: `tls_cert` per account, for Proton Mail Bridge's self-signed certificate (added at your request)
 - [ ] T23: Filter in the `?` help popup (`/`); added after T8 review, lands before the README
 

@@ -67,6 +67,14 @@ func (f *fixture) connector() Connector {
 	}
 }
 
+// newModel is New with the refresh timer off: tests send refreshTickMsg
+// themselves, since a real tick would block settle for minutes.
+func newModel(connect Connector) Model {
+	m := New(testConfig(), connect, nil)
+	m.every = func(time.Duration) tea.Cmd { return nil }
+	return m
+}
+
 // settle runs cmd and every command that follows from it, feeding each
 // message back through Update. Spinner ticks are dropped so it terminates.
 func settle(t *testing.T, m Model, cmd tea.Cmd) Model {
@@ -94,7 +102,7 @@ func settle(t *testing.T, m Model, cmd tea.Cmd) Model {
 // started returns a model sized w×h whose accounts have all connected.
 func started(t *testing.T, f *fixture, w, h int) Model {
 	t.Helper()
-	m := New(testConfig(), f.connector(), nil)
+	m := newModel(f.connector())
 	m.list = threadlist.New(func() time.Time { return fixedNow })
 	m = send(t, m, size(w, h))
 	return settle(t, m, m.Init())
@@ -183,7 +191,7 @@ func TestAccounts_KeysWorkWhileConnecting(t *testing.T) {
 	f := newFixture()
 	f.personal.SetDelay(300 * time.Millisecond)
 	f.work.SetDelay(300 * time.Millisecond)
-	m := send(t, New(testConfig(), f.connector(), nil), size(160, 30))
+	m := send(t, newModel(f.connector()), size(160, 30))
 	batch, ok := m.Init()().(tea.BatchMsg)
 	if !ok {
 		t.Fatal("Init didn't return a batch")
@@ -289,7 +297,7 @@ func TestStatus_ErrorStaysUntilKeyPress(t *testing.T) {
 }
 
 func TestAccounts_LoadingStatus(t *testing.T) {
-	m := send(t, New(testConfig(), newFixture().connector(), nil), size(160, 30))
+	m := send(t, newModel(newFixture().connector()), size(160, 30))
 	next, cmd := m.Update(accountMsg{index: 0, mb: newFixture().personal, folders: []mail.Folder{{Name: "INBOX", Role: mail.RoleInbox}}})
 	m = next.(Model)
 
@@ -300,7 +308,7 @@ func TestAccounts_LoadingStatus(t *testing.T) {
 
 func TestAccounts_NilMailboxIsAnError(t *testing.T) {
 	connect := func(context.Context, config.Account) (mail.Mailbox, error) { return nil, nil }
-	m := send(t, New(testConfig(), connect, nil), size(160, 30))
+	m := send(t, newModel(connect), size(160, 30))
 
 	m = settle(t, m, m.Init())
 

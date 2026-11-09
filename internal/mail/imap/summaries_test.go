@@ -318,3 +318,25 @@ func TestNewAddress_StripsTerminalEscapes(t *testing.T) {
 		t.Errorf("newAddress = %+v, want escapes stripped", got)
 	}
 }
+
+// The UI refreshes with before = max UID: the newest page, but checked
+// against UIDVALIDITY like paging.
+func TestSummaries_MaxBeforeIsNewestPageThatDetectsResets(t *testing.T) {
+	srv := startServer(t, modeImplicit, capsListStatus)
+	srv.seedBulk(t, "Bulk", 3)
+	c := srv.newClient(t, modeImplicit)
+	ctx := timeoutCtx(t, 10*time.Second)
+
+	got, err := c.Summaries(ctx, "Bulk", ^mail.UID(0), 2)
+	if err != nil || len(got) != 2 || got[0].Subject != "message 003" {
+		t.Fatalf("Summaries(max) = %+v, %v; want the 2 newest", got, err)
+	}
+
+	if err := srv.user.Delete("Bulk"); err != nil {
+		t.Fatal(err)
+	}
+	srv.seedBulk(t, "Bulk", 3)
+	if _, err := c.Summaries(ctx, "Bulk", ^mail.UID(0), 2); !errors.Is(err, mail.ErrFolderChanged) {
+		t.Errorf("after a reset: error = %v, want ErrFolderChanged", err)
+	}
+}

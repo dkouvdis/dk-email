@@ -520,12 +520,20 @@ Every task also meets the standing bar before it counts as done:
 
 **Acceptance criteria:**
 
-- [ ] New mail on the fake appears after a tick, with the cursor still on the same thread.
-- [ ] A refresh that fails shows in the status line, and the next tick tries again.
+- [x] New mail on the fake appears after a tick, with the cursor still on the same thread.
+- [x] A refresh that fails shows in the status line, and the next tick tries again.
 
 **Verification:**
 
-- [ ] `go test -race ./internal/ui/...` passes.
+- [x] `go test -race ./internal/ui/...` passes (stable over 3 runs).
+
+**Notes:**
+
+- Each tick (and `r`) runs one command per connected account: `Folders` for unread counts and, for the open folder's account, its newest page. `r` shows "Refreshing…" until done. A refresh never overlaps another; a tick during one just schedules the next tick.
+- `threadlist.Merge` adds new mail, takes fresh flags, and drops loaded messages inside the page's UID range that the server no longer has (moved elsewhere). Older pages stay. The cursor and expanded threads stay put.
+- The refresh asks for `before = max UID` rather than 0. It's still the newest page, but as "paging" it fails with `ErrFolderChanged` when the folder's UIDs were reset (before = 0 would silently accept them and old UIDs would point at different mail), which reloads the folder.
+- Results are dropped when a triage write was in flight when the refresh started, or started during it, so a refresh can't undo an optimistic change. The next tick catches up. This also corrects the unread counts that archive and move leave approximate.
+- Accounts that failed to connect aren't retried by refresh (that would re-run `password_cmd` every 2 minutes). Reconnecting is part of T21.
 
 **Dependencies:** T10
 **Files:** `internal/ui/refresh.go`, `internal/ui/refresh_test.go`, `internal/ui/model.go`

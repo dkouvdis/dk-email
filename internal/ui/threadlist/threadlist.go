@@ -152,6 +152,42 @@ func (m Model) Remove(uids []mail.UID) Model {
 	return m
 }
 
+// Merge applies a refreshed newest page: new messages are added, loaded
+// ones take the page's flags, and loaded messages within the page's UID
+// range that it no longer holds (moved or deleted elsewhere) are dropped.
+// Older pages are kept. The cursor and expanded threads stay put; if the
+// cursor's message is gone it moves like Remove.
+func (m Model) Merge(page []mail.Summary) Model {
+	if len(page) == 0 {
+		return m
+	}
+	lowest := slices.MinFunc(page, func(a, b mail.Summary) int { return cmp.Compare(a.UID, b.UID) }).UID
+	fresh := make(map[mail.UID]mail.Summary, len(page))
+	for _, s := range page {
+		fresh[s.UID] = s
+	}
+	var gone []mail.UID
+	sums := slices.Clone(m.sums)
+	for i, s := range sums {
+		switch f, ok := fresh[s.UID]; {
+		case ok:
+			sums[i] = f
+		case s.UID >= lowest:
+			gone = append(gone, s.UID)
+		}
+	}
+	m.sums = dedupe(sums, page)
+	m.threads = thread.Build(m.sums)
+	if len(m.threads) > 0 && m.cursor.uid == 0 {
+		m.cursor.uid = m.threads[0].Latest().UID
+	}
+	if len(gone) > 0 {
+		return m.Remove(gone)
+	}
+	m.ensureVisible()
+	return m
+}
+
 // Restore puts removed messages back, e.g. when a move fails.
 func (m Model) Restore(sums []mail.Summary) Model {
 	m.sums = dedupe(m.sums, sums)

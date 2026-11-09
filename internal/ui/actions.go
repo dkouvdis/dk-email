@@ -131,6 +131,8 @@ func (m Model) changeFlag(account int, folder string, targets []mail.Summary, f 
 		return m, nil
 	}
 	m.applyFlag(account, folder, uids, f, on)
+	m.writes++
+	m.inflight++
 	m.log.Debug("set flag", "flag", f, "on", on, "count", len(uids))
 	return m, setFlag(m.boxes[account], account, folder, uids, f, on)
 }
@@ -157,6 +159,7 @@ func (m *Model) applyFlag(account int, folder string, uids []mail.UID, f mail.Fl
 }
 
 func (m Model) handleFlag(msg flagMsg) (Model, tea.Cmd) {
+	m.inflight--
 	if msg.err == nil {
 		return m, nil
 	}
@@ -242,12 +245,15 @@ func (m Model) startMove(targets []mail.Summary, to, label, verb string) (Model,
 		}
 	}
 	m.side = m.side.AdjustUnread(account, from, -msg.unread)
+	m.writes++
+	m.inflight++
 	m.setStatus(progressive(verb) + "…")
 	m.log.Debug("move", "verb", verb, "count", len(msg.uids), "role", m.side.Role(account, to))
 	return m, moveMessages(m.boxes[account], msg)
 }
 
 func (m Model) handleMove(msg moveMsg) (Model, tea.Cmd) {
+	m.inflight--
 	if msg.err == nil {
 		done := fmt.Sprintf("%s %s", past(msg.verb), plural(len(msg.uids), "message"))
 		if msg.verb == "move" {
