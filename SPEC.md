@@ -195,6 +195,8 @@ password_cmd = "op read op://Personal/Gmail/app-password"   # omit to use the ke
 
 Actions on a **collapsed thread** apply to every message in it. On an expanded row, or in the reader, they apply to the selected message. Opening a message marks it read.
 
+The **`?` help popup** is sized to its content, groups keys into sections, and scrolls with `j`/`k`, `↑`/`↓`, `pgup`/`pgdn` and `g`/`G`. Inside it, `/` filters the keys by key or description.
+
 ## Versioning & Release
 
 - **Version scheme: [SemVer 2.0](https://semver.org).** Tags are `vMAJOR.MINOR.PATCH`, with optional pre-release suffixes: `v0.1.0-beta.1`, `v0.1.0-rc.1`, then `v0.1.0`.

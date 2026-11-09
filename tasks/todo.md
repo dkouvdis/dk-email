@@ -198,6 +198,7 @@ Every task also meets the standing bar before it counts as done:
 - The hint bar fits keys in priority order, marks a cut with `…`, and always ends with `? help • q quit`. bubbles' `help` truncation overshot by a cell and wrapped the bar, so the hint bar does its own fitting.
 - `v` below 80 columns leaves the mode unchanged and explains why in the status line. The right side of the status line shows the active layout (`wide`, `narrow`, `list` or `list (forced)`).
 - Popups are drawn with Lip Gloss v2's `Compositor` over the panes.
+- After review, the `?` popup was resized to fit its content (≈41 columns) instead of 90% × 90%. Keys are grouped into Navigation, Threads, Accounts & view and General. It has an `esc close` badge, a scrollbar, scrolls with `j`/`k`/`↑↓`/`pgup`/`pgdn`/`g`/`G`, and reopens at the top. The `/` filter is T23.
 - `run` takes a `startFunc`, so the `main` tests never take over the terminal. The debug log goes to `$XDG_CACHE_HOME/dk-email/debug.log` (or `~/.cache/…`) with dir `0700` and file `0600`.
 - Panes are placeholders. The sidebar lists account names as "not connected" (T9), and outside wide mode the list pane shows the `account › folder` header (T13).
 
@@ -420,6 +421,27 @@ Add `release.yml`, triggered by `v*` tags, which runs the tests and then `gorele
 
 **Dependencies:** T10
 **Files:** `internal/ui/refresh.go`, `internal/ui/refresh_test.go`, `internal/ui/model.go`
+**Scope:** S
+
+### T23: Filter in the `?` help popup (`/`)
+
+**Description:** Inside the help popup, `/` focuses a filter input (`bubbles/textinput`) under the header, with the placeholder "press / to filter by key or description".
+- Typing narrows the list live to keys whose key or description contains the text, case-insensitively. A section with no matches is hidden.
+- While the input is focused, every printable key is typed into it, including `q`, `j`, `k`, `g`, `G` and `?`. `esc` clears the filter and leaves the input (a second `esc` closes the popup), and `enter` leaves the input but keeps the filter. `ctrl+c` still quits.
+- With no matches, the popup shows "No keys match" and keeps its size, so the box doesn't jump.
+- The scroll position resets to the top whenever the filter changes, and the footer adds `filter /`.
+
+**Acceptance criteria:**
+- [ ] Typing `arch` leaves only `e archive` under its section, and typing `q` while filtering filters instead of quitting.
+- [ ] The `esc` sequence works as described: clear and leave, then close. Reopening the popup starts with an empty filter.
+- [ ] A golden file covers the popup with an active filter.
+
+**Verification:**
+- [ ] `go test -race ./internal/ui/...` passes.
+- [ ] Manual: `?`, `/`, type `star`, `esc`, `esc`.
+
+**Dependencies:** T8
+**Files:** `internal/ui/popup/help.go`, `internal/ui/popup/help_test.go`, `internal/ui/model.go`, `internal/ui/model_test.go`
 **Scope:** S
 
 ### ✅ Checkpoint 3: Triage

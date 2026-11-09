@@ -55,6 +55,7 @@ The full details for every task are in [todo.md](todo.md).
 - [ ] T17: Triage keys `u` / `s` / `e` / `d` with optimistic update
 - [ ] T18: Move-to-folder picker (`m`)
 - [ ] T19: Auto-refresh (120s) + `r`
+- [ ] T23: Filter in the `?` help popup (`/`); added after T8 review, lands before the README
 
 **Checkpoint 3:** spec success criteria 5–7 are verified on real Gmail. You approve, then `v0.1.0-beta.2` is tagged.
 
@@ -81,6 +82,7 @@ T1 ─┬─ T2 ─────────────┬───────�
            └─ T8 ┴─ T9 ┴─ T10 ─┬─ T13
                                 └─ T14
 T1 ── T15 (needs a runnable binary; lands after T14)
+T8 ── T23 (help filter; any time after T8, before T22 so the README covers it)
 ```
 
 **Can run in parallel:**
