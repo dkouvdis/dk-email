@@ -293,13 +293,21 @@ Every task also meets the standing bar before it counts as done:
   - Opening a message marks it `\Seen`. Until `SetFlag` exists (T16), the fake records the call and the IMAP implementation returns "not implemented".
 
 **Acceptance criteria:**
-- [ ] `enter` on a thread shows the whole conversation, and `j`/`k` scroll the reader.
-- [ ] Fetching never sets `\Seen` implicitly, which the memserver test asserts.
-- [ ] A slow fetch shows "Loading…" without blocking key handling.
+- [x] `enter` on a thread shows the whole conversation, and `j`/`k` scroll the reader.
+- [x] Fetching never sets `\Seen` implicitly, which the memserver test asserts.
+- [x] A slow fetch shows "Loading…" without blocking key handling.
 
 **Verification:**
-- [ ] `go test -race ./...` passes.
+- [x] `go test -race ./...` passes (reader coverage 95%, UI tests stable over 3 runs).
 - [ ] Manual: read real Gmail threads with the live account.
+
+**Notes:**
+- IMAP `Message` opens the folder read-only and fetches `BODY.PEEK[]`, then parses it with `render`. Flags come from the server, and the date falls back to the internal date. A missing UID returns `ErrMessageNotFound`, and a reset folder returns `ErrFolderChanged`, which reloads the folder with a notice.
+- `enter` on a thread row expands the first unread message, or the latest if all are read. On a message row of an expanded thread, it expands that message. Focus moves to the reader, and `esc` returns it to the list. In the reader, `space` expands every message (loading their bodies) and toggles back.
+- Opening an unread message sends `SetFlag(\Seen)` after its body loads. On success, the list row, the reader and the sidebar's unread count update. Real IMAP returns `ErrUnsupported` until T16, which is only logged, so Phase 2 stays read-only on Gmail as the live-account policy requires.
+- `enter` does nothing in list + popup mode until T14 adds the popup.
+- The golden tests now apply keys synchronously before teatest renders, so fetches can't race the snapshot. A `wide-reading` golden covers an open conversation.
+- `BODY.PEEK[]` downloads the whole message, attachments included, which is fine for v1. Fetching only the text parts is a later optimization.
 
 **Dependencies:** T10, T11
 **Files:** `internal/mail/imap/message.go`, `internal/mail/imap/message_test.go`, `internal/ui/reader/reader.go`, `internal/ui/reader/reader_test.go`, `internal/ui/model.go`

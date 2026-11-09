@@ -51,7 +51,7 @@ func msg(from, subject string, at time.Time, seen bool, id string, refs ...strin
 	if len(refs) > 0 {
 		s.InReplyTo, s.References = refs[len(refs)-1], refs
 	}
-	return mail.Message{Summary: s}
+	return mail.Message{Summary: s, Body: "Body of " + subject + " from " + from + "."}
 }
 
 func (f *fixture) connector() Connector {
@@ -390,10 +390,13 @@ func TestList_FolderChangedWhilePagingReloads(t *testing.T) {
 	next, cmd = m.Update(summariesMsg{account: 0, folder: "Bulk", before: 51, err: fmt.Errorf("%q: %w", "Bulk", mail.ErrFolderChanged)})
 	m = next.(Model)
 
-	if cmd == nil || !m.open.loading || m.statusErr || !strings.Contains(m.status, "Bulk changed on the server; reloaded.") {
+	if cmd == nil || !m.open.loading || m.statusErr {
 		t.Fatalf("status %q (err %v), loading %v, cmd %v; want a reload", m.status, m.statusErr, m.open.loading, cmd != nil)
 	}
 	m = settle(t, m, cmd)
+	if m.status != "Bulk changed on the server; reloaded." {
+		t.Errorf("status after reload = %q, want the notice", m.status)
+	}
 	if m.list.Count() != 200 || m.list.LoadingMore() {
 		t.Errorf("after reload: %d messages, loading more %v; want a fresh first page", m.list.Count(), m.list.LoadingMore())
 	}

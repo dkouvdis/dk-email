@@ -215,3 +215,19 @@ func TestSpinnerTicksOnlyWhileConnecting(t *testing.T) {
 		t.Error("spinner keeps ticking after every account finished")
 	}
 }
+
+func TestAdjustUnread(t *testing.T) {
+	m := New([]string{"Personal"}).SetFolders(0, gmailFolders(), nil)
+
+	m = m.AdjustUnread(0, "INBOX", -2).AdjustUnread(0, "[Gmail]/Spam", -10).AdjustUnread(5, "INBOX", -1)
+
+	if f, _ := m.Folder(0, "INBOX"); f.Unread != 10 {
+		t.Errorf("INBOX unread = %d, want 10", f.Unread)
+	}
+	if f, _ := m.Folder(0, "[Gmail]/Spam"); f.Unread != 0 {
+		t.Errorf("Spam unread = %d, want clamped to 0", f.Unread)
+	}
+	if _, ok := m.Folder(0, "nope"); ok {
+		t.Error("Folder found a folder that doesn't exist")
+	}
+}

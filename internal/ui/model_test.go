@@ -284,9 +284,9 @@ func TestModel_DebugLogRecordsMetadata(t *testing.T) {
 	}
 }
 
-// The golden tests connect fake accounts synchronously (so spinner and
-// load timing can't change the output), then run the model in a real
-// teatest program at fixed sizes and compare the final screen without ANSI
+// The golden tests connect fake accounts and apply keys synchronously (so
+// spinner and load timing can't change the output), then run the model in
+// a real teatest program at fixed sizes and compare the final screen without ANSI
 // styling. Update them with go test ./internal/ui/ -run Golden -update
 func TestGolden(t *testing.T) {
 	tests := []struct {
@@ -299,6 +299,7 @@ func TestGolden(t *testing.T) {
 		{"wide-sidebar-focused", 140, 24, false, []string{"h", "j"}},
 		{"wide-account-error", 140, 24, true, nil},
 		{"wide-thread-expanded", 140, 24, false, []string{"space", "j"}},
+		{"wide-reading", 140, 24, false, []string{"enter"}},
 		{"narrow", 100, 24, false, nil},
 		{"list", 70, 20, false, nil},
 		{"help", 120, 30, false, []string{"?"}},
@@ -312,12 +313,14 @@ func TestGolden(t *testing.T) {
 				f.errs["Work"] = errors.New(`login to account "Work" (mail.example.com:993) failed: invalid credentials`)
 			}
 			m := started(t, f, tt.w, tt.h)
+			// Keys may start fetches, so they're applied and settled here
+			// rather than sent through teatest, where timing would vary.
+			for _, k := range tt.keys {
+				m = pressSettled(t, m, k)
+			}
 			m.connect = nil // already connected; Init must not reconnect
 
 			tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(tt.w, tt.h))
-			for _, k := range tt.keys {
-				tm.Send(press(k))
-			}
 			tm.Send(press("q"))
 
 			final := tm.FinalModel(t, teatest.WithFinalTimeout(5*time.Second)).(Model)

@@ -370,3 +370,17 @@ func TestView_EmptyAndScrolling(t *testing.T) {
 		t.Errorf("g didn't scroll back to the top:\n%s", v)
 	}
 }
+
+func TestSetSeen_UpdatesRowsInPlace(t *testing.T) {
+	m := New(clock).SetSummaries(inbox(), false)
+	m, _ = send(m, "space", "j")
+
+	m = m.SetSeen([]mail.UID{14}, true)
+
+	if strings.Contains(lines(m, 70)[0], "●") {
+		t.Errorf("Plan row still unread: %q", lines(m, 70)[0])
+	}
+	if got := cursorUID(t, m); got != 10 || m.OnThreadRow() {
+		t.Errorf("cursor moved to %d (thread row %v)", got, m.OnThreadRow())
+	}
+}

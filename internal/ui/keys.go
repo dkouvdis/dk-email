@@ -75,7 +75,7 @@ func (k KeyMap) hints(focus Pane, kind Kind) []key.Binding {
 	case PaneList:
 		keys = append(keys, k.Expand, k.ToggleRead, k.Star, k.Archive, k.Delete, k.Move)
 	case PaneReader:
-		keys = append(keys, k.ToggleRead, k.Star, k.Archive, k.Delete, k.Move)
+		keys = append(keys, k.Back, k.Expand, k.ToggleRead, k.Star, k.Archive, k.Delete, k.Move)
 	}
 	if kind != KindList {
 		keys = append(keys, k.NextPane)

@@ -150,6 +150,22 @@ func (m Model) SetHeight(h int) Model {
 	return m
 }
 
+// AdjustUnread changes a folder's unread count by delta, never below zero.
+func (m Model) AdjustUnread(account int, name string, delta int) Model {
+	if account < 0 || account >= len(m.accounts) {
+		return m
+	}
+	m.accounts = slices.Clone(m.accounts)
+	a := &m.accounts[account]
+	a.folders = slices.Clone(a.folders)
+	for i := range a.folders {
+		if a.folders[i].Name == name {
+			a.folders[i].Unread = max(a.folders[i].Unread+delta, 0)
+		}
+	}
+	return m
+}
+
 // Folder looks up a folder by account and name.
 func (m Model) Folder(account int, name string) (mail.Folder, bool) {
 	if account < 0 || account >= len(m.accounts) {

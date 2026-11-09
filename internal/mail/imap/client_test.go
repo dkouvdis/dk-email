@@ -452,7 +452,6 @@ func TestClose_AfterServerDroppedConnection(t *testing.T) {
 func TestUnsupportedMethods_ReturnErrUnsupported(t *testing.T) {
 	c := New(config.Account{Name: "Test"}, "pw")
 	calls := map[string]func() error{
-		"Message": func() error { _, err := c.Message(bg, "INBOX", 1); return err },
 		"SetFlag": func() error { return c.SetFlag(bg, "INBOX", []mail.UID{1}, mail.FlagSeen, true) },
 		"Move":    func() error { return c.Move(bg, "INBOX", []mail.UID{1}, "Archive") },
 	}

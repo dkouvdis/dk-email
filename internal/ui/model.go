@@ -1,5 +1,5 @@
 // Package ui is the root Bubble Tea model: layout, focus, keys, the status
-// line, the hint bar and popups. The reader is a placeholder until T12.
+// line, the hint bar and popups.
 package ui
 
 import (
@@ -19,6 +19,7 @@ import (
 	"github.com/dkouvdis/dk-email/internal/config"
 	"github.com/dkouvdis/dk-email/internal/mail"
 	"github.com/dkouvdis/dk-email/internal/ui/popup"
+	"github.com/dkouvdis/dk-email/internal/ui/reader"
 	"github.com/dkouvdis/dk-email/internal/ui/sidebar"
 	"github.com/dkouvdis/dk-email/internal/ui/threadlist"
 )
@@ -59,6 +60,7 @@ type Model struct {
 	side  sidebar.Model
 	open  openFolder
 	list  threadlist.Model
+	read  reader.Model
 
 	log           *slog.Logger
 	keys          KeyMap
@@ -97,6 +99,7 @@ func New(cfg config.Config, connect Connector, log *slog.Logger) Model {
 		side:    sidebar.New(names),
 		open:    openFolder{account: -1},
 		list:    threadlist.New(time.Now),
+		read:    reader.New(time.Now),
 		log:     log,
 		keys:    keys,
 		styles:  defaultStyles(),
@@ -143,6 +146,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleSummaries(msg)
 	case threadlist.LoadMoreMsg:
 		return m.loadMore(msg.Before)
+	case messageMsg:
+		return m.handleMessage(msg)
+	case flagMsg:
+		return m.handleFlag(msg)
 	}
 	return m, nil
 }
@@ -162,6 +169,7 @@ func (m *Model) relayout() {
 	frame := m.styles.pane.GetVerticalFrameSize()
 	m.side = m.side.SetHeight(max(m.panes.Sidebar.H-frame, 0))
 	m.list = m.list.SetHeight(max(m.panes.List.H-frame-listHeaderRows, 0))
+	m.read = m.read.SetSize(max(m.panes.Reader.W-m.styles.pane.GetHorizontalFrameSize(), 0), max(m.panes.Reader.H-frame, 0))
 	if !slices.Contains(m.visiblePanes(), m.focus) {
 		m.focus = PaneList
 	}
@@ -214,10 +222,21 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.side, cmd = m.side.Update(msg)
 		return m, cmd
+	case m.focus == PaneList && key.Matches(msg, m.keys.Open):
+		// List + popup mode shows the reader as a popup, which is T14.
+		if m.panes.Kind == KindList {
+			return m, nil
+		}
+		return m.openThread()
 	case m.focus == PaneList:
 		var cmd tea.Cmd
 		m.list, cmd = m.list.Update(msg)
 		return m, cmd
+	case m.focus == PaneReader && key.Matches(msg, m.keys.Back):
+		m.focus = PaneList
+	case m.focus == PaneReader:
+		m.read, _ = m.read.Update(msg)
+		return m, m.fetchMissing()
 	}
 	return m, nil
 }
@@ -272,7 +291,7 @@ func (m Model) render() string {
 	}
 	cols = append(cols, m.renderPane(PaneList, p.List, m.listView))
 	if p.Reader.W > 0 {
-		cols = append(cols, m.renderPane(PaneReader, p.Reader, lines(m.readerLines())))
+		cols = append(cols, m.renderPane(PaneReader, p.Reader, m.read.View))
 	}
 	screen := lipgloss.JoinVertical(lipgloss.Left,
 		lipgloss.JoinHorizontal(lipgloss.Top, cols...),
@@ -306,10 +325,6 @@ func (m Model) renderPane(pane Pane, r Rect, content func(w, h int) string) stri
 	return style.Width(r.W).Height(r.H).Render(body)
 }
 
-func lines(l []string) func(w, h int) string {
-	return func(int, int) string { return strings.Join(l, "\n") }
-}
-
 // listHeaderRows is the folder header above the thread rows.
 const listHeaderRows = 1
 
@@ -338,10 +353,6 @@ func (m Model) listView(w, h int) string {
 		body = m.list.View(w, h-listHeaderRows)
 	}
 	return title + "\n" + body
-}
-
-func (m Model) readerLines() []string {
-	return []string{m.styles.title.Render("Message"), "", m.styles.dim.Render("No message selected.")}
 }
 
 func (m Model) renderStatus() string {

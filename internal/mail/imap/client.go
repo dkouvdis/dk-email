@@ -100,10 +100,6 @@ func (c *Client) Close() error {
 	return nil
 }
 
-func (c *Client) Message(ctx context.Context, folder string, uid mail.UID) (mail.Message, error) {
-	return mail.Message{}, fmt.Errorf("imap: Message: %w", errors.ErrUnsupported)
-}
-
 func (c *Client) SetFlag(ctx context.Context, folder string, uids []mail.UID, f mail.Flag, on bool) error {
 	return fmt.Errorf("imap: SetFlag: %w", errors.ErrUnsupported)
 }

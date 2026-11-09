@@ -126,14 +126,7 @@ func newSummary(m *imapclient.FetchMessageBuffer) mail.Summary {
 		Date:       m.InternalDate,
 		References: parseReferences(m.FindBodySection(referencesSection)),
 	}
-	for _, f := range m.Flags {
-		switch {
-		case strings.EqualFold(string(f), string(goimap.FlagSeen)):
-			s.Seen = true
-		case strings.EqualFold(string(f), string(goimap.FlagFlagged)):
-			s.Flagged = true
-		}
-	}
+	s.Seen, s.Flagged = readFlags(m.Flags)
 	if env := m.Envelope; env != nil {
 		if len(env.From) > 0 {
 			s.From = newAddress(env.From[0])
@@ -149,6 +142,19 @@ func newSummary(m *imapclient.FetchMessageBuffer) mail.Summary {
 		s.InReplyTo = strings.Join(env.InReplyTo, " ")
 	}
 	return s
+}
+
+// readFlags reports the flags the UI shows: \Seen and \Flagged (starred).
+func readFlags(flags []goimap.Flag) (seen, flagged bool) {
+	for _, f := range flags {
+		switch {
+		case strings.EqualFold(string(f), string(goimap.FlagSeen)):
+			seen = true
+		case strings.EqualFold(string(f), string(goimap.FlagFlagged)):
+			flagged = true
+		}
+	}
+	return seen, flagged
 }
 
 // newAddress sanitizes as well, since list rows print names directly.

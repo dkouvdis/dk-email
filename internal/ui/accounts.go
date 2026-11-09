@@ -49,6 +49,8 @@ type openFolder struct {
 	folder  string
 	label   string
 	loading bool
+	// notice is shown in the status line once the first page arrives.
+	notice string
 }
 
 func connectAccount(connect Connector, index int, acct config.Account) tea.Cmd {
@@ -112,10 +114,19 @@ func (m Model) openFolder(account int, folder string) (Model, tea.Cmd) {
 	}
 	m.open = openFolder{account: account, folder: folder, label: label, loading: true}
 	m.list = m.list.SetSummaries(nil, false)
+	m.read = m.read.Close()
 	m.side = m.side.SetOpen(account, folder)
 	m.setStatus(fmt.Sprintf("Loading %s…", label))
 	m.log.Debug("open folder", "account", m.accts[account].Name, "role", role)
 	return m, loadSummaries(m.boxes[account], account, folder, 0)
+}
+
+// reloadChanged reopens a folder whose UIDs were reset on the server.
+func (m Model) reloadChanged(account int, folder string) (Model, tea.Cmd) {
+	m.log.Debug("folder changed on server; reloading", "account", m.accts[account].Name)
+	m, cmd := m.openFolder(account, folder)
+	m.open.notice = fmt.Sprintf("%s changed on the server; reloaded.", m.open.label)
+	return m, cmd
 }
 
 // loadMore fetches the page older than before for the open folder.
@@ -144,10 +155,7 @@ func (m Model) handleSummaries(msg summariesMsg) (Model, tea.Cmd) {
 
 	switch {
 	case paging && errors.Is(msg.err, mail.ErrFolderChanged):
-		m.log.Debug("folder changed on server; reloading", "account", name)
-		m, cmd := m.openFolder(msg.account, msg.folder)
-		m.setStatus(fmt.Sprintf("%s changed on the server; reloaded.", m.open.label))
-		return m, cmd
+		return m.reloadChanged(msg.account, msg.folder)
 	case msg.err != nil:
 		if paging {
 			m.list = m.list.PageFailed()
@@ -159,7 +167,7 @@ func (m Model) handleSummaries(msg summariesMsg) (Model, tea.Cmd) {
 	default:
 		m.list = m.list.SetSummaries(msg.summaries, more)
 	}
-	m.setStatus("")
+	m.setStatus(m.open.notice)
 	m.log.Debug("summaries loaded", "account", name, "count", len(msg.summaries), "page", paging)
 	return m, nil
 }

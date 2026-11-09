@@ -91,6 +91,20 @@ func (m Model) AddPage(sums []mail.Summary, more bool) Model {
 	return m
 }
 
+// SetSeen updates messages' read state after a flag change, keeping the
+// cursor and expanded threads.
+func (m Model) SetSeen(uids []mail.UID, seen bool) Model {
+	sums := slices.Clone(m.sums)
+	for i := range sums {
+		if slices.Contains(uids, sums[i].UID) {
+			sums[i].Seen = seen
+		}
+	}
+	m.sums = sums
+	m.threads = thread.Build(m.sums)
+	return m
+}
+
 // PageFailed ends a page load that failed, so reaching the end retries.
 func (m Model) PageFailed() Model {
 	m.loading = false
