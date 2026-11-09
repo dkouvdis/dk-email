@@ -3,6 +3,7 @@
 │ ▶ Inbox            2 ││ ●    Bob        Re: Plan (2)   13:30 ││                                                                          │
 │   Sent Mail          ││ ●    Carol      Lunch?         Nov 8 ││                                                                          │
 │   All Mail           ││                                      ││                                                                          │
+│   Trash              ││                                      ││                                                                          │
 │   Receipts         1 ││                                      ││                                                                          │
 │                      ││                                      ││                                                                          │
 │ Work                 ││                                      ││                                                                          │
@@ -12,7 +13,6 @@
 │   993) failed:       ││                                      ││                                                                          │
 │   invalid            ││                                      ││                                                                          │
 │   credentials        ││                                      ││                                                                          │
-│                      ││                                      ││                                                                          │
 │                      ││                                      ││                                                                          │
 │                      ││                                      ││                                                                          │
 │                      ││                                      ││                                                                          │

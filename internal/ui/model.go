@@ -154,6 +154,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleMessage(msg)
 	case flagMsg:
 		return m.handleFlag(msg)
+	case moveMsg:
+		return m.handleMove(msg)
 	}
 	return m, nil
 }
@@ -244,6 +246,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case key.Matches(msg, m.keys.Picker):
 			return m.openPicker()
+		case m.isTriageKey(msg):
+			return m.triage(msg)
 		}
 		m.read, _ = m.read.Update(msg)
 		return m, m.fetchMissing()
@@ -270,6 +274,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.side, cmd = m.side.Update(msg)
 		return m, cmd
+	case (m.focus == PaneList || m.focus == PaneReader) && m.isTriageKey(msg):
+		return m.triage(msg)
 	case m.focus == PaneList && key.Matches(msg, m.keys.Open):
 		return m.openThread()
 	case m.focus == PaneList:

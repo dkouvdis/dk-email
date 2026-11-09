@@ -384,3 +384,77 @@ func TestSetSeen_UpdatesRowsInPlace(t *testing.T) {
 		t.Errorf("cursor moved to %d (thread row %v)", got, m.OnThreadRow())
 	}
 }
+
+func TestSetFlagged(t *testing.T) {
+	m := New(clock).SetSummaries(inbox(), false)
+
+	m = m.SetFlagged([]mail.UID{12}, false).SetFlagged([]mail.UID{11}, true)
+
+	got := lines(m, 70)
+	if strings.Contains(got[0], "★") || !strings.Contains(got[1], "★") {
+		t.Errorf("stars not updated:\n%s", strings.Join(got, "\n"))
+	}
+}
+
+func TestLookup(t *testing.T) {
+	m := New(clock).SetSummaries(inbox(), false)
+
+	got := m.Lookup([]mail.UID{14, 99, 5})
+
+	if len(got) != 2 || got[0].UID != 14 || got[1].UID != 5 {
+		t.Errorf("Lookup = %+v, want UIDs 14 and 5", got)
+	}
+}
+
+func TestRemove_MovesCursorToNextThreadAndRestoreUndoes(t *testing.T) {
+	m := New(clock).SetSummaries(inbox(), true) // Plan (14,12,10), Lunch (11), Old news (5)
+
+	m = m.Remove([]mail.UID{14, 12, 10})
+
+	if n := len(lines(m, 70)); n != 2 {
+		t.Fatalf("got %d rows after removing Plan, want 2", n)
+	}
+	if got := cursorUID(t, m); got != 11 {
+		t.Errorf("cursor on %d after removing the cursor's thread, want the next thread (11)", got)
+	}
+
+	m, _ = send(m, "G")
+	m = m.PageFailed() // the end-of-list fetch is irrelevant here
+	m = m.Remove([]mail.UID{5})
+	if got := cursorUID(t, m); got != 11 {
+		t.Errorf("cursor on %d after removing the last thread, want the previous one (11)", got)
+	}
+
+	m = m.Restore(inbox()[:3])
+	if n := len(lines(m, 70)); n != 2 || !strings.Contains(lines(m, 70)[0], "Re: Plan (3)") {
+		t.Errorf("Restore didn't bring Plan back:\n%s", strings.Join(lines(m, 70), "\n"))
+	}
+	if got := cursorUID(t, m); got != 11 {
+		t.Errorf("Restore moved the cursor to %d", got)
+	}
+}
+
+func TestRemove_MessageRowKeepsThread(t *testing.T) {
+	m := New(clock).SetSummaries(inbox(), false)
+	m, _ = send(m, "space", "j", "j") // Bob's message (12)
+
+	m = m.Remove([]mail.UID{12})
+
+	got := lines(m, 70)
+	if !strings.Contains(got[0], "Re: Plan (2)") {
+		t.Errorf("thread row = %q, want 2 messages left", got[0])
+	}
+	if uid := cursorUID(t, m); uid != 14 && uid != 10 {
+		t.Errorf("cursor on %d, want it to stay in the Plan thread", uid)
+	}
+}
+
+func TestRemove_EverythingLeavesEmptyList(t *testing.T) {
+	m := New(clock).SetSummaries(inbox()[3:4], false)
+
+	m = m.Remove([]mail.UID{11})
+
+	if _, ok := m.CursorUID(); ok || !strings.Contains(lines(m, 40)[0], "No messages.") {
+		t.Error("removing every message should leave an empty list")
+	}
+}

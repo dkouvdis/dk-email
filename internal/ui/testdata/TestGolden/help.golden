@@ -3,12 +3,12 @@
 │ ▶ Inbox            2 ││ ●    Bob     │ Keys                       esc close  │                                       │
 │   Sent Mail          ││ ●    Carol   │                                       │                                       │
 │   All Mail           ││              │ Navigation                          ┃ │                                       │
-│   Receipts         1 ││              │   k/↑         up                    ┃ │                                       │
-│                      ││              │   j/↓         down                  ┃ │                                       │
-│ Work                 ││              │   g           top                   ┃ │                                       │
-│   Inbox            1 ││              │   G           bottom                ┃ │                                       │
-│   Archive            ││              │   h/←         left pane             ┃ │                                       │
-│                      ││              │   l/→         right pane            ┃ │                                       │
+│   Trash              ││              │   k/↑         up                    ┃ │                                       │
+│   Receipts         1 ││              │   j/↓         down                  ┃ │                                       │
+│                      ││              │   g           top                   ┃ │                                       │
+│ Work                 ││              │   G           bottom                ┃ │                                       │
+│   Inbox            1 ││              │   h/←         left pane             ┃ │                                       │
+│   Archive            ││              │   l/→         right pane            ┃ │                                       │
 │                      ││              │   tab         next pane             ┃ │                                       │
 │                      ││              │   shift+tab   previous pane         ┃ │                                       │
 │                      ││              │                                     ┃ │                                       │

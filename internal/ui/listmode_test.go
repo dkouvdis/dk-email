@@ -112,7 +112,7 @@ func TestListMode_OpeningAnotherFolderClosesPopup(t *testing.T) {
 	m = pressSettled(t, m, "enter")
 
 	m = pressSettled(t, m, "a")
-	for _, k := range []string{"j", "j", "j", "enter"} { // Personal › Receipts
+	for _, k := range []string{"j", "j", "j", "j", "enter"} { // Personal › Receipts
 		m = pressSettled(t, m, k)
 	}
 

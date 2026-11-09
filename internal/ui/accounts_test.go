@@ -31,6 +31,7 @@ func newFixture() *fixture {
 	p.AddFolder("[Gmail]/Sent Mail", mail.RoleSent)
 	p.AddFolder("[Gmail]/All Mail", mail.RoleAll)
 	p.AddFolder("Receipts", mail.RoleNone)
+	p.AddFolder("[Gmail]/Trash", mail.RoleTrash)
 	p.AddMessage("INBOX", msg("Alice", "Plan", fixedNow.Add(-5*time.Hour), true, "p1"))
 	p.AddMessage("INBOX", msg("Carol", "Lunch?", fixedNow.Add(-26*time.Hour), false, "l1"))
 	p.AddMessage("INBOX", msg("Bob", "Re: Plan", fixedNow.Add(-2*time.Hour), false, "p2", "p1"))
@@ -219,8 +220,8 @@ func TestAccounts_EnterOpensFolderUnderCursor(t *testing.T) {
 	m := started(t, f, 160, 30)
 	m = send(t, m, press("h")) // focus the sidebar; cursor is on Personal's Inbox
 
-	// Inbox, Sent Mail, All Mail, Receipts.
-	m = send(t, m, press("j"), press("j"), press("j"))
+	// Inbox, Sent Mail, All Mail, Trash, Receipts.
+	m = send(t, m, press("j"), press("j"), press("j"), press("j"))
 	next, cmd := m.Update(press("enter"))
 	m = settle(t, next.(Model), cmd)
 

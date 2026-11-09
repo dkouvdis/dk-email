@@ -3,12 +3,12 @@
 │ ▶ Inbox            2 ││ ●    Bob     │ Keys                       esc close  │                                       │
 │   Sent Mail          ││ ●    Carol   │                                       │                                       │
 │   All Mail           ││              │   enter       open                    │                                       │
-│   Receipts         1 ││              │   space       expand                  │                                       │
-│                      ││              │   u           read/unread             │                                       │
-│ Work                 ││              │   s           star                    │                                       │
-│   Inbox            1 ││              │   e           archive                 │                                       │
-│   Archive            ││              │   d           delete                  │                                       │
-│                      ││              │   m           move                    │                                       │
+│   Trash              ││              │   space       expand                  │                                       │
+│   Receipts         1 ││              │   u           read/unread             │                                       │
+│                      ││              │   s           star                    │                                       │
+│ Work                 ││              │   e           archive                 │                                       │
+│   Inbox            1 ││              │   d           delete                  │                                       │
+│   Archive            ││              │   m           move                    │                                       │
 │                      ││              │   r           refresh               ┃ │                                       │
 │                      ││              │                                     ┃ │                                       │
 │                      ││              │ Accounts & view                     ┃ │                                       │

@@ -38,7 +38,7 @@ type body struct {
 
 type keys struct{ up, down, pgUp, pgDown, top, bottom, expandAll key.Binding }
 
-type styles struct{ subject, label, sender, dim, dot, sep, err lipgloss.Style }
+type styles struct{ subject, label, sender, dim, dot, star, sep, err lipgloss.Style }
 
 type Model struct {
 	now func() time.Time
@@ -75,6 +75,7 @@ func New(now func() time.Time) Model {
 			sender:  lipgloss.NewStyle().Bold(true),
 			dim:     lipgloss.NewStyle().Foreground(lipgloss.Color("244")),
 			dot:     lipgloss.NewStyle().Foreground(lipgloss.Color("111")),
+			star:    lipgloss.NewStyle().Foreground(lipgloss.Color("220")),
 			sep:     lipgloss.NewStyle().Foreground(lipgloss.Color("238")),
 			err:     lipgloss.NewStyle().Foreground(lipgloss.Color("203")),
 		},
@@ -158,13 +159,56 @@ func (m Model) SetMessage(uid mail.UID, msg mail.Message, err error) Model {
 
 // SetSeen updates read markers after a flag change.
 func (m Model) SetSeen(uids []mail.UID, seen bool) Model {
+	return m.update(uids, func(s *mail.Summary) { s.Seen = seen })
+}
+
+// SetFlagged updates star markers after a flag change.
+func (m Model) SetFlagged(uids []mail.UID, flagged bool) Model {
+	return m.update(uids, func(s *mail.Summary) { s.Flagged = flagged })
+}
+
+func (m Model) update(uids []mail.UID, fn func(*mail.Summary)) Model {
 	msgs := slices.Clone(m.th.Messages)
 	for i := range msgs {
 		if slices.Contains(uids, msgs[i].UID) {
-			msgs[i].Seen = seen
+			fn(&msgs[i])
 		}
 	}
 	m.th = thread.Thread{Messages: msgs}
+	return m
+}
+
+// Current is the message the reader is on: the one expanded when the
+// thread opened. Triage keys in the reader act on it. It's 0 when closed.
+func (m Model) Current() mail.UID {
+	for _, s := range m.th.Messages {
+		if m.defaults[s.UID] {
+			return s.UID
+		}
+	}
+	return 0
+}
+
+// Remove drops messages that were moved away. If the current message goes,
+// the next one (or the last) becomes current; with none left the reader
+// closes.
+func (m Model) Remove(uids []mail.UID) Model {
+	if !m.open {
+		return m
+	}
+	cur := slices.IndexFunc(m.th.Messages, func(s mail.Summary) bool { return s.UID == m.Current() })
+	msgs := slices.DeleteFunc(slices.Clone(m.th.Messages), func(s mail.Summary) bool { return slices.Contains(uids, s.UID) })
+	if len(msgs) == 0 {
+		return m.Close()
+	}
+	m.th = thread.Thread{Messages: msgs}
+	if m.Current() == 0 {
+		next := msgs[min(max(cur, 0), len(msgs)-1)].UID
+		m.defaults = map[mail.UID]bool{next: true}
+		m.expanded = maps.Clone(m.expanded)
+		m.expanded[next] = true
+	}
+	m.offset = m.clamp(m.offset)
 	return m
 }
 
@@ -262,7 +306,14 @@ func (m Model) collapsedLine(s mail.Summary) string {
 	if !s.Seen {
 		dot = m.st.dot.Render("●")
 	}
-	return dot + " " + m.st.sender.Render(s.From.DisplayName()) + "  " + m.st.dim.Render(m.longDate(s.Date))
+	return dot + " " + m.st.sender.Render(s.From.DisplayName()) + m.star(s) + "  " + m.st.dim.Render(m.longDate(s.Date))
+}
+
+func (m Model) star(s mail.Summary) string {
+	if !s.Flagged {
+		return ""
+	}
+	return " " + m.st.star.Render("★")
 }
 
 func (m Model) expandedLines(s mail.Summary, width int) []string {
@@ -272,7 +323,7 @@ func (m Model) expandedLines(s mail.Summary, width int) []string {
 		to, cc = b.msg.To, b.msg.Cc
 	}
 
-	out := m.header("From", s.From.String(), width)
+	out := m.header("From", s.From.String()+m.star(s), width)
 	if len(to) > 0 {
 		out = append(out, m.header("To", joinAddresses(to), width)...)
 	}

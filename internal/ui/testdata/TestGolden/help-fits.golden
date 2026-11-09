@@ -3,12 +3,12 @@
 │ ▶ Inbox            2 ││ ●    Bob      Re: … (2) 13:30 ││                                                             │
 │   Sent Mail          ││ ●    Carol    Lunch?    Nov 8 ││                                                             │
 │   All Mail           ││                               ││                                                             │
-│   Receipts         1 ││                               ││                                                             │
-│                      ││               ╭──────────────────────────────────────╮                                       │
-│ Work                 ││               │ Keys                      esc close  │                                       │
-│   Inbox            1 ││               │                                      │                                       │
-│   Archive            ││               │ Navigation                           │                                       │
-│                      ││               │   k/↑         up                     │                                       │
+│   Trash              ││                               ││                                                             │
+│   Receipts         1 ││               ╭──────────────────────────────────────╮                                       │
+│                      ││               │ Keys                      esc close  │                                       │
+│ Work                 ││               │                                      │                                       │
+│   Inbox            1 ││               │ Navigation                           │                                       │
+│   Archive            ││               │   k/↑         up                     │                                       │
 │                      ││               │   j/↓         down                   │                                       │
 │                      ││               │   g           top                    │                                       │
 │                      ││               │   G           bottom                 │                                       │

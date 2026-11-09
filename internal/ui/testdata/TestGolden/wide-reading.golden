@@ -3,12 +3,12 @@
 │ ▶ Inbox            1 ││      Bob        Re: Plan (2)   13:30 ││                                                                          │
 │   Sent Mail          ││ ●    Carol      Lunch?         Nov 8 ││   Alice  Mon 9 Nov 2026 10:30                                            │
 │   All Mail           ││                                      ││ ──────────────────────────────────────────────────────────────────────── │
-│   Receipts         1 ││                                      ││ From: Bob                                                                │
-│                      ││                                      ││ Date: Mon 9 Nov 2026 13:30                                               │
-│ Work                 ││                                      ││                                                                          │
-│   Inbox            1 ││                                      ││ Body of Re: Plan from Bob.                                               │
-│   Archive            ││                                      ││                                                                          │
+│   Trash              ││                                      ││ From: Bob                                                                │
+│   Receipts         1 ││                                      ││ Date: Mon 9 Nov 2026 13:30                                               │
 │                      ││                                      ││                                                                          │
+│ Work                 ││                                      ││ Body of Re: Plan from Bob.                                               │
+│   Inbox            1 ││                                      ││                                                                          │
+│   Archive            ││                                      ││                                                                          │
 │                      ││                                      ││                                                                          │
 │                      ││                                      ││                                                                          │
 │                      ││                                      ││                                                                          │

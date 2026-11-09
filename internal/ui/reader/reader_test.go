@@ -231,3 +231,35 @@ func TestFormatSize(t *testing.T) {
 		}
 	}
 }
+
+func TestCurrent(t *testing.T) {
+	if got := open(conversation(), 0).Current(); got != 2 {
+		t.Errorf("Current() = %d, want the first unread (2)", got)
+	}
+	if got := open(conversation(), 1).Current(); got != 1 {
+		t.Errorf("Current() = %d, want the focused message (1)", got)
+	}
+	if got := New(time.Now).Current(); got != 0 {
+		t.Errorf("Current() on an empty reader = %d, want 0", got)
+	}
+}
+
+func TestSetFlaggedAndRemove(t *testing.T) {
+	m := open(conversation(), 0).SetFlagged([]mail.UID{1}, true)
+	if !strings.Contains(view(m), "★") {
+		t.Errorf("starred message has no star:\n%s", view(m))
+	}
+
+	m = m.Remove([]mail.UID{2})
+	if strings.Contains(view(m), "Bob") || !m.IsOpen() {
+		t.Errorf("Bob's message still shown, or the reader closed:\n%s", view(m))
+	}
+	if m.Current() != 3 {
+		t.Errorf("Current() = %d after removing it, want the next message (3)", m.Current())
+	}
+
+	m = m.Remove([]mail.UID{1, 3})
+	if m.IsOpen() {
+		t.Error("reader still open with no messages left")
+	}
+}

@@ -162,7 +162,7 @@ func TestReader_SetFlagErrorShows(t *testing.T) {
 
 	m = pressSettled(t, m, "enter")
 
-	if !m.statusErr || !strings.Contains(m.status, "mark seen: STORE refused") {
+	if !m.statusErr || !strings.Contains(m.status, "mark as read: STORE refused") {
 		t.Errorf("status = %q", m.status)
 	}
 }

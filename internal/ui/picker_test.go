@@ -26,8 +26,8 @@ func TestPicker_ChoosingAnotherAccountSwitchesAndLoads(t *testing.T) {
 	f := newFixture()
 	m := started(t, f, 100, 30)
 
-	// Personal: Inbox, Sent Mail, All Mail, Receipts; then Work: Inbox.
-	for _, k := range []string{"a", "j", "j", "j", "j", "enter"} {
+	// Personal: Inbox, Sent Mail, All Mail, Trash, Receipts; then Work: Inbox.
+	for _, k := range []string{"a", "j", "j", "j", "j", "j", "enter"} {
 		m = pressSettled(t, m, k)
 	}
 

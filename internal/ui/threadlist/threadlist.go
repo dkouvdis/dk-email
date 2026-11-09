@@ -94,14 +94,69 @@ func (m Model) AddPage(sums []mail.Summary, more bool) Model {
 // SetSeen updates messages' read state after a flag change, keeping the
 // cursor and expanded threads.
 func (m Model) SetSeen(uids []mail.UID, seen bool) Model {
+	return m.update(uids, func(s *mail.Summary) { s.Seen = seen })
+}
+
+// SetFlagged updates messages' starred state, keeping the cursor.
+func (m Model) SetFlagged(uids []mail.UID, flagged bool) Model {
+	return m.update(uids, func(s *mail.Summary) { s.Flagged = flagged })
+}
+
+func (m Model) update(uids []mail.UID, fn func(*mail.Summary)) Model {
 	sums := slices.Clone(m.sums)
 	for i := range sums {
 		if slices.Contains(uids, sums[i].UID) {
-			sums[i].Seen = seen
+			fn(&sums[i])
 		}
 	}
 	m.sums = sums
 	m.threads = thread.Build(m.sums)
+	return m
+}
+
+// Lookup returns the loaded summaries for uids, in uids order, skipping
+// any that aren't loaded.
+func (m Model) Lookup(uids []mail.UID) []mail.Summary {
+	var out []mail.Summary
+	for _, uid := range uids {
+		if i := slices.IndexFunc(m.sums, func(s mail.Summary) bool { return s.UID == uid }); i >= 0 {
+			out = append(out, m.sums[i])
+		}
+	}
+	return out
+}
+
+// Remove drops messages, e.g. after archiving. If the cursor's row goes,
+// the cursor moves to the thread that took its place (the next one), or
+// the new last thread.
+func (m Model) Remove(uids []mail.UID) Model {
+	rows := m.rows()
+	at := max(m.cursorRow(rows), 0)
+	threadAt := 0
+	if at < len(rows) {
+		threadAt = rows[at].thread
+	}
+
+	m.sums = slices.DeleteFunc(slices.Clone(m.sums), func(s mail.Summary) bool { return slices.Contains(uids, s.UID) })
+	m.threads = thread.Build(m.sums)
+
+	if _, ok := m.CursorUID(); ok && !slices.Contains(uids, m.cursor.uid) {
+		m.ensureVisible()
+		return m
+	}
+	m.cursor = cursor{}
+	if len(m.threads) > 0 {
+		m.cursor.uid = m.threads[min(threadAt, len(m.threads)-1)].Latest().UID
+	}
+	m.ensureVisible()
+	return m
+}
+
+// Restore puts removed messages back, e.g. when a move fails.
+func (m Model) Restore(sums []mail.Summary) Model {
+	m.sums = dedupe(m.sums, sums)
+	m.threads = thread.Build(m.sums)
+	m.ensureVisible()
 	return m
 }
 
