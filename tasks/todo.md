@@ -80,11 +80,11 @@ Every task also meets the standing bar before it counts as done:
 - `internal/mail/mailtest.Fake`: an in-memory `Mailbox` with configurable delay and errors, for UI tests
 
 **Acceptance criteria:**
-- [ ] The `mail` package imports no IMAP or UI packages, and a test checks this using `go list -deps`.
-- [ ] `Fake` supports every interface method, including `Move` and `SetFlag` state changes, and can inject an error for each method.
+- [x] The `mail` package imports no IMAP or UI packages, and a test checks this using `go list -deps`.
+- [x] `Fake` supports every interface method, including `Move` and `SetFlag` state changes, and can inject an error for each method.
 
 **Verification:**
-- [ ] `go test -race ./internal/mail/...` passes.
+- [x] `go test -race ./internal/mail/...` passes.
 
 **Dependencies:** T1
 **Files:** `internal/mail/mail.go`, `internal/mail/mail_test.go`, `internal/mail/mailtest/fake.go`, `internal/mail/mailtest/fake_test.go`

@@ -31,7 +31,7 @@ The full details for every task are in [todo.md](todo.md).
 - [x] T1: Scaffold the module with a `--version` flag, `.gitignore`, and CI
 - [x] T2: Config loading, paths, and the config-folder `.gitignore`
 - [x] T3: Password resolution (`password_cmd` and keychain)
-- [ ] T4: Mail domain types, the `Mailbox` interface, and a fake
+- [x] T4: Mail domain types, the `Mailbox` interface, and a fake
 - [ ] T5: IMAP connect + `Folders` (memserver tests + live read-only Gmail check)
 
 **Checkpoint 1:** foundation tests pass, and real Gmail folders are listed through `op read`.
