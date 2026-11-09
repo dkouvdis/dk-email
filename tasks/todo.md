@@ -299,7 +299,7 @@ Every task also meets the standing bar before it counts as done:
 
 **Verification:**
 - [x] `go test -race ./...` passes (reader coverage 95%, UI tests stable over 3 runs).
-- [ ] Manual: read real Gmail threads with the live account.
+- [x] Manual: read real Gmail threads with the live account. (Confirmed by you 2026-11-09.)
 
 **Notes:**
 - IMAP `Message` opens the folder read-only and fetches `BODY.PEEK[]`, then parses it with `render`. Flags come from the server, and the date falls back to the internal date. A missing UID returns `ErrMessageNotFound`, and a reset folder returns `ErrFolderChanged`, which reloads the folder with a notice.

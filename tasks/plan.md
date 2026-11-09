@@ -43,7 +43,7 @@ The full details for every task are in [todo.md](todo.md).
 - [x] T9: Sidebar with folder selection (wide mode)
 - [x] T10: Thread list (expand/collapse, navigation, paging)
 - [x] T11: Render package (MIME → text)
-- [ ] T12: IMAP `Message` fetch + reader pane + mark read on open
+- [x] T12: IMAP `Message` fetch + reader pane + mark read on open
 - [ ] T13: Narrow mode header + account/folder picker (`a`)
 - [ ] T14: List + popup mode (`v`, forced below 80 columns)
 - [ ] T15: Release pipeline (GoReleaser, `release.yml`, Homebrew cask)
