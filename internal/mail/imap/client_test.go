@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -454,8 +456,11 @@ func TestNewTLSConfig_EnforcesServerNameAndMinimumVersion(t *testing.T) {
 	c := New(config.Account{IMAPHost: "imap.example.com"}, "pw")
 	c.tlsConfig = base
 
-	got := c.newTLSConfig()
+	got, err := c.newTLSConfig()
 
+	if err != nil {
+		t.Fatal(err)
+	}
 	if got.ServerName != "imap.example.com" {
 		t.Errorf("ServerName = %q, want imap.example.com", got.ServerName)
 	}
@@ -470,10 +475,10 @@ func TestNewTLSConfig_EnforcesServerNameAndMinimumVersion(t *testing.T) {
 func TestNewTLSConfig_DefaultsToTLS12(t *testing.T) {
 	c := New(config.Account{IMAPHost: "imap.example.com"}, "pw")
 
-	got := c.newTLSConfig()
+	got, err := c.newTLSConfig()
 
-	if got.MinVersion != tls.VersionTLS12 || got.ServerName != "imap.example.com" {
-		t.Errorf("newTLSConfig() = {MinVersion: %#x, ServerName: %q}", got.MinVersion, got.ServerName)
+	if err != nil || got.MinVersion != tls.VersionTLS12 || got.ServerName != "imap.example.com" || got.RootCAs != nil {
+		t.Errorf("newTLSConfig() = %+v, %v; want TLS 1.2, the host, and system roots", got, err)
 	}
 }
 
@@ -481,4 +486,50 @@ func newTrustingClient(srv *testServer, mode, password string) *Client {
 	c := New(srv.account(mode), password)
 	c.tlsConfig = srv.clientTLS
 	return c
+}
+
+func TestDial_TrustsTLSCertFileLikeProtonBridge(t *testing.T) {
+	for _, mode := range []string{modeStartTLS, modeImplicit} {
+		t.Run(mode, func(t *testing.T) {
+			srv := startServer(t, mode, capsListStatus)
+			certFile := filepath.Join(t.TempDir(), "cert.pem")
+			if err := os.WriteFile(certFile, srv.certPEM, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			acct := srv.account(mode)
+			acct.TLSCert = certFile
+
+			c, err := Dial(timeoutCtx(t, 10*time.Second), acct, testPassword) // no test-only tlsConfig
+
+			if err != nil {
+				t.Fatalf("Dial() with tls_cert error = %v", err)
+			}
+			c.Close()
+		})
+	}
+}
+
+func TestDial_TLSCertErrors(t *testing.T) {
+	srv := startServer(t, modeStartTLS, capsListStatus)
+	other := startServer(t, modeStartTLS, capsListStatus)
+	dir := t.TempDir()
+	wrong := filepath.Join(dir, "other.pem")
+	if err := os.WriteFile(wrong, other.certPEM, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct{ file, want string }{
+		{wrong, "certificate signed by unknown authority"},
+		{filepath.Join(dir, "missing.pem"), `tls_cert for account "Test"`},
+	}
+	for _, tt := range tests {
+		acct := srv.account(modeStartTLS)
+		acct.TLSCert = tt.file
+
+		_, err := Dial(timeoutCtx(t, 10*time.Second), acct, testPassword)
+
+		if err == nil || !strings.Contains(err.Error(), tt.want) {
+			t.Errorf("Dial() with %s error = %v, want %q", filepath.Base(tt.file), err, tt.want)
+		}
+	}
 }

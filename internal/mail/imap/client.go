@@ -203,7 +203,11 @@ func (c *Client) open(ctx context.Context) (*imapclient.Client, net.Conn, error)
 // handshake upgrades raw to TLS, waits for the greeting and logs in. It
 // leaves raw open on failure; the caller closes it.
 func (c *Client) handshake(ctx context.Context, raw net.Conn) (*imapclient.Client, error) {
-	opts := &imapclient.Options{TLSConfig: c.newTLSConfig()}
+	tlsConfig, err := c.newTLSConfig()
+	if err != nil {
+		return nil, err
+	}
+	opts := &imapclient.Options{TLSConfig: tlsConfig}
 
 	var conn *imapclient.Client
 	switch c.acct.TLS {
@@ -233,14 +237,25 @@ func (c *Client) handshake(ctx context.Context, raw net.Conn) (*imapclient.Clien
 	return conn, nil
 }
 
-func (c *Client) newTLSConfig() *tls.Config {
+// newTLSConfig verifies the server against the system roots, or only
+// against the account's tls_cert when set. A custom pool also makes Go use
+// its own verifier rather than macOS's, which rejects self-signed certs
+// valid for more than 825 days, such as Proton Mail Bridge's.
+func (c *Client) newTLSConfig() (*tls.Config, error) {
 	cfg := &tls.Config{}
 	if c.tlsConfig != nil {
 		cfg = c.tlsConfig.Clone()
 	}
 	cfg.ServerName = c.acct.IMAPHost
 	cfg.MinVersion = max(cfg.MinVersion, tls.VersionTLS12)
-	return cfg
+	if c.acct.TLSCert != "" {
+		pool, err := config.CertPool(c.acct.TLSCert)
+		if err != nil {
+			return nil, fmt.Errorf("tls_cert for account %q: %w", c.acct.Name, err)
+		}
+		cfg.RootCAs = pool
+	}
+	return cfg, nil
 }
 
 func (c *Client) loginError(err error) error {

@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/pem"
 	"io"
 	"log"
 	"math/big"
@@ -81,6 +82,7 @@ var (
 type testServer struct {
 	host, port string
 	clientTLS  *tls.Config
+	certPEM    []byte // the server's self-signed certificate, as a tls_cert file holds it
 	ln         *trackingListener
 	user       *imapmemserver.User
 
@@ -113,6 +115,7 @@ func startServer(t *testing.T, mode string, caps goimap.CapSet) *testServer {
 		host:      host,
 		port:      port,
 		clientTLS: &tls.Config{RootCAs: pool},
+		certPEM:   pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert.Certificate[0]}),
 		ln:        ln,
 		user:      user,
 		release:   make(chan struct{}),
@@ -315,10 +318,12 @@ func selfSignedCert(t *testing.T) (tls.Certificate, *x509.CertPool) {
 		SerialNumber: big.NewInt(1),
 		Subject:      pkix.Name{CommonName: "dk-email test"},
 		NotBefore:    time.Now().Add(-time.Hour),
-		NotAfter:     time.Now().Add(time.Hour),
-		KeyUsage:     x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		IPAddresses:  []net.IP{net.ParseIP("127.0.0.1")},
+		// Valid for 20 years like Proton Mail Bridge's cert, which macOS's
+		// verifier rejects; tls_cert must not depend on that verifier.
+		NotAfter:    time.Now().AddDate(20, 0, 0),
+		KeyUsage:    x509.KeyUsageDigitalSignature,
+		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		IPAddresses: []net.IP{net.ParseIP("127.0.0.1")},
 	}
 	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
 	if err != nil {

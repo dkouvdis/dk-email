@@ -1,6 +1,13 @@
 package config
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
+	"math/big"
 	"os"
 	"path/filepath"
 	"strings"
@@ -221,5 +228,99 @@ func TestLoad_UnreadableFile(t *testing.T) {
 
 	if err == nil {
 		t.Fatal("Load() on a directory error = nil, want error")
+	}
+}
+
+// testCertPEM writes a self-signed certificate as PEM and returns its bytes.
+func testCertPEM(t *testing.T) []byte {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmpl := &x509.Certificate{SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "127.0.0.1"}, NotAfter: time.Now().Add(time.Hour)}
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
+}
+
+func TestLoad_TLSCertResolvesPaths(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	cert := testCertPEM(t)
+	if err := os.WriteFile(filepath.Join(home, "bridge.pem"), cert, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name, value string
+		want        func(cfgDir string) string
+	}{
+		{"home", "~/bridge.pem", func(string) string { return filepath.Join(home, "bridge.pem") }},
+		{"absolute", filepath.Join(home, "bridge.pem"), func(string) string { return filepath.Join(home, "bridge.pem") }},
+		{"relative to the config folder", "certs/bridge.pem", func(dir string) string { return filepath.Join(dir, "certs", "bridge.pem") }},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			path := writeConfig(t, "[[account]]\nname = \"Proton\"\nemail = \"me@pm.me\"\nimap_host = \"127.0.0.1\"\nimap_port = 1143\ntls = \"starttls\"\ntls_cert = \""+tt.value+"\"\n")
+			dir := filepath.Dir(path)
+			if err := os.MkdirAll(filepath.Join(dir, "certs"), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(dir, "certs", "bridge.pem"), cert, 0o600); err != nil {
+				t.Fatal(err)
+			}
+
+			cfg, err := Load(path)
+
+			if err != nil {
+				t.Fatalf("Load() error = %v", err)
+			}
+			if got := cfg.Accounts[0].TLSCert; got != tt.want(dir) {
+				t.Errorf("TLSCert = %q, want %q", got, tt.want(dir))
+			}
+		})
+	}
+}
+
+func TestLoad_TLSCertMustBeReadablePEM(t *testing.T) {
+	dir := t.TempDir()
+	garbage := filepath.Join(dir, "garbage.pem")
+	if err := os.WriteFile(garbage, []byte("not a certificate"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct{ value, want string }{
+		{filepath.Join(dir, "missing.pem"), "no such file"},
+		{garbage, "contains no PEM certificate"},
+	}
+	for _, tt := range tests {
+		path := writeConfig(t, "[[account]]\nname = \"Proton\"\nemail = \"me@pm.me\"\nimap_host = \"127.0.0.1\"\ntls_cert = \""+tt.value+"\"\n")
+
+		_, err := Load(path)
+
+		if err == nil || !strings.Contains(err.Error(), `account "Proton": tls_cert: `) || !strings.Contains(err.Error(), tt.want) {
+			t.Errorf("Load() error = %v, want a tls_cert error containing %q", err, tt.want)
+		}
+	}
+}
+
+func TestCertPool(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "c.pem")
+	if err := os.WriteFile(path, testCertPEM(t), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if pool, err := CertPool(path); err != nil || pool == nil {
+		t.Errorf("CertPool() = %v, %v", pool, err)
+	}
+}
+
+func TestResolvePath(t *testing.T) {
+	if got := resolvePath("", "/base"); got != "" {
+		t.Errorf("empty = %q", got)
+	}
+	if got := resolvePath("~", "/base"); got == "~" || got == "" {
+		t.Errorf("~ = %q, want the home directory", got)
 	}
 }

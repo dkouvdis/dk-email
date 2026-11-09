@@ -2,10 +2,12 @@
 package config
 
 import (
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -49,6 +51,11 @@ type Account struct {
 	TLS           string `toml:"tls"`
 	PasswordCmd   string `toml:"password_cmd"`
 	ArchiveFolder string `toml:"archive_folder"`
+	// TLSCert is a PEM file of certificates to trust for this account instead
+	// of the system roots, e.g. Proton Mail Bridge's exported cert.pem. Load
+	// makes it absolute: "~/" is expanded and a relative path is resolved
+	// from the config file's folder.
+	TLSCert string `toml:"tls_cert"`
 }
 
 // Duration reads TOML strings such as "120s" or "2m".
@@ -99,6 +106,7 @@ func Load(path string) (*Config, error) {
 
 	for i := range cfg.Accounts {
 		cfg.Accounts[i].applyDefaults()
+		cfg.Accounts[i].TLSCert = resolvePath(cfg.Accounts[i].TLSCert, filepath.Dir(path))
 	}
 	if err := errors.Join(unknownErr, cfg.validate()); err != nil {
 		return nil, fmt.Errorf("invalid config %s: %w", path, err)
@@ -192,5 +200,39 @@ func (a Account) validate() []error {
 	if a.IMAPPort < 1 || a.IMAPPort > 65535 {
 		errs = append(errs, fmt.Errorf("imap_port must be between 1 and 65535, got %d", a.IMAPPort))
 	}
+	if a.TLSCert != "" {
+		if _, err := CertPool(a.TLSCert); err != nil {
+			errs = append(errs, fmt.Errorf("tls_cert: %w", err))
+		}
+	}
 	return errs
+}
+
+// CertPool reads a PEM file into a pool holding only its certificates.
+func CertPool(path string) (*x509.CertPool, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	pool := x509.NewCertPool()
+	if !pool.AppendCertsFromPEM(data) {
+		return nil, fmt.Errorf("%s contains no PEM certificate", path)
+	}
+	return pool, nil
+}
+
+// resolvePath expands a leading "~/" and makes a relative path relative to
+// base. An empty path stays empty.
+func resolvePath(p, base string) string {
+	switch {
+	case p == "":
+		return ""
+	case p == "~" || strings.HasPrefix(p, "~/"):
+		if home, err := os.UserHomeDir(); err == nil {
+			return filepath.Join(home, strings.TrimPrefix(p, "~"))
+		}
+	case !filepath.IsAbs(p):
+		return filepath.Join(base, p)
+	}
+	return p
 }
