@@ -42,7 +42,16 @@ type Client struct {
 	conn   *imapclient.Client
 	raw    net.Conn // the TCP connection under conn, closed to abort a call
 	closed bool
+	// uidValidity remembers each folder's last seen UIDVALIDITY.
+	uidValidity map[string]uint32
 }
+
+// finalError marks an error from a healthy connection, so do neither drops
+// the connection nor retries.
+type finalError struct{ err error }
+
+func (e finalError) Error() string { return e.err.Error() }
+func (e finalError) Unwrap() error { return e.err }
 
 // New returns a Client for acct. It does no network I/O; the connection is
 // opened by the first call.
@@ -91,10 +100,6 @@ func (c *Client) Close() error {
 	return nil
 }
 
-func (c *Client) Summaries(ctx context.Context, folder string, before mail.UID, limit int) ([]mail.Summary, error) {
-	return nil, fmt.Errorf("imap: Summaries: %w", errors.ErrUnsupported)
-}
-
 func (c *Client) Message(ctx context.Context, folder string, uid mail.UID) (mail.Message, error) {
 	return mail.Message{}, fmt.Errorf("imap: Message: %w", errors.ErrUnsupported)
 }
@@ -134,7 +139,8 @@ func (c *Client) do(ctx context.Context, op string, fn func(*imapclient.Client) 
 			return fmt.Errorf("imap: %s: %w", op, ctxErr)
 		}
 		var serverErr *goimap.Error
-		if errors.As(err, &serverErr) {
+		var final finalError
+		if errors.As(err, &serverErr) || errors.As(err, &final) {
 			return fmt.Errorf("imap: %s: %w", op, err)
 		}
 		c.dropLocked()

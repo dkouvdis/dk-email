@@ -18,6 +18,10 @@ var (
 	ErrFolderNotFound  = errors.New("folder not found")
 	ErrMessageNotFound = errors.New("message not found")
 	ErrClosed          = errors.New("mailbox closed")
+	// ErrFolderChanged means the folder's UIDs were reset on the server
+	// (IMAP UIDVALIDITY changed), so UIDs from earlier calls are invalid and
+	// the caller must reload from the newest message.
+	ErrFolderChanged = errors.New("folder changed on server; reload it")
 )
 
 // UID identifies a message within one folder (IMAP UID semantics).
@@ -147,6 +151,7 @@ type Mailbox interface {
 	// Folders lists all folders with their role and unread/total counts.
 	Folders(ctx context.Context) ([]Folder, error)
 	// Summaries returns up to limit messages with UID below before (0 = newest), newest first.
+	// Paging (before != 0) fails with ErrFolderChanged if the folder's UIDs were reset.
 	Summaries(ctx context.Context, folder string, before UID, limit int) ([]Summary, error)
 	// Message fetches and parses a full message without marking it seen.
 	Message(ctx context.Context, folder string, uid UID) (Message, error)

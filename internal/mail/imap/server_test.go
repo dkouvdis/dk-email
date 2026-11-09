@@ -82,6 +82,7 @@ type testServer struct {
 	host, port string
 	clientTLS  *tls.Config
 	ln         *trackingListener
+	user       *imapmemserver.User
 
 	// hangList makes LIST block until the test ends.
 	hangList atomic.Bool
@@ -105,16 +106,17 @@ func startServer(t *testing.T, mode string, caps goimap.CapSet) *testServer {
 		t.Fatalf("split address: %v", err)
 	}
 
+	user := imapmemserver.NewUser(testUser, testPassword)
+	seedMailboxes(t, user)
+
 	s := &testServer{
 		host:      host,
 		port:      port,
 		clientTLS: &tls.Config{RootCAs: pool},
 		ln:        ln,
+		user:      user,
 		release:   make(chan struct{}),
 	}
-
-	user := imapmemserver.NewUser(testUser, testPassword)
-	seedMailboxes(t, user)
 
 	opts := &imapserver.Options{
 		NewSession: func(*imapserver.Conn) (imapserver.Session, *imapserver.GreetingData, error) {

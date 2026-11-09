@@ -127,7 +127,7 @@ package mail
 
 type Mailbox interface {
 	Folders(ctx context.Context) ([]Folder, error)              // includes special-use role and unread count
-	Summaries(ctx context.Context, folder string, before UID, limit int) ([]Summary, error)
+	Summaries(ctx context.Context, folder string, before UID, limit int) ([]Summary, error) // newest first; ErrFolderChanged when paging after UIDVALIDITY changed
 	Message(ctx context.Context, folder string, uid UID) (Message, error) // full parsed body
 	SetFlag(ctx context.Context, folder string, uids []UID, f Flag, on bool) error // Seen, Flagged
 	Move(ctx context.Context, from string, uids []UID, to string) error

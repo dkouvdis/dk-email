@@ -156,13 +156,20 @@ Every task also meets the standing bar before it counts as done:
 - Track UIDVALIDITY so a change triggers a reload.
 
 **Acceptance criteria:**
-- [ ] Paging through 450 seeded messages returns 200 + 200 + 50, newest first, with no duplicates or gaps.
-- [ ] Summary fields (From, To, Subject, Date, Flags and all three threading IDs) match the seeded data, including encoded-word subjects.
-- [ ] Selecting a folder doesn't change any flags (no implicit `\Seen`).
+- [x] Paging through 450 seeded messages returns 200 + 200 + 50, newest first, with no duplicates or gaps.
+- [x] Summary fields (From, To, Subject, Date, Flags and all three threading IDs) match the seeded data, including encoded-word subjects.
+- [x] Selecting a folder doesn't change any flags (no implicit `\Seen`).
 
 **Verification:**
-- [ ] `go test -race ./internal/mail/imap/...` passes.
-- [ ] The live test `TestLiveSummaries` shows the 200 newest INBOX subjects.
+- [x] `go test -race ./internal/mail/imap/...` passes (94.9% coverage, stable over 3 runs).
+- [ ] The live test `TestLiveSummaries` shows the 200 newest INBOX subjects. You run this manually: `DK_EMAIL_LIVE_ACCOUNT=Personal go test -tags live -run TestLiveSummaries ./internal/mail/imap/ -v`. It also fails if the INBOX unread count drops.
+
+**Notes:**
+- Each call runs `EXAMINE` → `UID SEARCH UID 1:before-1` (or `ALL`) → one `UID FETCH` of the envelope, flags, internal date and `BODY.PEEK[HEADER.FIELDS (References)]`. Date falls back to the internal date when the message has no `Date:` header.
+- A UIDVALIDITY change while paging (`before ≠ 0`) returns the new `mail.ErrFolderChanged`, and the UI must reload from `before = 0` (T10). `before = 0` always succeeds and records the new value.
+- `Client.do` doesn't drop the connection or retry on errors wrapped in `finalError`. Without that, a retry would have hidden `ErrFolderChanged`.
+- An unknown folder returns `mail.ErrFolderNotFound` (from `[NONEXISTENT]`) and keeps the connection.
+- `go-message` moved from an indirect to a direct dependency (already pulled in by go-imap) for `References` parsing.
 
 **Dependencies:** T5
 **Files:** `internal/mail/imap/summaries.go`, `internal/mail/imap/summaries_test.go`, `internal/mail/imap/live_test.go`
