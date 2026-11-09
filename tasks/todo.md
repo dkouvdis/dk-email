@@ -560,8 +560,17 @@ Add `release.yml`, triggered by `v*` tags, which runs the tests and then `gorele
 - the keybinding table
 - the release process for maintainers (tag format, prerequisites, token expiry)
 
+The **keychain section** (requested 2026-11-09) must cover:
+- Omit `password_cmd` to use the keychain. The entry's service is `dk-email` and its account is the config `name`, which must match exactly (case and spaces).
+- A config example without `password_cmd`, noting the defaults: `imap_port` 993 for `implicit` and 143 for `starttls`, and `username` defaulting to `email`. For Gmail, use `imap.gmail.com` and an app password.
+- Storing the password by hand on macOS, so it never lands in shell history: `security add-generic-password -s dk-email -a "<name>" -U -w` (`-w` with no value prompts; `-U` replaces an existing entry). Mention the "enter once → keychain" option in the connect popup (`A`, T21) as the in-app way.
+- Checking it: `security find-generic-password -s dk-email -a "<name>" -w`.
+- Troubleshooting: "no password: set password_cmd or store one in the keychain" means no entry matches `name`. macOS may ask once whether `dk-email` can read the item ("Always Allow"), and may ask again after the binary is rebuilt or upgraded.
+- Linux: the Secret Service (GNOME Keyring or KWallet), e.g. `secret-tool store --label dk-email service dk-email username "<name>"`. Verify this command against go-keyring's Linux backend before documenting it.
+
 **Acceptance criteria:**
 - [ ] Every command and key in the README matches the spec and the code.
+- [ ] The keychain section above is included, and its `security` commands are checked against a real keychain entry that dk-email reads.
 
 **Verification:**
 - [ ] Manual review.
