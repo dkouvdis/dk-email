@@ -233,20 +233,31 @@ func TestModel_HelpPopup(t *testing.T) {
 }
 
 func TestModel_Quit(t *testing.T) {
-	for _, k := range []string{"q", "ctrl+c"} {
-		for _, help := range []bool{false, true} {
-			m := send(t, New(testConfig(), nil, nil), size(120, 30))
-			if help {
-				m = send(t, m, press("?"))
-			}
-			_, cmd := m.Update(press(k))
-			if cmd == nil {
-				t.Fatalf("%s (help %v) returned no command", k, help)
-			}
-			if _, ok := cmd().(tea.QuitMsg); !ok {
-				t.Errorf("%s (help %v) didn't quit", k, help)
-			}
+	quits := func(cmd tea.Cmd) bool {
+		if cmd == nil {
+			return false
 		}
+		_, ok := cmd().(tea.QuitMsg)
+		return ok
+	}
+	m := send(t, New(testConfig(), nil, nil), size(120, 30))
+
+	for _, k := range []string{"q", "ctrl+c"} {
+		if _, cmd := m.Update(press(k)); !quits(cmd) {
+			t.Errorf("%s with no popup didn't quit", k)
+		}
+	}
+
+	withHelp := send(t, m, press("?"))
+	next, cmd := withHelp.Update(press("q"))
+	if quits(cmd) || next.(Model).showHelp {
+		t.Error("q with the help popup open should close it, not quit")
+	}
+	if !strings.Contains(ansi.Strip(withHelp.renderHints()), "q close") {
+		t.Errorf("hint bar = %q, want q close while a popup is open", ansi.Strip(withHelp.renderHints()))
+	}
+	if _, cmd := withHelp.Update(press("ctrl+c")); !quits(cmd) {
+		t.Error("ctrl+c with a popup open didn't quit")
 	}
 }
 
@@ -323,7 +334,7 @@ func TestGolden(t *testing.T) {
 			m.connect = nil // already connected; Init must not reconnect
 
 			tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(tt.w, tt.h))
-			tm.Send(press("q"))
+			tm.Send(press("ctrl+c")) // q would only close an open popup
 
 			final := tm.FinalModel(t, teatest.WithFinalTimeout(5*time.Second)).(Model)
 			teatest.RequireEqualOutput(t, []byte(plain(final)))

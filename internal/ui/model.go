@@ -205,7 +205,15 @@ func (m Model) visiblePanes() []Pane {
 }
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if key.Matches(msg, m.keys.ForceQuit) {
+		m.log.Debug("quit")
+		return m, tea.Quit
+	}
+	// q closes the topmost popup before it quits.
 	if key.Matches(msg, m.keys.Quit) {
+		if m.closeTopPopup() {
+			return m, nil
+		}
 		m.log.Debug("quit")
 		return m, tea.Quit
 	}
@@ -275,6 +283,26 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, m.fetchMissing()
 	}
 	return m, nil
+}
+
+func (m Model) popupOpen() bool { return m.showHelp || m.showPicker || m.readerPopup }
+
+// closeTopPopup closes the popup drawn on top, if any: help or the picker,
+// then the reader popup beneath them.
+func (m *Model) closeTopPopup() bool {
+	var name string
+	switch {
+	case m.showHelp:
+		m.showHelp, name = false, "help"
+	case m.showPicker:
+		m.showPicker, name = false, "picker"
+	case m.readerPopup:
+		m.readerPopup, name = false, "reader"
+	default:
+		return false
+	}
+	m.log.Debug("popup closed", "popup", name)
+	return true
 }
 
 func (m *Model) moveFocus(step int, wrap bool) {
@@ -426,7 +454,11 @@ func (m Model) renderHints() string {
 	item := func(b key.Binding) string {
 		return st.ShortKey.Render(b.Help().Key) + " " + st.ShortDesc.Render(b.Help().Desc)
 	}
-	tail := item(m.keys.Help) + sep + item(m.keys.Quit)
+	quit := m.keys.Quit
+	if m.popupOpen() {
+		quit = key.NewBinding(key.WithKeys("q"), key.WithHelp("q", "close"))
+	}
+	tail := item(m.keys.Help) + sep + item(quit)
 	room := m.width - lipgloss.Width(tail)
 
 	var head []string

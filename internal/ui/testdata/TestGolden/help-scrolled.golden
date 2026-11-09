@@ -2,14 +2,13 @@
 │ Personal             ││ Inbox · 2 unr╭───────────────────────────────────────╮                                       │
 │ ▶ Inbox            2 ││ ●    Bob     │ Keys                       esc close  │                                       │
 │   Sent Mail          ││ ●    Carol   │                                       │                                       │
-│   All Mail           ││              │ Threads                               │                                       │
-│   Receipts         1 ││              │   enter       open                    │                                       │
-│                      ││              │   space       expand                  │                                       │
-│ Work                 ││              │   u           read/unread             │                                       │
-│   Inbox            1 ││              │   s           star                    │                                       │
-│   Archive            ││              │   e           archive                 │                                       │
-│                      ││              │   d           delete                  │                                       │
-│                      ││              │   m           move                  ┃ │                                       │
+│   All Mail           ││              │   enter       open                    │                                       │
+│   Receipts         1 ││              │   space       expand                  │                                       │
+│                      ││              │   u           read/unread             │                                       │
+│ Work                 ││              │   s           star                    │                                       │
+│   Inbox            1 ││              │   e           archive                 │                                       │
+│   Archive            ││              │   d           delete                  │                                       │
+│                      ││              │   m           move                    │                                       │
 │                      ││              │   r           refresh               ┃ │                                       │
 │                      ││              │                                     ┃ │                                       │
 │                      ││              │ Accounts & view                     ┃ │                                       │
@@ -21,10 +20,11 @@
 │                      ││              │   ?           help                  ┃ │                                       │
 │                      ││              │   esc         back                  ┃ │                                       │
 │                      ││              │   q           quit                  ┃ │                                       │
+│                      ││              │   ctrl+c      quit now              ┃ │                                       │
 │                      ││              │                                       │                                       │
-│                      ││              │ scroll j/k/↑↓/pgup/pgdn · close esc/? │                                       │
+│                      ││              │ scroll j/k/↑↓/pgup/pgdn · close esc/q │                                       │
 │                      ││              ╰───────────────────────────────────────╯                                       │
 │                      ││                               ││                                                             │
 ╰──────────────────────╯╰───────────────────────────────╯╰─────────────────────────────────────────────────────────────╯
                                                                                                                     wide
-k/↑ up • j/↓ down • enter open • space expand • u read/unread • s star • e archive • d delete • … • ? help • q quit
+k/↑ up • j/↓ down • enter open • space expand • u read/unread • s star • e archive • d delete • … • ? help • q close

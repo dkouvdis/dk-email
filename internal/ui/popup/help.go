@@ -121,9 +121,9 @@ func (h Help) scrollable() bool { return len(h.lines) > h.viewH() }
 
 func (h Help) footer() string {
 	if h.scrollable() {
-		return "scroll j/k/↑↓/pgup/pgdn · close esc/?"
+		return "scroll j/k/↑↓/pgup/pgdn · close esc/q"
 	}
-	return "close esc/?"
+	return "close esc/q"
 }
 
 // View renders the popup, or "" when there's no room for it.

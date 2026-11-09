@@ -120,3 +120,23 @@ func TestListMode_OpeningAnotherFolderClosesPopup(t *testing.T) {
 		t.Errorf("popup %v, reader open %v, folder %q; want Receipts with no popup", m.readerPopup, m.read.IsOpen(), m.open.folder)
 	}
 }
+
+func TestListMode_QClosesPopupsTopFirst(t *testing.T) {
+	m := started(t, newFixture(), 70, 24)
+	m = pressSettled(t, m, "enter")
+	m = pressSettled(t, m, "?")
+
+	next, cmd := m.Update(press("q"))
+	m = next.(Model)
+	if cmd != nil || m.showHelp || !m.readerPopup {
+		t.Fatalf("first q: help %v reader %v quit %v; want only help closed", m.showHelp, m.readerPopup, cmd != nil)
+	}
+	next, cmd = m.Update(press("q"))
+	m = next.(Model)
+	if cmd != nil || m.readerPopup {
+		t.Fatalf("second q: reader %v quit %v; want the reader popup closed", m.readerPopup, cmd != nil)
+	}
+	if _, cmd = m.Update(press("q")); cmd == nil {
+		t.Error("third q with no popup didn't quit")
+	}
+}

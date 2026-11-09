@@ -17,7 +17,7 @@ type KeyMap struct {
 	Refresh                key.Binding
 	Picker, Connect        key.Binding
 	ToggleView, Help, Back key.Binding
-	Quit                   key.Binding
+	Quit, ForceQuit        key.Binding
 }
 
 func DefaultKeyMap() KeyMap {
@@ -46,7 +46,8 @@ func DefaultKeyMap() KeyMap {
 		ToggleView: b([]string{"v"}, "v", "split/list"),
 		Help:       b([]string{"?"}, "?", "help"),
 		Back:       b([]string{"esc"}, "esc", "back"),
-		Quit:       b([]string{"q", "ctrl+c"}, "q", "quit"),
+		Quit:       b([]string{"q"}, "q", "quit"),
+		ForceQuit:  b([]string{"ctrl+c"}, "ctrl+c", "quit now"),
 	}
 }
 
@@ -56,7 +57,7 @@ func (k KeyMap) HelpSections() []popup.Section {
 		{Title: "Navigation", Keys: []key.Binding{k.Up, k.Down, k.Top, k.Bottom, k.Left, k.Right, k.NextPane, k.PrevPane}},
 		{Title: "Threads", Keys: []key.Binding{k.Open, k.Expand, k.ToggleRead, k.Star, k.Archive, k.Delete, k.Move, k.Refresh}},
 		{Title: "Accounts & view", Keys: []key.Binding{k.Picker, k.Connect, k.ToggleView}},
-		{Title: "General", Keys: []key.Binding{k.Help, k.Back, k.Quit}},
+		{Title: "General", Keys: []key.Binding{k.Help, k.Back, k.Quit, k.ForceQuit}},
 	}
 }
 

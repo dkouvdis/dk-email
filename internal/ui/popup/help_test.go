@@ -53,7 +53,7 @@ func TestHelp_SizesToContentWhenItFits(t *testing.T) {
 	if got := lipgloss.Height(view); got != 17+6 {
 		t.Errorf("height = %d, want %d", got, 17+6)
 	}
-	for _, want := range []string{"Keys", "esc close", "one", "three", "c3", "third group", "close esc/?"} {
+	for _, want := range []string{"Keys", "esc close", "one", "three", "c3", "third group", "close esc/q"} {
 		if !strings.Contains(plain, want) {
 			t.Errorf("view missing %q:\n%s", want, plain)
 		}

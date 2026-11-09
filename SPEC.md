@@ -191,7 +191,8 @@ password_cmd = "op read op://Personal/Gmail/app-password"   # omit to use the ke
 | `m` | move to folder (picker) | `r` | refresh |
 | `a` | account/folder picker | `A` | connect account |
 | `v` | toggle split ↔ list + popup | `?` | full key help |
-| `esc` | close popup / back | `q`, `ctrl+c` | quit |
+| `esc` | close popup / back | `q` | close the open popup, otherwise quit |
+| `ctrl+c` | quit, even with a popup open | | |
 
 Actions on a **collapsed thread** apply to every message in it. On an expanded row, or in the reader, they apply to the selected message. Opening a message marks it read.
 

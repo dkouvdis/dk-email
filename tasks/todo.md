@@ -354,6 +354,7 @@ Every task also meets the standing bar before it counts as done:
 - In list mode, `enter` opens the reader in a framed popup the size of `Layout`'s 90% × 90% `Popup` rect. Keys go to the reader (`j`/`k`/`space`/…), `esc` closes it, `?` opens help on top, and `a` opens the picker.
 - Reading carries across resizes. A focused reader pane becomes the popup when the layout drops to list mode, and the popup becomes the focused pane again when it widens.
 - `popup/overlay.go` has `Overlay`, `Center` and `Frame`, and all three popups now use them.
+- After review, `q` closes the topmost popup (help or picker, then the reader popup) instead of quitting. The hint bar shows `q close` while a popup is open, and `ctrl+c` always quits.
 
 **Dependencies:** T12
 **Files:** `internal/ui/model.go`, `internal/ui/popup/overlay.go`, `internal/ui/model_test.go`

@@ -22,9 +22,9 @@
 │                      ││              │   m           move                    │                                       │
 │                      ││              │   r           refresh                 │                                       │
 │                      ││              │                                       │                                       │
-│                      ││              │ scroll j/k/↑↓/pgup/pgdn · close esc/? │                                       │
+│                      ││              │ scroll j/k/↑↓/pgup/pgdn · close esc/q │                                       │
 │                      ││              ╰───────────────────────────────────────╯                                       │
 │                      ││                               ││                                                             │
 ╰──────────────────────╯╰───────────────────────────────╯╰─────────────────────────────────────────────────────────────╯
                                                                                                                     wide
-k/↑ up • j/↓ down • enter open • space expand • u read/unread • s star • e archive • d delete • … • ? help • q quit
+k/↑ up • j/↓ down • enter open • space expand • u read/unread • s star • e archive • d delete • … • ? help • q close

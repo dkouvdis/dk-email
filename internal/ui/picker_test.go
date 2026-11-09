@@ -63,7 +63,7 @@ func TestPicker_EscAndReselectChangeNothing(t *testing.T) {
 	}
 }
 
-func TestPicker_KeysDontLeakAndQuitWorks(t *testing.T) {
+func TestPicker_KeysDontLeakAndQClosesIt(t *testing.T) {
 	m := started(t, newFixture(), 100, 30)
 	m = pressSettled(t, m, "a")
 
@@ -71,8 +71,9 @@ func TestPicker_KeysDontLeakAndQuitWorks(t *testing.T) {
 	if m.focus != PaneList {
 		t.Errorf("tab moved focus to %v while the picker was open", m.focus)
 	}
-	if _, cmd := m.Update(press("q")); cmd == nil {
-		t.Error("q didn't quit with the picker open")
+	m = pressSettled(t, m, "q")
+	if m.showPicker {
+		t.Error("q didn't close the picker")
 	}
 }
 

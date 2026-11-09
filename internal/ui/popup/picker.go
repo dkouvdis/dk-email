@@ -162,7 +162,7 @@ func (p Picker[T]) itemRow(it Item[T], cursor bool, width int) string {
 	return marker + label + gap + p.st.key.Render(count)
 }
 
-func (p Picker[T]) footer() string { return "j/k move · enter open · esc close" }
+func (p Picker[T]) footer() string { return "j/k move · enter open · esc/q close" }
 
 // contentW is the inner width the items need, before capping.
 func (p Picker[T]) contentW() int {
