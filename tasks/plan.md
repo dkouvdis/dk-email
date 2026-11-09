@@ -45,7 +45,7 @@ The full details for every task are in [todo.md](todo.md).
 - [x] T11: Render package (MIME → text)
 - [x] T12: IMAP `Message` fetch + reader pane + mark read on open
 - [x] T13: Narrow mode header + account/folder picker (`a`)
-- [ ] T14: List + popup mode (`v`, forced below 80 columns)
+- [x] T14: List + popup mode (`v`, forced below 80 columns)
 - [ ] T15: Release pipeline (GoReleaser, `release.yml`, Homebrew cask)
 
 **Checkpoint 2:** read-only use against real Gmail works in all three layouts. You approve, then `v0.1.0-beta.1` is tagged.

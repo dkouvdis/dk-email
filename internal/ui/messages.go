@@ -59,8 +59,12 @@ func (m Model) openThread() (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.read = m.read.Open(m.open.account, m.open.folder, th, uid)
-	m.focus = PaneReader
-	m.log.Debug("open thread", "messages", th.Len())
+	if m.panes.Kind == KindList {
+		m.readerPopup = true
+	} else {
+		m.focus = PaneReader
+	}
+	m.log.Debug("open thread", "messages", th.Len(), "popup", m.readerPopup)
 	return m, m.fetchMissing()
 }
 

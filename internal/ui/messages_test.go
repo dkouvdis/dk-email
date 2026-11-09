@@ -196,14 +196,3 @@ func TestReader_FolderChangedReloads(t *testing.T) {
 		t.Errorf("status %q, reader open %v, %d messages; want a reload", m.status, m.read.IsOpen(), m.list.Count())
 	}
 }
-
-func TestReader_EnterDoesNothingInListModeYet(t *testing.T) {
-	f := newFixture()
-	m := started(t, f, 70, 24)
-
-	next, cmd := m.Update(press("enter"))
-
-	if cmd != nil || next.(Model).read.IsOpen() {
-		t.Error("enter in list mode opened the reader; the popup comes in T14")
-	}
-}

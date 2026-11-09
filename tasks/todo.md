@@ -344,11 +344,16 @@ Every task also meets the standing bar before it counts as done:
 - Below 80 columns list mode is forced and `v` does nothing. Widening the terminal again restores the mode you last chose.
 
 **Acceptance criteria:**
-- [ ] The popup reuses `reader` without duplicating it, and triage keys still work in the popup once T17 adds them.
-- [ ] Resizing from 130 → 70 → 130 columns ends in the mode you chose, with the cursor unchanged.
+- [x] The popup reuses `reader` without duplicating it, and triage keys still work in the popup once T17 adds them. (Popup keys route to the reader, so T17 must handle triage keys before that fallthrough.)
+- [x] Resizing from 130 → 70 → 130 columns ends in the mode you chose, with the cursor unchanged.
 
 **Verification:**
-- [ ] `go test -race ./internal/ui/...` passes, with teatest golden output for the popup.
+- [x] `go test -race ./internal/ui/...` passes, with teatest golden output for the popup (`list-reader-popup`).
+
+**Notes:**
+- In list mode, `enter` opens the reader in a framed popup the size of `Layout`'s 90% × 90% `Popup` rect. Keys go to the reader (`j`/`k`/`space`/…), `esc` closes it, `?` opens help on top, and `a` opens the picker.
+- Reading carries across resizes. A focused reader pane becomes the popup when the layout drops to list mode, and the popup becomes the focused pane again when it widens.
+- `popup/overlay.go` has `Overlay`, `Center` and `Frame`, and all three popups now use them.
 
 **Dependencies:** T12
 **Files:** `internal/ui/model.go`, `internal/ui/popup/overlay.go`, `internal/ui/model_test.go`

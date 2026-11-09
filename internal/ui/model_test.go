@@ -303,6 +303,7 @@ func TestGolden(t *testing.T) {
 		{"narrow", 100, 24, false, nil},
 		{"narrow-picker", 100, 24, false, []string{"a", "j"}},
 		{"list", 70, 20, false, nil},
+		{"list-reader-popup", 70, 24, false, []string{"enter"}},
 		{"help", 120, 30, false, []string{"?"}},
 		{"help-scrolled", 120, 30, false, []string{"?", "G"}},
 		{"help-fits", 120, 50, false, []string{"?"}},

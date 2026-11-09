@@ -73,9 +73,11 @@ type Model struct {
 	focus         Pane
 	showHelp      bool
 	showPicker    bool
-	picker        popup.Picker[pick]
-	status        string
-	statusErr     bool
+	// readerPopup shows the reader in a popup over the list (list mode).
+	readerPopup bool
+	picker      popup.Picker[pick]
+	status      string
+	statusErr   bool
 }
 
 // New builds the root model. Init connects every account with connect. log
@@ -172,7 +174,21 @@ func (m *Model) relayout() {
 	frame := m.styles.pane.GetVerticalFrameSize()
 	m.side = m.side.SetHeight(max(m.panes.Sidebar.H-frame, 0))
 	m.list = m.list.SetHeight(max(m.panes.List.H-frame-listHeaderRows, 0))
-	m.read = m.read.SetSize(max(m.panes.Reader.W-m.styles.pane.GetHorizontalFrameSize(), 0), max(m.panes.Reader.H-frame, 0))
+	if m.panes.Kind == KindList {
+		m.read = m.read.SetSize(popup.FrameInner(m.panes.Popup.W, m.panes.Popup.H))
+	} else {
+		m.read = m.read.SetSize(max(m.panes.Reader.W-m.styles.pane.GetHorizontalFrameSize(), 0), max(m.panes.Reader.H-frame, 0))
+	}
+
+	// Reading carries across layouts: a focused reader pane becomes the
+	// popup in list mode, and the popup becomes the pane again when wider.
+	switch {
+	case m.panes.Kind == KindList && m.focus == PaneReader && m.read.IsOpen():
+		m.readerPopup = true
+	case m.panes.Kind != KindList && m.readerPopup:
+		m.readerPopup = false
+		m.focus = PaneReader
+	}
 	if !slices.Contains(m.visiblePanes(), m.focus) {
 		m.focus = PaneList
 	}
@@ -208,6 +224,22 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.showPicker {
 		return m.handlePickerKey(msg)
 	}
+	if m.readerPopup {
+		switch {
+		case key.Matches(msg, m.keys.Back):
+			m.readerPopup = false
+			m.log.Debug("popup closed", "popup", "reader")
+			return m, nil
+		case key.Matches(msg, m.keys.Help):
+			m.showHelp = true
+			m.helpPop.Reset()
+			return m, nil
+		case key.Matches(msg, m.keys.Picker):
+			return m.openPicker()
+		}
+		m.read, _ = m.read.Update(msg)
+		return m, m.fetchMissing()
+	}
 
 	switch {
 	case key.Matches(msg, m.keys.Help):
@@ -231,10 +263,6 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.side, cmd = m.side.Update(msg)
 		return m, cmd
 	case m.focus == PaneList && key.Matches(msg, m.keys.Open):
-		// List + popup mode shows the reader as a popup, which is T14.
-		if m.panes.Kind == KindList {
-			return m, nil
-		}
 		return m.openThread()
 	case m.focus == PaneList:
 		var cmd tea.Cmd
@@ -307,6 +335,11 @@ func (m Model) render() string {
 		m.renderHints(),
 	)
 
+	if m.readerPopup {
+		p := m.panes.Popup
+		w, h := popup.FrameInner(p.W, p.H)
+		screen = popup.Overlay(screen, popup.Frame(m.read.View(w, h), p.W, p.H), p.X, p.Y)
+	}
 	pop := ""
 	switch {
 	case m.showHelp:
@@ -314,15 +347,8 @@ func (m Model) render() string {
 	case m.showPicker:
 		pop = m.picker.View()
 	}
-	if pop != "" {
-		body := m.height - footerRows
-		x := max((m.width-lipgloss.Width(pop))/2, 0)
-		y := max((body-lipgloss.Height(pop))/2, 0)
-		screen = lipgloss.NewCompositor(
-			lipgloss.NewLayer(screen),
-			lipgloss.NewLayer(pop).X(x).Y(y).Z(1),
-		).Render()
-	}
+	x, y := popup.Center(m.width, m.height-footerRows, pop)
+	screen = popup.Overlay(screen, pop, x, y)
 	return screen
 }
 
@@ -405,7 +431,11 @@ func (m Model) renderHints() string {
 
 	var head []string
 	used := 0
-	hints := m.keys.hints(m.focus, m.panes.Kind)
+	focus := m.focus
+	if m.readerPopup {
+		focus = PaneReader
+	}
+	hints := m.keys.hints(focus, m.panes.Kind)
 	for i, b := range hints {
 		w := lipgloss.Width(item(b)) + lipgloss.Width(sep)
 		// Unless this is the last key, leave space for a "… • " marker.

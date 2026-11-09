@@ -115,6 +115,7 @@ func (m Model) openFolder(account int, folder string) (Model, tea.Cmd) {
 	m.open = openFolder{account: account, folder: folder, label: label, loading: true}
 	m.list = m.list.SetSummaries(nil, false)
 	m.read = m.read.Close()
+	m.readerPopup = false
 	m.side = m.side.SetOpen(account, folder)
 	m.setStatus(fmt.Sprintf("Loading %s…", label))
 	m.log.Debug("open folder", "account", m.accts[account].Name, "role", role)
