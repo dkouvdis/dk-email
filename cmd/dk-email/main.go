@@ -7,11 +7,14 @@ import (
 	"io"
 	"os"
 
+	tea "charm.land/bubbletea/v2"
+
 	"github.com/dkouvdis/dk-email/internal/config"
+	"github.com/dkouvdis/dk-email/internal/ui"
 )
 
 func main() {
-	err := run(os.Args[1:], os.Stdout, os.Stderr)
+	err := run(os.Args[1:], os.Stdout, os.Stderr, startUI)
 	switch {
 	case err == nil, errors.Is(err, flag.ErrHelp):
 		return
@@ -21,7 +24,11 @@ func main() {
 	}
 }
 
-func run(args []string, stdout, stderr io.Writer) error {
+// startFunc runs the interface with a loaded config. Tests pass a stub so
+// run never takes over the terminal.
+type startFunc func(cfg *config.Config) error
+
+func run(args []string, stdout, stderr io.Writer, start startFunc) error {
 	fs := flag.NewFlagSet("dk-email", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	showVersion := fs.Bool("version", false, "print version and exit")
@@ -39,8 +46,18 @@ func run(args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(stderr, "dk-email: loaded %d account(s) from %s; the terminal interface is not implemented yet\n", len(cfg.Accounts), cfg.Path)
-	return nil
+	return start(cfg)
+}
+
+func startUI(cfg *config.Config) error {
+	log, closeLog, err := openDebugLog(os.Getenv("DK_EMAIL_DEBUG") == "1")
+	if err != nil {
+		return err
+	}
+	defer closeLog()
+
+	_, err = tea.NewProgram(ui.New(*cfg, log)).Run()
+	return err
 }
 
 // loadConfig loads the config from an explicit --config path, or from the

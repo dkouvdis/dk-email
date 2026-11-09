@@ -185,13 +185,21 @@ Every task also meets the standing bar before it counts as done:
 `main` wires the config and accounts into the model, with placeholder panes for now.
 
 **Acceptance criteria:**
-- [ ] Table tests for `Layout` cover widths 60, 79, 80, 119, 120 and 200 in both modes.
-- [ ] Resizing across the breakpoints switches the layout live, and `v` has no effect below 80 columns.
-- [ ] teatest golden files exist for the wide, narrow and list layouts at fixed sizes.
+- [x] Table tests for `Layout` cover widths 60, 79, 80, 119, 120 and 200 in both modes.
+- [x] Resizing across the breakpoints switches the layout live, and `v` has no effect below 80 columns.
+- [x] teatest golden files exist for the wide, narrow and list layouts at fixed sizes.
 
 **Verification:**
-- [ ] `go test -race ./internal/ui/...` passes.
-- [ ] Manual: `go run ./cmd/dk-email`, resize the terminal, and press `?`, `tab` and `q`.
+- [x] `go test -race ./internal/ui/...` passes (stable over 3 runs).
+- [ ] Manual: `go run ./cmd/dk-email`, resize the terminal, and press `?`, `tab` and `q`. (A pty smoke test of the built binary passed: the help popup opened and closed, a resize to 70 columns forced list mode, `q` exited 0, and the debug log held metadata only. Your check in a real terminal is still needed.)
+
+**Notes:**
+- The golden files (`internal/ui/testdata/TestGolden/*.golden`, including one for the help popup) hold the final screen **without ANSI styling**, so they don't depend on the terminal's colour support. Regenerate them with `go test ./internal/ui/ -run Golden -update`.
+- The hint bar fits keys in priority order, marks a cut with `…`, and always ends with `? help • q quit`. bubbles' `help` truncation overshot by a cell and wrapped the bar, so the hint bar does its own fitting.
+- `v` below 80 columns leaves the mode unchanged and explains why in the status line. The right side of the status line shows the active layout (`wide`, `narrow`, `list` or `list (forced)`).
+- Popups are drawn with Lip Gloss v2's `Compositor` over the panes.
+- `run` takes a `startFunc`, so the `main` tests never take over the terminal. The debug log goes to `$XDG_CACHE_HOME/dk-email/debug.log` (or `~/.cache/…`) with dir `0700` and file `0600`.
+- Panes are placeholders. The sidebar lists account names as "not connected" (T9), and outside wide mode the list pane shows the `account › folder` header (T13).
 
 **Dependencies:** T2, T4
 **Files:** `internal/ui/model.go`, `internal/ui/layout.go`, `internal/ui/keys.go`, `internal/ui/styles.go`, `internal/ui/layout_test.go`, `internal/ui/popup/help.go`

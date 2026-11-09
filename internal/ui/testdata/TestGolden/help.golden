@@ -1,0 +1,30 @@
+╭──────────────────────╮╭───────────────────────────────╮╭─────────────────────────────────────────────────────────────╮
+│ Fold╭──────────────────────────────────────────────────────────────────────────────────────────────────────────╮     │
+│     │ Keys                                                                                                     │     │
+│ ▸ Pe│                                                                                                          │     │
+│   no│ k/↑   up       tab       next pane       u read/unread   A   connect account                             │     │
+│ ▸ Wo│ j/↓   down     shift+tab previous pane   s star          ?   help                                        │     │
+│   no│ g     top      h/←       left pane       e archive       esc back                                        │     │
+│     │ G     bottom   l/→       right pane      d delete        q   quit                                        │     │
+│     │ enter open     a         accounts        m move                                                          │     │
+│     │ space expand   v         split/list      r refresh                                                       │     │
+│     │                                                                                                          │     │
+│     │                                                                                                          │     │
+│     │                                                                                                          │     │
+│     │                                                                                                          │     │
+│     │                                                                                                          │     │
+│     │                                                                                                          │     │
+│     │                                                                                                          │     │
+│     │                                                                                                          │     │
+│     │                                                                                                          │     │
+│     │                                                                                                          │     │
+│     │                                                                                                          │     │
+│     │                                                                                                          │     │
+│     │                                                                                                          │     │
+│     │                                                                                                          │     │
+│     │ esc or ? to close                                                                                        │     │
+│     ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────╯     │
+│                      ││                               ││                                                             │
+╰──────────────────────╯╰───────────────────────────────╯╰─────────────────────────────────────────────────────────────╯
+                                                                                                                    wide
+k/↑ up • j/↓ down • enter open • space expand • u read/unread • s star • e archive • d delete • … • ? help • q quit
