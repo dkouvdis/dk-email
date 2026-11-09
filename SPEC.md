@@ -38,7 +38,7 @@ Messages in the conversation are stacked oldest to newest. The latest (or first 
 
 1. **`dk-email` is the official name** for the binary and config folder (confirmed). The config lives at `$XDG_CONFIG_HOME/dk-email/`, falling back to `~/.config/dk-email/` on **every OS, macOS included**.
 2. **No plain-text `password` field in v1.** Passwords come only from `password_cmd` or the keychain.
-3. **Threading happens per folder** (Thunderbird's default; confirmed): client-side, from `Message-ID` / `In-Reply-To` / `References`, falling back to normalized subject. There's no cross-folder threading, so replies sitting in Sent won't appear inside Inbox threads.
+3. **Threading happens per folder** (Thunderbird's default; confirmed): client-side, from `Message-ID` / `In-Reply-To` / `References`, falling back to normalized subject only for replies (`Re:`/`Fwd:`) that carry no references, so unrelated mails with a generic subject never merge. There's no cross-folder threading, so replies sitting in Sent won't appear inside Inbox threads.
 4. **v1 caches nothing on disk.** Headers and bodies are kept in memory for the session. `~/.cache/dk-email/` is reserved for the future cache and holds only the debug log.
 5. **Each folder loads its newest 200 messages**, and more are fetched when scrolling reaches the end.
 6. **Refresh:** `r` refreshes manually, and the selected folder plus all folders' unread counts are polled every `refresh_interval` (default 120s; confirmed). No IMAP IDLE in v1.

@@ -132,13 +132,18 @@ Every task also meets the standing bar before it counts as done:
 - Sort threads by their newest message; messages within a thread are ordered oldest first.
 
 **Acceptance criteria:**
-- [ ] Handles out-of-order arrival, missing parents, cycles, duplicate Message-IDs, and messages with no Message-ID.
-- [ ] Subject fallback never merges two unrelated messages that share a generic subject such as "Hello" when both have Message-IDs but no references.
-- [ ] Building 5,000 summaries takes under 50ms, measured with a benchmark.
+- [x] Handles out-of-order arrival, missing parents, cycles, duplicate Message-IDs, and messages with no Message-ID.
+- [x] Subject fallback never merges two unrelated messages that share a generic subject such as "Hello" when both have Message-IDs but no references.
+- [x] Building 5,000 summaries takes under 50ms, measured with a benchmark. (~2.8ms on an M4 Pro; `TestBuild_5000UnderBudget` enforces the budget outside `-race`/`-short`.)
 
 **Verification:**
-- [ ] `go test -race ./internal/thread/...` passes with at least 80% coverage.
-- [ ] `go test -bench . ./internal/thread/` passes.
+- [x] `go test -race ./internal/thread/...` passes with at least 80% coverage (99.4%).
+- [x] `go test -bench . ./internal/thread/` passes.
+
+**Notes:**
+- Linking is union-find over Message-ID, In-Reply-To and References, so cycles and missing parents need no special cases. Duplicate Message-IDs end up in one thread.
+- Subject fallback applies only to a message with **no references and a `Re:`/`Fwd:` prefix**. It joins the latest original with the same normalized subject sent at or before it (or the earliest original if all are later). Non-replies never merge by subject.
+- `Thread` is a flat, oldest-first list with `Latest`, `Len`, `Unread`, `Flagged` and `UIDs` helpers for T10. There's no reply tree; the spec only needs indented rows.
 
 **Dependencies:** T4
 **Files:** `internal/thread/thread.go`, `internal/thread/subject.go`, `internal/thread/thread_test.go`

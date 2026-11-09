@@ -37,7 +37,7 @@ The full details for every task are in [todo.md](todo.md).
 **Checkpoint 1:** foundation tests pass, and real Gmail folders are listed through `op read`.
 
 ### Phase 2: Read-only client → `v0.1.0-beta.1`
-- [ ] T6: Threading package
+- [x] T6: Threading package
 - [ ] T7: IMAP `Summaries` with UID paging
 - [ ] T8: UI shell (layout engine, hint bar, status line, help, debug log)
 - [ ] T9: Sidebar with folder selection (wide mode)
