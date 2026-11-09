@@ -3,6 +3,7 @@ package ui
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -15,6 +16,7 @@ import (
 	"github.com/dkouvdis/dk-email/internal/config"
 	"github.com/dkouvdis/dk-email/internal/mail"
 	"github.com/dkouvdis/dk-email/internal/mail/mailtest"
+	"github.com/dkouvdis/dk-email/internal/ui/threadlist"
 )
 
 // fixture is two accounts backed by fakes: Personal (Gmail-like) and Work.
@@ -29,16 +31,27 @@ func newFixture() *fixture {
 	p.AddFolder("[Gmail]/Sent Mail", mail.RoleSent)
 	p.AddFolder("[Gmail]/All Mail", mail.RoleAll)
 	p.AddFolder("Receipts", mail.RoleNone)
-	for i, seen := range []bool{true, false, false} {
-		p.AddMessage("INBOX", mail.Message{Summary: mail.Summary{Subject: "inbox " + string(rune('a'+i)), Seen: seen}})
-	}
-	p.AddMessage("Receipts", mail.Message{Summary: mail.Summary{Subject: "receipt"}})
+	p.AddMessage("INBOX", msg("Alice", "Plan", fixedNow.Add(-5*time.Hour), true, "p1"))
+	p.AddMessage("INBOX", msg("Carol", "Lunch?", fixedNow.Add(-26*time.Hour), false, "l1"))
+	p.AddMessage("INBOX", msg("Bob", "Re: Plan", fixedNow.Add(-2*time.Hour), false, "p2", "p1"))
+	p.AddMessage("Receipts", msg("Shop", "Your receipt", fixedNow.Add(-72*time.Hour), false, "r1"))
 
 	w := mailtest.New()
 	w.AddFolder("INBOX", mail.RoleInbox)
 	w.AddFolder("Archive", mail.RoleArchive)
-	w.AddMessage("INBOX", mail.Message{Summary: mail.Summary{Subject: "work"}})
+	w.AddMessage("INBOX", msg("Boss", "Quarterly numbers", fixedNow.Add(-time.Hour), false, "w1"))
 	return &fixture{personal: p, work: w, errs: map[string]error{}}
+}
+
+// fixedNow is the clock for list dates, so golden output never changes.
+var fixedNow = time.Date(2026, 11, 9, 15, 30, 0, 0, time.Local)
+
+func msg(from, subject string, at time.Time, seen bool, id string, refs ...string) mail.Message {
+	s := mail.Summary{From: mail.Address{Name: from}, Subject: subject, Date: at, Seen: seen, MessageID: id}
+	if len(refs) > 0 {
+		s.InReplyTo, s.References = refs[len(refs)-1], refs
+	}
+	return mail.Message{Summary: s}
 }
 
 func (f *fixture) connector() Connector {
@@ -80,7 +93,9 @@ func settle(t *testing.T, m Model, cmd tea.Cmd) Model {
 // started returns a model sized w×h whose accounts have all connected.
 func started(t *testing.T, f *fixture, w, h int) Model {
 	t.Helper()
-	m := send(t, New(testConfig(), f.connector(), nil), size(w, h))
+	m := New(testConfig(), f.connector(), nil)
+	m.list = threadlist.New(func() time.Time { return fixedNow })
+	m = send(t, m, size(w, h))
 	return settle(t, m, m.Init())
 }
 
@@ -112,10 +127,10 @@ func TestAccounts_OpensFirstInboxAndLoadsSummaries(t *testing.T) {
 	f := newFixture()
 	m := started(t, f, 160, 30)
 
-	if m.open.account != 0 || m.open.folder != "INBOX" || len(m.open.summaries) != 3 {
-		t.Fatalf("open = %+v, want Personal INBOX with 3 summaries", m.open)
+	if m.open.account != 0 || m.open.folder != "INBOX" || m.list.Count() != 3 {
+		t.Fatalf("open = %+v with %d summaries, want Personal INBOX with 3", m.open, m.list.Count())
 	}
-	if !strings.Contains(plain(m), "3 messages loaded.") || !strings.Contains(plain(m), "▶ Inbox") {
+	if !strings.Contains(plain(m), "Re: Plan (2)") || !strings.Contains(plain(m), "▶ Inbox") {
 		t.Errorf("view doesn't show the opened Inbox:\n%s", plain(m))
 	}
 	if calls := summaryCalls(f.work); len(calls) != 0 {
@@ -209,8 +224,8 @@ func TestAccounts_EnterOpensFolderUnderCursor(t *testing.T) {
 	next, cmd := m.Update(press("enter"))
 	m = settle(t, next.(Model), cmd)
 
-	if m.open.folder != "Receipts" || len(m.open.summaries) != 1 {
-		t.Fatalf("open = %+v, want Receipts with 1 summary", m.open)
+	if m.open.folder != "Receipts" || m.list.Count() != 1 || !strings.Contains(plain(m), "Your receipt") {
+		t.Fatalf("open = %+v with %d summaries, want Receipts with 1", m.open, m.list.Count())
 	}
 	if got := summaryCalls(f.personal); !slices.Equal(got, []string{"INBOX", "Receipts"}) {
 		t.Errorf("Summaries calls = %v, want [INBOX Receipts]", got)
@@ -238,7 +253,7 @@ func TestAccounts_StaleSummariesAreIgnored(t *testing.T) {
 	next, _ := m.Update(summariesMsg{account: 0, folder: "Receipts", summaries: make([]mail.Summary, 9)})
 	m = next.(Model)
 
-	if m.open.folder != "INBOX" || len(m.open.summaries) != 3 {
+	if m.open.folder != "INBOX" || m.list.Count() != 3 {
 		t.Errorf("a response for a closed folder replaced the open one: %+v", m.open)
 	}
 }
@@ -305,5 +320,92 @@ func TestAccounts_CloseClosesMailboxes(t *testing.T) {
 		if _, err := fake.Folders(context.Background()); !errors.Is(err, mail.ErrClosed) {
 			t.Errorf("%s still open after Close (err = %v)", name, err)
 		}
+	}
+}
+
+func TestList_KeysMoveAndExpandWhenFocused(t *testing.T) {
+	m := started(t, newFixture(), 160, 30)
+
+	m = send(t, m, press("space"))
+	if !strings.Contains(plain(m), "Alice") {
+		t.Errorf("space didn't expand the Plan thread:\n%s", plain(m))
+	}
+	m = send(t, m, press("j"))
+	if _, uid, _ := m.list.Selected(); uid == 0 {
+		t.Error("j didn't move into the expanded thread")
+	}
+}
+
+func bulkFixture(n int) *fixture {
+	f := newFixture()
+	f.personal.AddFolder("Bulk", mail.RoleNone)
+	for i := range n {
+		f.personal.AddMessage("Bulk", msg("S", fmt.Sprintf("bulk %03d", i), fixedNow.Add(time.Duration(i-n)*time.Minute), true, fmt.Sprint("b", i)))
+	}
+	return f
+}
+
+func TestList_PagesThroughAFolder(t *testing.T) {
+	m := started(t, bulkFixture(450), 160, 30)
+	opened, cmd := m.openFolder(0, "Bulk")
+	m = settle(t, opened, cmd)
+	if m.list.Count() != 200 {
+		t.Fatalf("first page has %d messages, want 200", m.list.Count())
+	}
+
+	for _, want := range []int{400, 450, 450} {
+		next, cmd := m.Update(press("G"))
+		m = settle(t, next.(Model), cmd)
+		if m.list.Count() != want {
+			t.Fatalf("after G: %d messages, want %d", m.list.Count(), want)
+		}
+	}
+	if m.status != "" {
+		t.Errorf("status = %q after paging, want it cleared", m.status)
+	}
+}
+
+func TestList_PageErrorShowsAndAllowsRetry(t *testing.T) {
+	m := started(t, bulkFixture(250), 160, 30)
+	opened, cmd := m.openFolder(0, "Bulk")
+	m = settle(t, opened, cmd)
+	next, _ := m.Update(press("G"))
+	m = next.(Model)
+
+	next, _ = m.Update(summariesMsg{account: 0, folder: "Bulk", before: 51, err: errors.New("fetch failed")})
+	m = next.(Model)
+
+	if !m.statusErr || !strings.Contains(m.status, "fetch failed") || m.list.LoadingMore() {
+		t.Errorf("status %q, loading %v; want the error and no page loading", m.status, m.list.LoadingMore())
+	}
+}
+
+func TestList_FolderChangedWhilePagingReloads(t *testing.T) {
+	m := started(t, bulkFixture(250), 160, 30)
+	opened, cmd := m.openFolder(0, "Bulk")
+	m = settle(t, opened, cmd)
+	next, _ := m.Update(press("G"))
+	m = next.(Model)
+
+	next, cmd = m.Update(summariesMsg{account: 0, folder: "Bulk", before: 51, err: fmt.Errorf("%q: %w", "Bulk", mail.ErrFolderChanged)})
+	m = next.(Model)
+
+	if cmd == nil || !m.open.loading || m.statusErr || !strings.Contains(m.status, "Bulk changed on the server; reloaded.") {
+		t.Fatalf("status %q (err %v), loading %v, cmd %v; want a reload", m.status, m.statusErr, m.open.loading, cmd != nil)
+	}
+	m = settle(t, m, cmd)
+	if m.list.Count() != 200 || m.list.LoadingMore() {
+		t.Errorf("after reload: %d messages, loading more %v; want a fresh first page", m.list.Count(), m.list.LoadingMore())
+	}
+}
+
+func TestList_UnexpectedPageIsIgnored(t *testing.T) {
+	m := started(t, newFixture(), 160, 30)
+
+	next, _ := m.Update(summariesMsg{account: 0, folder: "INBOX", before: 3, summaries: make([]mail.Summary, 5)})
+	m = next.(Model)
+
+	if m.list.Count() != 3 {
+		t.Errorf("a page nobody asked for changed the list to %d messages", m.list.Count())
 	}
 }

@@ -33,20 +33,22 @@ type accountMsg struct {
 	took    time.Duration
 }
 
+// summariesMsg is a page of summaries; before is 0 for a folder's first page.
 type summariesMsg struct {
 	account   int
 	folder    string
+	before    mail.UID
 	summaries []mail.Summary
 	err       error
 }
 
-// openFolder is the folder whose threads are shown; account is -1 when none is.
+// openFolder is the folder whose threads are shown; account is -1 when none
+// is. Its threads live in Model.list.
 type openFolder struct {
-	account   int
-	folder    string
-	label     string
-	loading   bool
-	summaries []mail.Summary
+	account int
+	folder  string
+	label   string
+	loading bool
 }
 
 func connectAccount(connect Connector, index int, acct config.Account) tea.Cmd {
@@ -67,12 +69,12 @@ func connectAccount(connect Connector, index int, acct config.Account) tea.Cmd {
 	}
 }
 
-func loadSummaries(mb mail.Mailbox, account int, folder string) tea.Cmd {
+func loadSummaries(mb mail.Mailbox, account int, folder string, before mail.UID) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), summariesTimeout)
 		defer cancel()
-		sums, err := mb.Summaries(ctx, folder, 0, pageSize)
-		return summariesMsg{account: account, folder: folder, summaries: sums, err: err}
+		sums, err := mb.Summaries(ctx, folder, before, pageSize)
+		return summariesMsg{account: account, folder: folder, before: before, summaries: sums, err: err}
 	}
 }
 
@@ -109,25 +111,56 @@ func (m Model) openFolder(account int, folder string) (Model, tea.Cmd) {
 		label, role = sidebar.Label(f), f.Role
 	}
 	m.open = openFolder{account: account, folder: folder, label: label, loading: true}
+	m.list = m.list.SetSummaries(nil, false)
 	m.side = m.side.SetOpen(account, folder)
 	m.setStatus(fmt.Sprintf("Loading %s…", label))
 	m.log.Debug("open folder", "account", m.accts[account].Name, "role", role)
-	return m, loadSummaries(m.boxes[account], account, folder)
+	return m, loadSummaries(m.boxes[account], account, folder, 0)
+}
+
+// loadMore fetches the page older than before for the open folder.
+func (m Model) loadMore(before mail.UID) (Model, tea.Cmd) {
+	if m.open.account < 0 || m.open.loading {
+		return m, nil
+	}
+	m.setStatus("Loading older messages…")
+	m.log.Debug("load page", "account", m.accts[m.open.account].Name, "before", before)
+	return m, loadSummaries(m.boxes[m.open.account], m.open.account, m.open.folder, before)
 }
 
 func (m Model) handleSummaries(msg summariesMsg) (Model, tea.Cmd) {
-	// A slow response for a folder that's no longer open is dropped.
+	// A slow response for a folder that's no longer open, or a page nobody
+	// is waiting for, is dropped.
 	if m.open.account != msg.account || m.open.folder != msg.folder {
 		return m, nil
 	}
-	m.open.loading = false
-	if msg.err != nil {
-		m.setError(fmt.Errorf("load %s/%s: %w", m.accts[msg.account].Name, m.open.label, msg.err))
+	paging := msg.before != 0
+	if paging != m.list.LoadingMore() || (!paging && !m.open.loading) {
 		return m, nil
 	}
-	m.open.summaries = msg.summaries
+	name := m.accts[msg.account].Name
+	m.open.loading = false
+	more := len(msg.summaries) == pageSize
+
+	switch {
+	case paging && errors.Is(msg.err, mail.ErrFolderChanged):
+		m.log.Debug("folder changed on server; reloading", "account", name)
+		m, cmd := m.openFolder(msg.account, msg.folder)
+		m.setStatus(fmt.Sprintf("%s changed on the server; reloaded.", m.open.label))
+		return m, cmd
+	case msg.err != nil:
+		if paging {
+			m.list = m.list.PageFailed()
+		}
+		m.setError(fmt.Errorf("load %s/%s: %w", name, m.open.label, msg.err))
+		return m, nil
+	case paging:
+		m.list = m.list.AddPage(msg.summaries, more)
+	default:
+		m.list = m.list.SetSummaries(msg.summaries, more)
+	}
 	m.setStatus("")
-	m.log.Debug("summaries loaded", "account", m.accts[msg.account].Name, "count", len(msg.summaries))
+	m.log.Debug("summaries loaded", "account", name, "count", len(msg.summaries), "page", paging)
 	return m, nil
 }
 

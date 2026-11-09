@@ -298,6 +298,7 @@ func TestGolden(t *testing.T) {
 		{"wide", 140, 24, false, nil},
 		{"wide-sidebar-focused", 140, 24, false, []string{"h", "j"}},
 		{"wide-account-error", 140, 24, true, nil},
+		{"wide-thread-expanded", 140, 24, false, []string{"space", "j"}},
 		{"narrow", 100, 24, false, nil},
 		{"list", 70, 20, false, nil},
 		{"help", 120, 30, false, []string{"?"}},

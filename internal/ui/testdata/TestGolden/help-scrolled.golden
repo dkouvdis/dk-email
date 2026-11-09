@@ -1,7 +1,7 @@
 ╭──────────────────────╮╭───────────────────────────────╮╭─────────────────────────────────────────────────────────────╮
-│ Personal             ││ Threads      ╭───────────────────────────────────────╮                                       │
-│ ▶ Inbox            2 ││              │ Keys                       esc close  │                                       │
-│   Sent Mail          ││ 3 messages lo│                                       │                                       │
+│ Personal             ││ Inbox        ╭───────────────────────────────────────╮                                       │
+│ ▶ Inbox            2 ││ ●    Bob     │ Keys                       esc close  │                                       │
+│   Sent Mail          ││ ●    Carol   │                                       │                                       │
 │   All Mail           ││              │ Threads                               │                                       │
 │   Receipts         1 ││              │   enter       open                    │                                       │
 │                      ││              │   space       expand                  │                                       │

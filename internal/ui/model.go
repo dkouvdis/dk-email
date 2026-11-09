@@ -1,6 +1,5 @@
 // Package ui is the root Bubble Tea model: layout, focus, keys, the status
-// line, the hint bar and popups. The thread list and reader are placeholders
-// until T10–T12.
+// line, the hint bar and popups. The reader is a placeholder until T12.
 package ui
 
 import (
@@ -8,6 +7,7 @@ import (
 	"log/slog"
 	"slices"
 	"strings"
+	"time"
 
 	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/key"
@@ -20,6 +20,7 @@ import (
 	"github.com/dkouvdis/dk-email/internal/mail"
 	"github.com/dkouvdis/dk-email/internal/ui/popup"
 	"github.com/dkouvdis/dk-email/internal/ui/sidebar"
+	"github.com/dkouvdis/dk-email/internal/ui/threadlist"
 )
 
 // Below this size only a "too small" notice is drawn.
@@ -57,6 +58,7 @@ type Model struct {
 	boxes []mail.Mailbox
 	side  sidebar.Model
 	open  openFolder
+	list  threadlist.Model
 
 	log           *slog.Logger
 	keys          KeyMap
@@ -94,6 +96,7 @@ func New(cfg config.Config, connect Connector, log *slog.Logger) Model {
 		boxes:   make([]mail.Mailbox, len(cfg.Accounts)),
 		side:    sidebar.New(names),
 		open:    openFolder{account: -1},
+		list:    threadlist.New(time.Now),
 		log:     log,
 		keys:    keys,
 		styles:  defaultStyles(),
@@ -138,6 +141,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.openFolder(msg.Account, msg.Folder)
 	case summariesMsg:
 		return m.handleSummaries(msg)
+	case threadlist.LoadMoreMsg:
+		return m.loadMore(msg.Before)
 	}
 	return m, nil
 }
@@ -154,7 +159,9 @@ func (m *Model) resize(w, h int) {
 func (m *Model) relayout() {
 	m.panes = Layout(m.width, m.height, m.mode, m.ui)
 	m.helpPop.SetSize(m.panes.Popup.W, m.panes.Popup.H)
-	m.side = m.side.SetHeight(max(m.panes.Sidebar.H-m.styles.pane.GetVerticalFrameSize(), 0))
+	frame := m.styles.pane.GetVerticalFrameSize()
+	m.side = m.side.SetHeight(max(m.panes.Sidebar.H-frame, 0))
+	m.list = m.list.SetHeight(max(m.panes.List.H-frame-listHeaderRows, 0))
 	if !slices.Contains(m.visiblePanes(), m.focus) {
 		m.focus = PaneList
 	}
@@ -206,6 +213,10 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case m.focus == PaneSidebar:
 		var cmd tea.Cmd
 		m.side, cmd = m.side.Update(msg)
+		return m, cmd
+	case m.focus == PaneList:
+		var cmd tea.Cmd
+		m.list, cmd = m.list.Update(msg)
 		return m, cmd
 	}
 	return m, nil
@@ -259,7 +270,7 @@ func (m Model) render() string {
 	if p.Sidebar.W > 0 {
 		cols = append(cols, m.renderPane(PaneSidebar, p.Sidebar, m.side.View))
 	}
-	cols = append(cols, m.renderPane(PaneList, p.List, lines(m.listLines())))
+	cols = append(cols, m.renderPane(PaneList, p.List, m.listView))
 	if p.Reader.W > 0 {
 		cols = append(cols, m.renderPane(PaneReader, p.Reader, lines(m.readerLines())))
 	}
@@ -299,29 +310,34 @@ func lines(l []string) func(w, h int) string {
 	return func(int, int) string { return strings.Join(l, "\n") }
 }
 
-// listLines shows the account › folder header outside wide mode, where
-// there's no sidebar to show it.
-func (m Model) listLines() []string {
-	title := m.styles.title.Render("Threads")
-	if m.panes.Kind != KindWide {
-		switch {
-		case m.open.account >= 0:
-			title = m.styles.title.Render(m.accts[m.open.account].Name) + m.styles.dim.Render(" › "+m.open.label)
-		case len(m.accts) > 0:
-			title = m.styles.title.Render(m.accts[0].Name) + m.styles.dim.Render(" › no folder")
-		default:
-			title = m.styles.title.Render("No account")
-		}
+// listHeaderRows is the folder header above the thread rows.
+const listHeaderRows = 1
+
+// listView shows the open folder's name, plus its account outside wide mode
+// where there's no sidebar, above the thread rows.
+func (m Model) listView(w, h int) string {
+	var title string
+	switch {
+	case m.open.account >= 0 && m.panes.Kind == KindWide:
+		title = m.styles.title.Render(m.open.label)
+	case m.open.account >= 0:
+		title = m.styles.title.Render(m.accts[m.open.account].Name) + m.styles.dim.Render(" › "+m.open.label)
+	case len(m.accts) > 0:
+		title = m.styles.title.Render("Threads")
+	default:
+		title = m.styles.title.Render("No account")
 	}
-	body := "Threads appear here once a folder is open."
+
+	var body string
 	switch {
 	case m.open.account < 0:
+		body = m.styles.dim.Render("Threads appear here once a folder is open.")
 	case m.open.loading:
-		body = "Loading…"
+		body = m.styles.dim.Render("Loading…")
 	default:
-		body = fmt.Sprintf("%d messages loaded.", len(m.open.summaries))
+		body = m.list.View(w, h-listHeaderRows)
 	}
-	return []string{title, "", m.styles.dim.Render(body)}
+	return title + "\n" + body
 }
 
 func (m Model) readerLines() []string {

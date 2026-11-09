@@ -239,13 +239,21 @@ Every task also meets the standing bar before it counts as done:
 - Reaching the end of the list fetches the next page, and all loaded messages are re-threaded together.
 
 **Acceptance criteria:**
-- [ ] Rows are truncated to the pane width and dates are formatted relative to now (time today, otherwise the date).
-- [ ] Expanding shows one indented row per message. Collapsing keeps the cursor on the thread.
-- [ ] Paging adds older threads without moving the cursor, and a thread that spans a page boundary is merged.
+- [x] Rows are truncated to the pane width and dates are formatted relative to now (time today, otherwise the date).
+- [x] Expanding shows one indented row per message. Collapsing keeps the cursor on the thread.
+- [x] Paging adds older threads without moving the cursor, and a thread that spans a page boundary is merged.
 
 **Verification:**
-- [ ] `go test -race ./internal/ui/...` passes.
-- [ ] teatest golden output for the list exists.
+- [x] `go test -race ./internal/ui/...` passes (stable over 3 runs; threadlist coverage 95%).
+- [x] teatest golden output for the list exists (wide, narrow, list, and an expanded thread).
+
+**Notes:**
+- Dates show `15:04` for today, `Jan 2` earlier this year, and `2006-01-02` before that, in local time. The date column is as wide as the widest date on screen. Golden tests use a fixed clock.
+- The sender column is 28% of the width, clamped to 8–24. A thread row's `(n)` count is kept when the subject is truncated, and empty fields show "(unknown sender)" or "(no subject)".
+- The cursor and expanded state are keyed by message UID rather than row index, so they survive re-threading. A thread is expanded if any of its UIDs was expanded, which keeps it open when a page merges into it.
+- `space` on a message row collapses its thread and puts the cursor back on the thread row.
+- Reaching the last row sends `LoadMoreMsg{Before: oldest UID}`. The root loads that page, and pages are de-duplicated by UID. A page shorter than 200 means there are no more pages. The list shows "Loading more…", and a failed page can be retried by moving onto the last row again.
+- `ErrFolderChanged` while paging reloads the folder from the top and says so in the status line.
 
 **Dependencies:** T9, T6, T7
 **Files:** `internal/ui/threadlist/threadlist.go`, `internal/ui/threadlist/row.go`, `internal/ui/threadlist/threadlist_test.go`, `internal/ui/model.go`
