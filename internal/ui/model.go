@@ -72,6 +72,8 @@ type Model struct {
 	panes         Panes
 	focus         Pane
 	showHelp      bool
+	showPicker    bool
+	picker        popup.Picker[pick]
 	status        string
 	statusErr     bool
 }
@@ -166,6 +168,7 @@ func (m *Model) resize(w, h int) {
 func (m *Model) relayout() {
 	m.panes = Layout(m.width, m.height, m.mode, m.ui)
 	m.helpPop.SetSize(m.panes.Popup.W, m.panes.Popup.H)
+	m.picker.SetSize(m.panes.Popup.W, m.panes.Popup.H)
 	frame := m.styles.pane.GetVerticalFrameSize()
 	m.side = m.side.SetHeight(max(m.panes.Sidebar.H-frame, 0))
 	m.list = m.list.SetHeight(max(m.panes.List.H-frame-listHeaderRows, 0))
@@ -202,6 +205,9 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.helpPop = m.helpPop.Update(msg)
 		return m, nil
 	}
+	if m.showPicker {
+		return m.handlePickerKey(msg)
+	}
 
 	switch {
 	case key.Matches(msg, m.keys.Help):
@@ -218,6 +224,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.moveFocus(-1, false)
 	case key.Matches(msg, m.keys.ToggleView):
 		m.toggleMode()
+	case key.Matches(msg, m.keys.Picker):
+		return m.openPicker()
 	case m.focus == PaneSidebar:
 		var cmd tea.Cmd
 		m.side, cmd = m.side.Update(msg)
@@ -299,16 +307,21 @@ func (m Model) render() string {
 		m.renderHints(),
 	)
 
-	if m.showHelp {
-		if pop := m.helpPop.View(); pop != "" {
-			body := m.height - footerRows
-			x := max((m.width-lipgloss.Width(pop))/2, 0)
-			y := max((body-lipgloss.Height(pop))/2, 0)
-			screen = lipgloss.NewCompositor(
-				lipgloss.NewLayer(screen),
-				lipgloss.NewLayer(pop).X(x).Y(y).Z(1),
-			).Render()
-		}
+	pop := ""
+	switch {
+	case m.showHelp:
+		pop = m.helpPop.View()
+	case m.showPicker:
+		pop = m.picker.View()
+	}
+	if pop != "" {
+		body := m.height - footerRows
+		x := max((m.width-lipgloss.Width(pop))/2, 0)
+		y := max((body-lipgloss.Height(pop))/2, 0)
+		screen = lipgloss.NewCompositor(
+			lipgloss.NewLayer(screen),
+			lipgloss.NewLayer(pop).X(x).Y(y).Z(1),
+		).Render()
 	}
 	return screen
 }
@@ -325,6 +338,15 @@ func (m Model) renderPane(pane Pane, r Rect, content func(w, h int) string) stri
 	return style.Width(r.W).Height(r.H).Render(body)
 }
 
+// unreadNote is " · N unread" for the open folder, or "" when it has none.
+func (m Model) unreadNote() string {
+	f, ok := m.side.Folder(m.open.account, m.open.folder)
+	if !ok || f.Unread == 0 {
+		return ""
+	}
+	return m.styles.dim.Render(fmt.Sprintf(" · %d unread", f.Unread))
+}
+
 // listHeaderRows is the folder header above the thread rows.
 const listHeaderRows = 1
 
@@ -334,9 +356,9 @@ func (m Model) listView(w, h int) string {
 	var title string
 	switch {
 	case m.open.account >= 0 && m.panes.Kind == KindWide:
-		title = m.styles.title.Render(m.open.label)
+		title = m.styles.title.Render(m.open.label) + m.unreadNote()
 	case m.open.account >= 0:
-		title = m.styles.title.Render(m.accts[m.open.account].Name) + m.styles.dim.Render(" › "+m.open.label)
+		title = m.styles.title.Render(m.accts[m.open.account].Name) + m.styles.dim.Render(" › "+m.open.label) + m.unreadNote()
 	case len(m.accts) > 0:
 		title = m.styles.title.Render("Threads")
 	default:

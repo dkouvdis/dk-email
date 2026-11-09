@@ -150,6 +150,37 @@ func (m Model) SetHeight(h int) Model {
 	return m
 }
 
+// Account is a read-only view of one account, for other folder lists.
+type Account struct {
+	Name string
+	// Note explains a missing folder list: connecting, an error, or no folders.
+	Note    string
+	Folders []mail.Folder // in display order
+}
+
+// Accounts lists every account with its folders in display order.
+func (m Model) Accounts() []Account {
+	out := make([]Account, len(m.accounts))
+	for i, a := range m.accounts {
+		out[i] = Account{Name: a.name, Folders: slices.Clone(a.folders)}
+		switch {
+		case a.state == connecting:
+			out[i].Note = "connecting…"
+		case a.state == failed:
+			out[i].Note = SummarizeError(a.err)
+		case len(a.folders) == 0:
+			out[i].Note = "no folders"
+		}
+	}
+	return out
+}
+
+// SummarizeError is the first line of err, for one-line notes.
+func SummarizeError(err error) string {
+	s, _, _ := strings.Cut(err.Error(), "\n")
+	return s
+}
+
 // AdjustUnread changes a folder's unread count by delta, never below zero.
 func (m Model) AdjustUnread(account int, name string, delta int) Model {
 	if account < 0 || account >= len(m.accounts) {

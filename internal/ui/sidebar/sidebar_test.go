@@ -231,3 +231,22 @@ func TestAdjustUnread(t *testing.T) {
 		t.Error("Folder found a folder that doesn't exist")
 	}
 }
+
+func TestAccounts(t *testing.T) {
+	m := New([]string{"Personal", "Work", "Empty"})
+	m = m.SetFolders(0, gmailFolders(), nil)
+	m = m.SetFolders(2, nil, nil)
+
+	got := m.Accounts()
+
+	if len(got) != 3 || got[0].Name != "Personal" || got[0].Folders[0].Name != "INBOX" || got[0].Note != "" {
+		t.Errorf("Personal = %+v", got[0])
+	}
+	if got[1].Note != "connecting…" || got[2].Note != "no folders" {
+		t.Errorf("notes = %q, %q", got[1].Note, got[2].Note)
+	}
+	m = m.SetFolders(1, nil, errors.New("login failed\nHint: use an app password"))
+	if note := m.Accounts()[1].Note; note != "login failed" {
+		t.Errorf("error note = %q, want its first line", note)
+	}
+}

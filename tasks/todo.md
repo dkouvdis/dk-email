@@ -321,11 +321,17 @@ Every task also meets the standing bar before it counts as done:
 - In wide mode, `a` jumps focus to the sidebar instead.
 
 **Acceptance criteria:**
-- [ ] The header always matches the current selection, and picking a folder in another account switches to it and loads that folder.
-- [ ] `esc` closes the picker without changing anything.
+- [x] The header always matches the current selection, and picking a folder in another account switches to it and loads that folder.
+- [x] `esc` closes the picker without changing anything.
 
 **Verification:**
-- [ ] `go test -race ./internal/ui/...` passes, with teatest golden output for the narrow layout with the picker open.
+- [x] `go test -race ./internal/ui/...` passes, with teatest golden output for the narrow layout with the picker open (`narrow-picker`; picker coverage 99%).
+
+**Notes:**
+- `popup.Picker[T]` is generic: groups (accounts) of items (folders) with counts, a `Current` item the cursor starts on (marked `▶`), and the cursor marked `▸`. It's built for reuse by the `m` move picker in T18.
+- The picker shows every account in sidebar order. An account without folders shows why: connecting…, the first line of its error, or no folders. Choosing the folder that's already open does nothing.
+- The list header shows `Account › Folder · N unread` outside wide mode and `Folder · N unread` in wide mode. The count tracks the sidebar, so it drops when you read mail.
+- `a` works in list mode too. In wide mode it focuses the sidebar.
 
 **Dependencies:** T10
 **Files:** `internal/ui/popup/picker.go`, `internal/ui/popup/picker_test.go`, `internal/ui/model.go`, `internal/ui/threadlist/threadlist.go`

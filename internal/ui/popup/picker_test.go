@@ -1,0 +1,154 @@
+package popup
+
+import (
+	"strings"
+	"testing"
+
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
+)
+
+func pickerKey(k string) tea.KeyPressMsg {
+	switch k {
+	case "enter":
+		return tea.KeyPressMsg{Code: tea.KeyEnter}
+	case "esc":
+		return tea.KeyPressMsg{Code: tea.KeyEscape}
+	case "down":
+		return tea.KeyPressMsg{Code: tea.KeyDown}
+	}
+	return tea.KeyPressMsg{Code: []rune(k)[0], Text: k}
+}
+
+func groups() []Group[string] {
+	return []Group[string]{
+		{Name: "Personal", Items: []Item[string]{
+			{Label: "Inbox", Count: 2, Value: "p/inbox"},
+			{Label: "Sent Mail", Value: "p/sent"},
+			{Label: "Receipts", Count: 1, Value: "p/receipts", Current: true},
+		}},
+		{Name: "Broken", Note: "login failed"},
+		{Name: "Work", Items: []Item[string]{
+			{Label: "Inbox", Count: 1, Value: "w/inbox"},
+		}},
+	}
+}
+
+func TestPicker_StartsOnCurrentAndMovesAcrossGroups(t *testing.T) {
+	p := NewPicker("Go to folder", groups())
+	p.SetSize(80, 30)
+
+	if v, _ := p.Selected(); v != "p/receipts" {
+		t.Fatalf("starts on %q, want the current folder", v)
+	}
+	steps := []struct{ key, want string }{
+		{"j", "w/inbox"}, // skips the Broken group, which has no folders
+		{"j", "w/inbox"},
+		{"g", "p/inbox"},
+		{"down", "p/sent"},
+		{"k", "p/inbox"},
+		{"k", "p/inbox"},
+		{"G", "w/inbox"},
+	}
+	for _, s := range steps {
+		var r Result
+		p, r = p.Update(pickerKey(s.key))
+		if r != Pending {
+			t.Fatalf("%s returned %v, want Pending", s.key, r)
+		}
+		if v, _ := p.Selected(); v != s.want {
+			t.Fatalf("after %s on %q, want %q", s.key, v, s.want)
+		}
+	}
+}
+
+func TestPicker_EnterChoosesAndEscCancels(t *testing.T) {
+	p := NewPicker("Go to folder", groups())
+
+	_, r := p.Update(pickerKey("enter"))
+	if r != Chosen {
+		t.Errorf("enter = %v, want Chosen", r)
+	}
+	_, r = p.Update(pickerKey("esc"))
+	if r != Cancelled {
+		t.Errorf("esc = %v, want Cancelled", r)
+	}
+	_, r = p.Update(pickerKey("x"))
+	if r != Pending {
+		t.Errorf("x = %v, want Pending", r)
+	}
+}
+
+func TestPicker_Empty(t *testing.T) {
+	p := NewPicker("Go to folder", []Group[string]{{Name: "Personal", Note: "connecting…"}})
+	p.SetSize(80, 30)
+
+	if _, ok := p.Selected(); ok {
+		t.Error("Selected() ok with no items")
+	}
+	if _, r := p.Update(pickerKey("enter")); r != Pending {
+		t.Errorf("enter with nothing to choose = %v, want Pending", r)
+	}
+	if !strings.Contains(ansi.Strip(p.View()), "connecting…") {
+		t.Errorf("note not shown:\n%s", ansi.Strip(p.View()))
+	}
+}
+
+func TestPicker_View(t *testing.T) {
+	p := NewPicker("Go to folder", groups())
+	p.SetSize(80, 30)
+	p, _ = p.Update(pickerKey("g"))
+
+	view := p.View()
+	plain := ansi.Strip(view)
+
+	for _, want := range []string{"Go to folder", "esc close", "Personal", "Broken", "login failed", "Work", "▸ Inbox", "▶ Receipts", "enter open"} {
+		if !strings.Contains(plain, want) {
+			t.Errorf("view missing %q:\n%s", want, plain)
+		}
+	}
+	lines := strings.Split(plain, "\n")
+	if !rowEndsWith(lines, "Inbox", "2") || !rowEndsWith(lines, "Receipts", "1") {
+		t.Errorf("unread counts not right-aligned on their rows:\n%s", plain)
+	}
+	if w := lipgloss.Width(view); w > 60 {
+		t.Errorf("width = %d, want a compact popup", w)
+	}
+}
+
+func rowEndsWith(lines []string, label, count string) bool {
+	for _, l := range lines {
+		l = strings.TrimSuffix(strings.TrimRight(l, " "), "│")
+		if strings.Contains(l, label) && strings.HasSuffix(strings.TrimRight(l, " "), " "+count) {
+			return true
+		}
+	}
+	return false
+}
+
+func TestPicker_ScrollsAndClamps(t *testing.T) {
+	var items []Item[int]
+	for i := range 40 {
+		items = append(items, Item[int]{Label: "folder", Value: i})
+	}
+	p := NewPicker("Go to folder", []Group[int]{{Name: "Personal", Items: items}})
+	p.SetSize(50, 14)
+
+	p, _ = p.Update(pickerKey("G"))
+	view := p.View()
+
+	if h := lipgloss.Height(view); h != 14 {
+		t.Errorf("height = %d, want clamped to 14", h)
+	}
+	if v, _ := p.Selected(); v != 39 {
+		t.Errorf("selected %d, want 39", v)
+	}
+	if !strings.Contains(ansi.Strip(view), "▸ folder") {
+		t.Errorf("cursor row not visible after G:\n%s", ansi.Strip(view))
+	}
+	p.SetSize(10, 3)
+	if p.View() != "" {
+		t.Error("tiny picker should render nothing")
+	}
+}
