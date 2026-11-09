@@ -467,13 +467,23 @@ Every task also meets the standing bar before it counts as done:
 
 **Acceptance criteria:**
 
-- [ ] Update-level tests on the fake cover every key in both thread and message scope, plus the rollback when the fake returns an error.
-- [ ] No key ever leads to a permanent expunge: delete moves to Trash.
+- [x] Update-level tests on the fake cover every key in both thread and message scope, plus the rollback when the fake returns an error.
+- [x] No key ever leads to a permanent expunge: delete moves to Trash.
 
 **Verification:**
 
-- [ ] `go test -race ./internal/ui/...` passes.
+- [x] `go test -race ./internal/ui/...` passes (stable over 3 runs).
 - [ ] **Live (you approve first):** run `u`, `s`, `e` and `d` on a throwaway email sent to yourself, and confirm the result in the Gmail web UI.
+
+**Notes:**
+
+- **Scope:** a collapsed thread row acts on every message in the thread, and an expanded message row on that message. In the reader and the popup, keys act on the reader's current message: the one expanded when the thread opened.
+- **Toggles:** `u` marks the targets read if any is unread, otherwise unread. `s` unstars if any is starred, otherwise stars. Only messages whose state actually changes are sent to the server.
+- **Optimistic UI:** the list, reader and sidebar change before the server answers. A failed call undoes the change and shows `star: …`, `mark as read: …`, `archive: …` and so on. `ErrFolderChanged` reloads the folder. Mark-read-on-open uses the same path, so it's optimistic now too.
+- **`e` and `d`:** these move to `mail.ArchiveFolder`/`mail.TrashFolder` (T16). Without such a folder the key is disabled with `can't archive in <account>: …`. In the archive or Trash folder itself it only says so ("never deletes mail permanently").
+  - Moved messages leave the list at once and the cursor takes the next thread. The reader drops them too and closes, along with the popup, when none are left.
+  - Only the source folder's unread count is adjusted: Gmail's All Mail already holds archived mail, so a destination bump would double-count. T19's refresh corrects counts.
+- The reader marks starred messages with `★`.
 
 **Dependencies:** T16, T14
 **Files:** `internal/ui/actions.go`, `internal/ui/actions_test.go`, `internal/ui/model.go`, `internal/ui/threadlist/threadlist.go`

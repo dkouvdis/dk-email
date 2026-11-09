@@ -50,7 +50,7 @@ The full details for every task are in [todo.md](todo.md).
 
 ### Phase 3: Triage
 - [x] T16: IMAP `SetFlag` + `Move` + archive/Trash folder resolution
-- [ ] T17: Triage keys `u` / `s` / `e` / `d` with optimistic update
+- [x] T17: Triage keys `u` / `s` / `e` / `d` with optimistic update
 - [ ] T18: Move-to-folder picker (`m`)
 - [ ] T19: Auto-refresh (120s) + `r`
 - [x] T24: `tls_cert` per account, for Proton Mail Bridge's self-signed certificate (added at your request)
