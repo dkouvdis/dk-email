@@ -104,7 +104,7 @@ func (m Model) handleMessage(msg messageMsg) (Model, tea.Cmd) {
 
 func (m Model) handleFlag(msg flagMsg) (Model, tea.Cmd) {
 	if msg.err != nil {
-		// Real IMAP can't set flags until T16; reading stays read-only until then.
+		// A Mailbox that can't change flags isn't worth an error on every open.
 		if errors.Is(msg.err, errors.ErrUnsupported) {
 			m.log.Debug("set flag unsupported", "flag", msg.flag)
 			return m, nil

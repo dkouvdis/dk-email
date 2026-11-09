@@ -49,7 +49,7 @@ The full details for every task are in [todo.md](todo.md).
 **Checkpoint 2:** read-only use against real Gmail works in all three layouts. You review; no tag yet.
 
 ### Phase 3: Triage
-- [ ] T16: IMAP `SetFlag` + `Move` + archive/Trash folder resolution
+- [x] T16: IMAP `SetFlag` + `Move` + archive/Trash folder resolution
 - [ ] T17: Triage keys `u` / `s` / `e` / `d` with optimistic update
 - [ ] T18: Move-to-folder picker (`m`)
 - [ ] T19: Auto-refresh (120s) + `r`

@@ -100,14 +100,6 @@ func (c *Client) Close() error {
 	return nil
 }
 
-func (c *Client) SetFlag(ctx context.Context, folder string, uids []mail.UID, f mail.Flag, on bool) error {
-	return fmt.Errorf("imap: SetFlag: %w", errors.ErrUnsupported)
-}
-
-func (c *Client) Move(ctx context.Context, from string, uids []mail.UID, to string) error {
-	return fmt.Errorf("imap: Move: %w", errors.ErrUnsupported)
-}
-
 // do runs fn on the account's connection, opening it if needed. If a
 // connection that was already open fails, do reconnects and runs fn once more,
 // so fn must be safe to repeat.

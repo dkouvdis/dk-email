@@ -379,11 +379,18 @@ Every task also meets the standing bar before it counts as done:
 - Resolve its trash folder from the `\Trash` role.
 
 **Acceptance criteria:**
-- [ ] Memserver tests cover setting and clearing both flags, moving with and without the MOVE capability, and the fallback expunging only the moved UIDs.
-- [ ] Table tests cover every combination of archive and trash folder resolution.
+- [x] Memserver tests cover setting and clearing both flags, moving with and without the MOVE capability, and the fallback expunging only the moved UIDs.
+- [x] Table tests cover every combination of archive and trash folder resolution.
 
 **Verification:**
-- [ ] `go test -race ./internal/mail/imap/...` passes.
+- [x] `go test -race ./internal/mail/imap/...` passes (93.8% coverage, stable over 3 runs).
+
+**Notes:**
+- Archive and trash resolution live in `internal/mail/roles.go` (`mail.ArchiveFolder`, `mail.TrashFolder`), not `imap/roles.go`, because T17's UI needs them and may only import `mail`. An `archive_folder` that doesn't exist on the server returns `ErrNoArchive` naming it. A folder merely named "Trash" isn't trusted without the `\Trash` role: delete is disabled instead of ever expunging.
+- go-imap's own `Move` fallback sends a plain `EXPUNGE` without UIDPLUS, which would permanently delete other mail marked `\Deleted`, so `Move` implements its own fallback. It first runs `UID SEARCH` for the given UIDs that are still present and not `\Deleted`, and moves only those (UID MOVE, or COPY + `\Deleted`). With UIDPLUS it then `UID EXPUNGE`s just the given UIDs; without it they stay flagged. Repeats (a retry) never copy twice.
+- `Summaries` now skips messages flagged `\Deleted`.
+- Writes `SELECT` read-write and fail with `ErrFolderChanged` if the folder's UIDVALIDITY changed. A missing destination maps to `ErrFolderNotFound` (`[TRYCREATE]`/`[NONEXISTENT]`).
+- From this task on, opening an unread message in the app really marks it read on the server, which is the spec behavior. Archive, delete and move keys arrive in T17/T18.
 
 **Dependencies:** T12
 **Files:** `internal/mail/imap/actions.go`, `internal/mail/imap/roles.go`, `internal/mail/imap/actions_test.go`

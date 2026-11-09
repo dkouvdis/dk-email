@@ -449,23 +449,6 @@ func TestClose_AfterServerDroppedConnection(t *testing.T) {
 	}
 }
 
-func TestUnsupportedMethods_ReturnErrUnsupported(t *testing.T) {
-	c := New(config.Account{Name: "Test"}, "pw")
-	calls := map[string]func() error{
-		"SetFlag": func() error { return c.SetFlag(bg, "INBOX", []mail.UID{1}, mail.FlagSeen, true) },
-		"Move":    func() error { return c.Move(bg, "INBOX", []mail.UID{1}, "Archive") },
-	}
-	for name, call := range calls {
-		t.Run(name, func(t *testing.T) {
-			err := call()
-
-			if !errors.Is(err, errors.ErrUnsupported) {
-				t.Errorf("%s() error = %v, want errors.ErrUnsupported", name, err)
-			}
-		})
-	}
-}
-
 func TestNewTLSConfig_EnforcesServerNameAndMinimumVersion(t *testing.T) {
 	base := &tls.Config{MinVersion: tls.VersionTLS10, ServerName: "other.example.com"}
 	c := New(config.Account{IMAPHost: "imap.example.com"}, "pw")

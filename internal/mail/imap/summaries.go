@@ -29,7 +29,7 @@ func (c *Client) Summaries(ctx context.Context, folder string, before mail.UID, 
 	}
 	var out []mail.Summary
 	err := c.do(ctx, "Summaries", func(conn *imapclient.Client) error {
-		if err := c.examineLocked(conn, folder, before != 0); err != nil {
+		if err := c.openLocked(conn, folder, readOnly, before != 0); err != nil {
 			return err
 		}
 		uids, err := newestUIDs(conn, before, limit)
@@ -48,10 +48,16 @@ func (c *Client) Summaries(ctx context.Context, folder string, before mail.UID, 
 	return out, nil
 }
 
-// examineLocked opens folder read-only and records its UIDVALIDITY. When
-// paging, a changed UIDVALIDITY is an error because the caller's UIDs are stale.
-func (c *Client) examineLocked(conn *imapclient.Client, folder string, paging bool) error {
-	data, err := conn.Select(folder, &goimap.SelectOptions{ReadOnly: true}).Wait()
+const (
+	readOnly  = true
+	readWrite = false
+)
+
+// openLocked selects folder (EXAMINE when readOnly) and records its
+// UIDVALIDITY. When the caller passes UIDs it got earlier (checkUIDs), a
+// changed UIDVALIDITY is an error because those UIDs are stale.
+func (c *Client) openLocked(conn *imapclient.Client, folder string, readOnly, checkUIDs bool) error {
+	data, err := conn.Select(folder, &goimap.SelectOptions{ReadOnly: readOnly}).Wait()
 	if err != nil {
 		var serverErr *goimap.Error
 		if errors.As(err, &serverErr) && serverErr.Code == goimap.ResponseCodeNonExistent {
@@ -65,15 +71,17 @@ func (c *Client) examineLocked(conn *imapclient.Client, folder string, paging bo
 		c.uidValidity = make(map[string]uint32)
 	}
 	c.uidValidity[folder] = data.UIDValidity
-	if paging && known && prev != data.UIDValidity {
+	if checkUIDs && known && prev != data.UIDValidity {
 		return finalError{fmt.Errorf("%q: %w", folder, mail.ErrFolderChanged)}
 	}
 	return nil
 }
 
-// newestUIDs returns the highest limit UIDs below before, in ascending order.
+// newestUIDs returns the highest limit UIDs below before, in ascending
+// order. Messages flagged \Deleted are skipped: they're on their way out,
+// e.g. moved without UIDPLUS to expunge them.
 func newestUIDs(conn *imapclient.Client, before mail.UID, limit int) ([]goimap.UID, error) {
-	criteria := &goimap.SearchCriteria{}
+	criteria := &goimap.SearchCriteria{NotFlag: []goimap.Flag{goimap.FlagDeleted}}
 	if before != 0 {
 		var set goimap.UIDSet
 		set.AddRange(1, goimap.UID(before-1))

@@ -21,7 +21,7 @@ var wholeMessage = &goimap.FetchItemBodySection{Peek: true}
 func (c *Client) Message(ctx context.Context, folder string, uid mail.UID) (mail.Message, error) {
 	var out mail.Message
 	err := c.do(ctx, "Message", func(conn *imapclient.Client) error {
-		if err := c.examineLocked(conn, folder, true); err != nil {
+		if err := c.openLocked(conn, folder, readOnly, true); err != nil {
 			return err
 		}
 		opts := &goimap.FetchOptions{
