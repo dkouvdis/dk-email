@@ -381,7 +381,7 @@ func TestView_ScrollingUpShowsTheAccountName(t *testing.T) {
 	m = m.SetFolders(0, folders("a1", "a2", "a3", "a4", "a5"), nil)
 	m = m.SetFolders(1, folders("b1", "b2", "b3", "b4", "b5"), nil)
 	m = m.SetFolders(2, folders("c1", "c2", "c3", "c4", "c5"), nil)
-	m = m.SetHeight(6)
+	m = m.SetSize(22, 6)
 	top := func() string { return strings.TrimSpace(strings.Split(ansi.Strip(m.View(22, 6)), "\n")[0]) }
 
 	m, _ = m.Update(press("G"))
@@ -483,7 +483,7 @@ func TestView_ScrollingUpMovesOneRowAtATime(t *testing.T) {
 	for i := range 15 {
 		fs = append(fs, mail.Folder{Name: fmt.Sprintf("f%02d", i)})
 	}
-	m := New([]string{"Personal"}).SetFolders(0, fs, nil).SetHeight(8)
+	m := New([]string{"Personal"}).SetFolders(0, fs, nil).SetSize(22, 8)
 
 	m, _ = m.Update(press("G"))
 	prev := m.offset
@@ -496,5 +496,21 @@ func TestView_ScrollingUpMovesOneRowAtATime(t *testing.T) {
 	}
 	if top := strings.Split(ansi.Strip(m.View(22, 8)), "\n")[0]; strings.TrimSpace(top) != "Personal" {
 		t.Errorf("on the first folder, top row = %q, want the account name", top)
+	}
+}
+
+func TestClick_OpensTheFolderOnThatLineAndClearsAFilter(t *testing.T) {
+	m := New([]string{"Personal"}).SetFolders(0, gmailFolders(), nil).SetSize(22, 20)
+
+	if _, cmd := m.Click(0); cmd != nil {
+		t.Error("clicking the account name should do nothing")
+	}
+	m = typeKeys(m, "/spam") // line 0 is the filter, 1 the account, 2 Spam
+	m, cmd := m.Click(2)
+	if cmd == nil {
+		t.Fatal("clicking a filtered folder returned no command")
+	}
+	if sel := cmd().(SelectedMsg); sel.Folder != "[Gmail]/Spam" || m.Filtering() {
+		t.Errorf("opened %q, filtering %v; want Spam and the filter cleared", sel.Folder, m.Filtering())
 	}
 }

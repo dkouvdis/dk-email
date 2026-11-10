@@ -663,6 +663,7 @@ How it behaves:
 - [x] Two layouts only. Narrow (the default, 80+ columns) is the folders sidebar (24 columns) │ thread list, and `a` focuses the sidebar. List (`v`, or forced below 80 columns) is the thread list alone, with the `a` picker. There's no reading pane: `enter` opens the conversation in the popup in both layouts. `wide_breakpoint` and `list_width` are removed. The thread list says "Connecting…" until the first folder opens.
 - [x] The hint bar reads lazygit style (`Archive: e | Delete: d`) in soft blue 110 instead of dark grey.
 - [x] Folders show as a tree (two spaces per level) in the sidebar and pickers. Special folders stay flat on top, parents that aren't folders are dimmed and can't be selected, and filtered matches show their full path.
+- [x] Mouse: click a folder to open it; click a thread to select it, and again to open it. The wheel scrolls without opening anything.
 - [x] `/` filters folders in the sidebar and in the folder pickers. Every key goes to the filter while typing, paste works, and the picker keeps its size.
 
 ---

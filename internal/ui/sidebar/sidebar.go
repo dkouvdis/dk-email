@@ -63,6 +63,7 @@ type Model struct {
 	cursor   ref
 	open     ref
 	offset   int
+	width    int
 	height   int
 	spinner  spinner.Model
 	filter   textinput.Model
@@ -236,11 +237,42 @@ func (m Model) SetOpen(account int, folder string) Model {
 	return m
 }
 
-// SetHeight tells the pane how many rows it has, for scrolling.
-func (m Model) SetHeight(h int) Model {
-	m.height = h
+// SetSize tells the pane its inner size, for scrolling and clicks.
+func (m Model) SetSize(width, height int) Model {
+	m.width, m.height = width, height
 	m.ensureVisible()
 	return m
+}
+
+// layout is what View shows for the pane's size: the rows, the first one
+// shown, and how many fit under the filter line, if any.
+func (m Model) layout(width, height int) (rows []row, offset, h int) {
+	h = height
+	if m.filter.Focused() {
+		h--
+	}
+	rows = m.rows(width)
+	cur := cursorRow(rows, m.cursor)
+	return rows, clampOffset(m.offset, cur, headerRow(rows, cur), h, len(rows)), h
+}
+
+// Click opens the folder on the pane's inner line (0 is the top line), as
+// enter would, and clears a filter. Other lines do nothing.
+func (m Model) Click(line int) (Model, tea.Cmd) {
+	rows, offset, h := m.layout(max(m.width, 1), m.height)
+	if m.filter.Focused() {
+		line--
+	}
+	if line < 0 || line >= h || offset+line >= len(rows) || rows[offset+line].ref == noRef {
+		return m, nil
+	}
+	c := rows[offset+line].ref
+	m.cursor, m.offset = c, offset
+	if m.filter.Focused() {
+		m.clearFilter()
+	}
+	m.ensureVisible()
+	return m, func() tea.Msg { return SelectedMsg{Account: c.account, Folder: c.folder} }
 }
 
 // Account is a read-only view of one account, for other folder lists.
@@ -504,11 +536,8 @@ func (m Model) View(width, height int) string {
 		f := m.filter
 		f.SetWidth(max(width-ansi.StringWidth(f.Prompt)-1, 1))
 		lines = append(lines, ansi.Truncate(f.View(), width, "…"))
-		height--
 	}
-	rows := m.rows(width)
-	cur := cursorRow(rows, m.cursor)
-	offset := clampOffset(m.offset, cur, headerRow(rows, cur), height, len(rows))
+	rows, offset, height := m.layout(width, height)
 	end := min(offset+max(height, 0), len(rows))
 	for _, r := range rows[offset:end] {
 		lines = append(lines, ansi.Truncate(r.text, width, ""))
@@ -517,16 +546,9 @@ func (m Model) View(width, height int) string {
 }
 
 func (m *Model) ensureVisible() {
-	h := m.height
-	if m.filter.Focused() {
-		h--
+	if _, offset, h := m.layout(max(m.width, 1), m.height); h > 0 {
+		m.offset = offset
 	}
-	if h <= 0 {
-		return
-	}
-	rows := m.rows(1)
-	cur := cursorRow(rows, m.cursor)
-	m.offset = clampOffset(m.offset, cur, headerRow(rows, cur), h, len(rows))
 }
 
 func cursorRow(rows []row, c ref) int {

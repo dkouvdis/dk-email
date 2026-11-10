@@ -286,6 +286,26 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	return m, nil
 }
 
+// Click puts the cursor on the row on the given line (0 is the top line
+// shown). It reports whether a row is there and whether the cursor was
+// already on it, so a second click can open it.
+func (m Model) Click(line int) (next Model, hit, again bool) {
+	rows := m.rows()
+	cur := m.cursorRow(rows)
+	offset := clampOffset(m.offset, cur, m.height, m.totalLines())
+	i := offset + line
+	if line < 0 || line >= m.height || i >= len(rows) {
+		return m, false, false
+	}
+	if i == cur {
+		return m, true, true
+	}
+	m.cursor = cursor{uid: m.rowSummary(rows[i]).UID, message: rows[i].msg >= 0}
+	m.offset = offset
+	m.ensureVisible()
+	return m, true, false
+}
+
 // toggle expands a collapsed thread, or collapses the thread under the
 // cursor (from its row or any of its messages) and puts the cursor on it.
 func (m *Model) toggle(r row) {

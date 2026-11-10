@@ -154,6 +154,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.resize(msg.Width, msg.Height)
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
+	case tea.MouseClickMsg:
+		return m.handleClick(tea.Mouse(msg))
+	case tea.MouseWheelMsg:
+		return m.handleWheel(tea.Mouse(msg))
 	case tea.PasteMsg:
 		switch {
 		case m.showConnect:
@@ -208,7 +212,7 @@ func (m *Model) relayout() {
 	m.picker.SetSize(m.panes.Popup.W, m.panes.Popup.H)
 	m.connectPop.SetSize(m.panes.Popup.W, m.panes.Popup.H)
 	frame := m.styles.pane.GetVerticalFrameSize()
-	m.side = m.side.SetHeight(max(m.panes.Sidebar.H-frame, 0))
+	m.side = m.side.SetSize(max(m.panes.Sidebar.W-m.styles.pane.GetHorizontalFrameSize(), 0), max(m.panes.Sidebar.H-frame, 0))
 	m.list = m.list.SetHeight(max(m.panes.List.H-frame-listHeaderRows, 0))
 	m.read = m.read.SetSize(popup.FrameInner(m.panes.Popup.W, m.panes.Popup.H))
 	if !slices.Contains(m.visiblePanes(), m.focus) {
@@ -373,6 +377,7 @@ func (m *Model) toggleMode() {
 func (m Model) View() tea.View {
 	v := tea.NewView(m.render())
 	v.AltScreen = true
+	v.MouseMode = tea.MouseModeCellMotion
 	return v
 }
 

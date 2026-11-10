@@ -49,6 +49,10 @@ func (k Kind) String() string {
 // Rect is a screen area in cells. A zero width means the pane is hidden.
 type Rect struct{ X, Y, W, H int }
 
+func (r Rect) contains(x, y int) bool {
+	return x >= r.X && x < r.X+r.W && y >= r.Y && y < r.Y+r.H
+}
+
 // Panes is where everything goes for one terminal size. Conversations are
 // always read in the popup.
 type Panes struct {
