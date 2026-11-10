@@ -366,3 +366,33 @@ func TestFilter_Paste(t *testing.T) {
 		t.Errorf("paste didn't filter to Spam (cursor %q):\n%s", f, view(m))
 	}
 }
+
+func TestView_ScrollingUpShowsTheAccountName(t *testing.T) {
+	folders := func(names ...string) []mail.Folder {
+		var out []mail.Folder
+		for _, n := range names {
+			out = append(out, mail.Folder{Name: n})
+		}
+		return out
+	}
+	m := New([]string{"Personal", "Work", "Proton"})
+	m = m.SetFolders(0, folders("a1", "a2", "a3", "a4", "a5"), nil)
+	m = m.SetFolders(1, folders("b1", "b2", "b3", "b4", "b5"), nil)
+	m = m.SetFolders(2, folders("c1", "c2", "c3", "c4", "c5"), nil)
+	m = m.SetHeight(6)
+	top := func() string { return strings.TrimSpace(strings.Split(ansi.Strip(m.View(22, 6)), "\n")[0]) }
+
+	m, _ = m.Update(press("G"))
+	m, _ = m.Update(press("g"))
+	if got := top(); got != "Personal" {
+		t.Errorf("after G then g, top row = %q, want the Personal header:\n%s", got, ansi.Strip(m.View(22, 6)))
+	}
+
+	m, _ = m.Update(press("G"))
+	for range 9 { // c5 → b1
+		m, _ = m.Update(press("k"))
+	}
+	if got := top(); got != "Work" {
+		t.Errorf("on Work's first folder, top row = %q, want the Work header:\n%s", got, ansi.Strip(m.View(22, 6)))
+	}
+}

@@ -373,8 +373,9 @@ func (m Model) selectable() []ref {
 }
 
 type row struct {
-	text string
-	ref  ref // noRef for headers and status lines
+	text   string
+	ref    ref  // noRef for headers and status lines
+	header bool // an account name
 }
 
 // rows lists each account and its folders. While a filter is typed, only
@@ -389,7 +390,7 @@ func (m Model) rows(width int) []row {
 		if i > 0 {
 			rows = append(rows, row{ref: noRef})
 		}
-		rows = append(rows, row{text: m.st.header.Render(ansi.Truncate(a.name, width, "…")), ref: noRef})
+		rows = append(rows, row{text: m.st.header.Render(ansi.Truncate(a.name, width, "…")), ref: noRef, header: true})
 		switch a.state {
 		case connecting:
 			rows = append(rows, row{text: "  " + m.spinner.View() + m.st.dim.Render(" connecting…"), ref: noRef})
@@ -432,7 +433,7 @@ func (m Model) filteredRows(width int) []row {
 		if len(rows) > 0 {
 			rows = append(rows, row{ref: noRef})
 		}
-		rows = append(rows, row{text: m.st.header.Render(ansi.Truncate(a.name, width, "…")), ref: noRef})
+		rows = append(rows, row{text: m.st.header.Render(ansi.Truncate(a.name, width, "…")), ref: noRef, header: true})
 		rows = append(rows, folders...)
 	}
 	if len(rows) == 0 {
@@ -493,7 +494,8 @@ func (m Model) View(width, height int) string {
 		height--
 	}
 	rows := m.rows(width)
-	offset := clampOffset(m.offset, cursorRow(rows, m.cursor), height, len(rows))
+	cur := cursorRow(rows, m.cursor)
+	offset := clampOffset(m.offset, cur, headerRow(rows, cur), height, len(rows))
 	end := min(offset+max(height, 0), len(rows))
 	for _, r := range rows[offset:end] {
 		lines = append(lines, ansi.Truncate(r.text, width, ""))
@@ -510,7 +512,8 @@ func (m *Model) ensureVisible() {
 		return
 	}
 	rows := m.rows(1)
-	m.offset = clampOffset(m.offset, cursorRow(rows, m.cursor), h, len(rows))
+	cur := cursorRow(rows, m.cursor)
+	m.offset = clampOffset(m.offset, cur, headerRow(rows, cur), h, len(rows))
 }
 
 func cursorRow(rows []row, c ref) int {
@@ -520,11 +523,26 @@ func cursorRow(rows []row, c ref) int {
 	return slices.IndexFunc(rows, func(r row) bool { return r.ref == c })
 }
 
-// clampOffset scrolls just enough to show the cursor row.
-func clampOffset(offset, cursor, height, total int) int {
+// headerRow is the row of the account name above the cursor row, or -1.
+func headerRow(rows []row, cursor int) int {
+	for i := cursor; i >= 0; i-- {
+		if rows[i].header {
+			return i
+		}
+	}
+	return -1
+}
+
+// clampOffset scrolls just enough to show the cursor row, and the cursor's
+// account name (header) too whenever both fit.
+func clampOffset(offset, cursor, header, height, total int) int {
 	if cursor >= 0 {
-		if cursor < offset {
-			offset = cursor
+		top := cursor
+		if header >= 0 && cursor-header < height {
+			top = header
+		}
+		if top < offset {
+			offset = top
 		}
 		if cursor >= offset+height {
 			offset = cursor - height + 1

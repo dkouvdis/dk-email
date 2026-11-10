@@ -215,6 +215,7 @@ func (p Picker[T]) Update(msg tea.KeyPressMsg) (Picker[T], Result) {
 type pickerLine struct {
 	text   string
 	cursor bool
+	header bool // a group heading, e.g. an account name
 }
 
 // lines lists the groups and their matching items. While filtering,
@@ -238,7 +239,7 @@ func (p Picker[T]) lines(width int) []pickerLine {
 		if len(out) > 0 {
 			out = append(out, pickerLine{})
 		}
-		out = append(out, pickerLine{text: p.st.section.Render(grp.Name)})
+		out = append(out, pickerLine{text: p.st.section.Render(grp.Name), header: true})
 		if grp.Note != "" && !p.filtered() {
 			out = append(out, pickerLine{text: "  " + p.st.dim.Render(grp.Note)})
 		}
@@ -310,14 +311,23 @@ func (p *Picker[T]) scrollToCursor() {
 		return
 	}
 	lines := p.lines(max(p.innerW(), 1))
-	row := 0
+	row, header := 0, 0
 	for i, l := range lines {
+		if l.header {
+			header = i
+		}
 		if l.cursor {
 			row = i
+			break
 		}
 	}
-	if row < p.offset {
-		p.offset = row
+	// Show the cursor's group heading too whenever both fit.
+	top := row
+	if row-header < vh {
+		top = header
+	}
+	if top < p.offset {
+		p.offset = top
 	}
 	if row >= p.offset+vh {
 		p.offset = row - vh + 1

@@ -1,6 +1,7 @@
 package popup
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -242,5 +243,25 @@ func TestPicker_SizeStaysPutWhileFiltering(t *testing.T) {
 		if w, h := lipgloss.Size(p.View()); w != beforeW || h != beforeH {
 			t.Fatalf("after %q the popup is %dx%d, want it to stay %dx%d", k, w, h, beforeW, beforeH)
 		}
+	}
+}
+
+func TestPicker_ScrollingUpShowsTheAccountName(t *testing.T) {
+	group := func(name string) Group[string] {
+		g := Group[string]{Name: name}
+		for i := range 5 {
+			g.Items = append(g.Items, Item[string]{Label: fmt.Sprintf("%s folder %d", name, i), Value: fmt.Sprint(name, i)})
+		}
+		return g
+	}
+	p := NewPicker("Go to folder", []Group[string]{group("Personal"), group("Work"), group("Proton")})
+	p.SetSize(50, 6+1+6) // chrome, filter row and 6 item lines
+
+	p, _ = p.Update(pickerKey("G"))
+	p, _ = p.Update(pickerKey("g"))
+
+	lines := strings.Split(ansi.Strip(p.View()), "\n")
+	if first := strings.Trim(lines[4], "│ "); first != "Personal" {
+		t.Errorf("first item line = %q, want the Personal heading:\n%s", first, strings.Join(lines, "\n"))
 	}
 }
