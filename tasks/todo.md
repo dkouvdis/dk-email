@@ -657,6 +657,11 @@ How it behaves:
 
 - [ ] Spec success criteria 1–3 are verified manually from an empty config folder.
 
+### UI changes (requested 2026-11-10)
+
+- [x] The selected row is white on purple 63 (the picker's highlight) instead of reverse video. The star is a yellow `*`, and thread rows have one space of left padding (`c4eb097`, `2dc6501`).
+- [x] Two layouts only. Narrow (the default, 80+ columns) is the folders sidebar (24 columns) │ thread list, and `a` focuses the sidebar. List (`v`, or forced below 80 columns) is the thread list alone, with the `a` picker. There's no reading pane: `enter` opens the conversation in the popup in both layouts. `wide_breakpoint` and `list_width` are removed. The thread list says "Connecting…" until the first folder opens.
+
 ---
 
 ## Phase 5: Release v0.1.0

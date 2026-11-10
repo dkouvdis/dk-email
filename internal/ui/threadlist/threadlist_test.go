@@ -516,13 +516,13 @@ func TestMerge_CursorMessageGoneMovesToNextThread(t *testing.T) {
 	}
 }
 
-func TestView_CursorRowIsGreyNotReversedAndKeepsStarColour(t *testing.T) {
+func TestView_CursorRowIsPurpleNotReversedAndKeepsStarColour(t *testing.T) {
 	m := New(clock).SetSummaries(inbox(), false)
 
 	row := strings.Split(m.View(60, 10), "\n")[0]
 
-	if !strings.Contains(row, "48;5;238") || !strings.Contains(row, "38;5;231") {
-		t.Errorf("cursor row should be white on grey 238: %q", row)
+	if !strings.Contains(row, "48;5;63") || !strings.Contains(row, "38;5;231") {
+		t.Errorf("cursor row should be white on purple 63: %q", row)
 	}
 	if strings.Contains(row, "\x1b[7m") || strings.Contains(row, ";7m") {
 		t.Errorf("cursor row should not use reverse video: %q", row)

@@ -31,7 +31,7 @@ func defaultRowStyles() rowStyles {
 		star:      lipgloss.NewStyle().Foreground(lipgloss.Color("220")),
 		bold:      lipgloss.NewStyle().Bold(true),
 		dim:       lipgloss.NewStyle().Foreground(lipgloss.Color("244")),
-		cursor:    lipgloss.NewStyle().Foreground(lipgloss.Color("231")).Background(lipgloss.Color("238")),
+		cursor:    lipgloss.NewStyle().Foreground(lipgloss.Color("231")).Background(lipgloss.Color("63")),
 	}
 }
 

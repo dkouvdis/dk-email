@@ -84,7 +84,7 @@ func New(names []string) Model {
 			folder: lipgloss.NewStyle(),
 			unread: lipgloss.NewStyle().Bold(true),
 			count:  lipgloss.NewStyle().Foreground(lipgloss.Color("111")),
-			cursor: lipgloss.NewStyle().Foreground(lipgloss.Color("231")).Background(lipgloss.Color("238")),
+			cursor: lipgloss.NewStyle().Foreground(lipgloss.Color("231")).Background(lipgloss.Color("63")),
 			open:   lipgloss.NewStyle().Foreground(lipgloss.Color("63")),
 			dim:    lipgloss.NewStyle().Foreground(lipgloss.Color("244")),
 			err:    lipgloss.NewStyle().Foreground(lipgloss.Color("203")),
