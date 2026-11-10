@@ -174,20 +174,34 @@ func TestModel_HintsFollowFocus(t *testing.T) {
 	m := send(t, New(testConfig(), nil, nil), size(200, 30))
 	hints := func() string { return ansi.Strip(m.renderHints()) }
 
-	if !strings.Contains(hints(), "archive") || strings.Contains(hints(), "accounts") {
+	if !strings.Contains(hints(), "Archive: e") || strings.Contains(hints(), "Accounts") {
 		t.Errorf("narrow list hints = %q, want triage keys and no account picker", hints())
 	}
 	m = send(t, m, press("h"))
-	if strings.Contains(hints(), "archive") {
+	if strings.Contains(hints(), "Archive") {
 		t.Errorf("sidebar hints = %q, want no triage keys", hints())
 	}
 	m = send(t, m, size(90, 30), press("v"))
-	if !strings.Contains(hints(), "accounts") {
+	if !strings.Contains(hints(), "Accounts: a") {
 		t.Errorf("list hints = %q, want the a picker key", hints())
 	}
 	m = send(t, m, size(60, 30))
-	if h := hints(); !strings.HasSuffix(strings.TrimRight(h, " "), "? help • q quit") || !strings.Contains(h, "…") {
-		t.Errorf("60-col hints = %q, want truncated pane keys ending in ? help • q quit", h)
+	if h := hints(); !strings.HasSuffix(strings.TrimRight(h, " "), "Help: ? | Quit: q") || !strings.Contains(h, "…") {
+		t.Errorf("60-col hints = %q, want truncated pane keys ending in Help: ? | Quit: q", h)
+	}
+}
+
+func TestModel_HintBarReadsDescriptionThenKey(t *testing.T) {
+	m := send(t, New(testConfig(), nil, nil), size(200, 30))
+
+	bar := m.renderHints()
+	h := ansi.Strip(bar)
+
+	if !strings.HasPrefix(h, "Up: k/↑ | Down: j/↓ | Open: enter | Expand: space") || strings.Contains(h, "•") {
+		t.Errorf("hint bar = %q, want lazygit style: Description: key | …", h)
+	}
+	if !strings.Contains(bar, "38;5;110") {
+		t.Errorf("hint bar isn't drawn in the soft blue (110): %q", bar)
 	}
 }
 
@@ -199,8 +213,8 @@ func TestModel_HintBarAlwaysFitsAndEndsWithHelpAndQuit(t *testing.T) {
 			if got := lipgloss.Width(bar); got != w {
 				t.Fatalf("width %d focus %v: hint bar is %d wide", w, m.focus, got)
 			}
-			if w >= 40 && !strings.HasSuffix(strings.TrimRight(ansi.Strip(bar), " "), "? help • q quit") {
-				t.Fatalf("width %d focus %v: hint bar %q doesn't end with ? help • q quit", w, m.focus, ansi.Strip(bar))
+			if w >= 40 && !strings.HasSuffix(strings.TrimRight(ansi.Strip(bar), " "), "Help: ? | Quit: q") {
+				t.Fatalf("width %d focus %v: hint bar %q doesn't end with Help: ? | Quit: q", w, m.focus, ansi.Strip(bar))
 			}
 			m = send(t, m, press("tab"))
 		}
@@ -256,8 +270,8 @@ func TestModel_Quit(t *testing.T) {
 	if quits(cmd) || next.(Model).showHelp {
 		t.Error("q with the help popup open should close it, not quit")
 	}
-	if !strings.Contains(ansi.Strip(withHelp.renderHints()), "q close") {
-		t.Errorf("hint bar = %q, want q close while a popup is open", ansi.Strip(withHelp.renderHints()))
+	if !strings.Contains(ansi.Strip(withHelp.renderHints()), "Close: q") {
+		t.Errorf("hint bar = %q, want Close: q while a popup is open", ansi.Strip(withHelp.renderHints()))
 	}
 	if _, cmd := withHelp.Update(press("ctrl+c")); !quits(cmd) {
 		t.Error("ctrl+c with a popup open didn't quit")

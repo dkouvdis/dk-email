@@ -25,7 +25,7 @@ A keyboard-driven terminal email client for **triaging several IMAP accounts** (
 
 There's no reading pane. In both layouts, `enter` opens the conversation in a centered popup (~90% × 90%), and `esc` closes it. Changed on 2026-11-10 at your request: the earlier three-pane wide layout and the list │ reader narrow layout were replaced by the two above, and `wide_breakpoint` and `list_width` were removed. Until the first folder opens, the thread list says "Connecting…".
 
-Every mode includes a bottom **hint bar** showing the keys for the focused pane, plus a status line for errors and progress (e.g. "Archiving…").
+Every mode includes a bottom **hint bar** showing the keys for the focused pane, plus a status line for errors and progress (e.g. "Archiving…"). The hint bar is written lazygit style, description first and then the key (`Archive: e | Delete: d | … | Help: ? | Quit: q`), all in a soft blue (256-colour 110) so it reads easily on a dark background.
 
 ### Thread list row
 

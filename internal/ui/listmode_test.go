@@ -16,7 +16,7 @@ func TestListMode_EnterOpensReaderPopup(t *testing.T) {
 		t.Fatalf("popup %v focus %v, want the reader popup over the list", m.readerPopup, m.focus)
 	}
 	v := plain(m)
-	for _, want := range []string{"From: Bob", "Body of Re: Plan from Bob.", "esc back"} {
+	for _, want := range []string{"From: Bob", "Body of Re: Plan from Bob.", "Back: esc"} {
 		if !strings.Contains(v, want) {
 			t.Errorf("popup view missing %q:\n%s", want, v)
 		}

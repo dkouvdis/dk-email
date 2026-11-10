@@ -174,8 +174,8 @@ func TestFolderFilter_KeyIsInHelpAndSidebarHints(t *testing.T) {
 	m := started(t, newFixture(), 160, 30)
 
 	m = pressSettled(t, m, "a")
-	if h := ansi.Strip(m.renderHints()); !strings.Contains(h, "/ filter") {
-		t.Errorf("sidebar hints = %q, want / filter", h)
+	if h := ansi.Strip(m.renderHints()); !strings.Contains(h, "Filter: /") {
+		t.Errorf("sidebar hints = %q, want Filter: /", h)
 	}
 	for _, k := range []string{"?", "/", "f", "o", "l", "d"} {
 		m = pressSettled(t, m, k)

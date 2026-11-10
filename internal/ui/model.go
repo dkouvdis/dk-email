@@ -8,8 +8,9 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
-	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
@@ -69,7 +70,6 @@ type Model struct {
 	log           *slog.Logger
 	keys          KeyMap
 	styles        styles
-	help          help.Model
 	helpPop       popup.Help
 	width, height int
 	mode          Mode
@@ -124,7 +124,6 @@ func New(cfg config.Config, connect Connector, log *slog.Logger) Model {
 		log:           log,
 		keys:          keys,
 		styles:        defaultStyles(),
-		help:          help.New(),
 		helpPop:       popup.NewHelp(keys.HelpSections()),
 		mode:          mode,
 		focus:         PaneList,
@@ -485,40 +484,41 @@ func (m Model) renderStatus() string {
 }
 
 // renderHints fits as many of the focused pane's keys as the width allows,
-// marks a cut with …, and always ends with ? help • q quit.
+// lazygit style ("Archive: e | Delete: d"), marks a cut with …, and always
+// ends with Help: ? | Quit: q.
 func (m Model) renderHints() string {
-	st := m.help.Styles
-	sep := st.ShortSeparator.Render(m.help.ShortSeparator)
+	const sep = " | "
 	item := func(b key.Binding) string {
-		return st.ShortKey.Render(b.Help().Key) + " " + st.ShortDesc.Render(b.Help().Desc)
+		d := b.Help().Desc
+		r, n := utf8.DecodeRuneInString(d)
+		return string(unicode.ToUpper(r)) + d[n:] + ": " + b.Help().Key
 	}
 	quit := m.keys.Quit
 	if m.popupOpen() {
 		quit = key.NewBinding(key.WithKeys("q"), key.WithHelp("q", "close"))
 	}
 	tail := item(m.keys.Help) + sep + item(quit)
-	room := m.width - lipgloss.Width(tail)
+	room := m.width - ansi.StringWidth(tail)
 
 	var head []string
 	used := 0
 	hints := m.keys.hints(m.focus, m.readerPopup, m.panes.Kind)
 	for i, b := range hints {
-		w := lipgloss.Width(item(b)) + lipgloss.Width(sep)
-		// Unless this is the last key, leave space for a "… • " marker.
+		w := ansi.StringWidth(item(b) + sep)
+		// Unless this is the last key, leave space for a "… | " marker.
 		reserve := 0
 		if i < len(hints)-1 {
-			reserve = 1 + lipgloss.Width(sep)
+			reserve = ansi.StringWidth("…" + sep)
 		}
 		if used+w+reserve > room {
-			head = append(head, st.Ellipsis.Render("…"))
+			head = append(head, "…")
 			break
 		}
 		head = append(head, item(b))
 		used += w
 	}
-	line := strings.Join(append(head, tail), sep)
-	line = ansi.Truncate(line, m.width, "")
-	return line + strings.Repeat(" ", max(m.width-lipgloss.Width(line), 0))
+	line := ansi.Truncate(strings.Join(append(head, tail), sep), m.width, "")
+	return m.styles.hint.Render(line + strings.Repeat(" ", max(m.width-ansi.StringWidth(line), 0)))
 }
 
 // setStatus shows progress or info. It never replaces an error, which stays

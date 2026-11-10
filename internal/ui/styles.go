@@ -6,6 +6,7 @@ type styles struct {
 	pane, paneFocused lipgloss.Style
 	title, dim        lipgloss.Style
 	status, statusErr lipgloss.Style
+	hint              lipgloss.Style
 }
 
 func defaultStyles() styles {
@@ -20,5 +21,6 @@ func defaultStyles() styles {
 		dim:         lipgloss.NewStyle().Foreground(lipgloss.Color("244")),
 		status:      lipgloss.NewStyle().Foreground(lipgloss.Color("244")),
 		statusErr:   lipgloss.NewStyle().Foreground(lipgloss.Color("203")),
+		hint:        lipgloss.NewStyle().Foreground(lipgloss.Color("110")),
 	}
 }
