@@ -84,7 +84,7 @@ func New(names []string) Model {
 			folder: lipgloss.NewStyle(),
 			unread: lipgloss.NewStyle().Bold(true),
 			count:  lipgloss.NewStyle().Foreground(lipgloss.Color("111")),
-			cursor: lipgloss.NewStyle().Reverse(true),
+			cursor: lipgloss.NewStyle().Foreground(lipgloss.Color("231")).Background(lipgloss.Color("238")),
 			open:   lipgloss.NewStyle().Foreground(lipgloss.Color("63")),
 			dim:    lipgloss.NewStyle().Foreground(lipgloss.Color("244")),
 			err:    lipgloss.NewStyle().Foreground(lipgloss.Color("203")),
@@ -336,7 +336,7 @@ func (m Model) folderRow(f mail.Folder, r ref, width int) string {
 	}
 	line := text + gap + m.st.count.Render(count)
 	if r == m.cursor {
-		line = m.st.cursor.Render(ansi.Strip(label) + gap + count)
+		line = m.st.cursor.Bold(f.Unread > 0).Render(label + gap + count)
 	}
 	return marker + line
 }

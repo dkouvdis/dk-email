@@ -266,3 +266,21 @@ func TestAddAccount(t *testing.T) {
 		t.Errorf("cursor = %d/%q, want the new account's Inbox when nothing else was selectable", a, f)
 	}
 }
+
+func TestView_CursorFolderIsGreyNotReversed(t *testing.T) {
+	m := New([]string{"Personal"}).SetFolders(0, gmailFolders(), nil)
+
+	var row string
+	for _, l := range strings.Split(m.View(22, 40), "\n") {
+		if strings.Contains(ansi.Strip(l), "Inbox") {
+			row = l
+		}
+	}
+
+	if !strings.Contains(row, "48;5;238") || !strings.Contains(row, "38;5;231") {
+		t.Errorf("cursor folder should be white on grey 238: %q", row)
+	}
+	if strings.Contains(row, "\x1b[7m") || strings.Contains(row, ";7m") {
+		t.Errorf("cursor folder should not use reverse video: %q", row)
+	}
+}

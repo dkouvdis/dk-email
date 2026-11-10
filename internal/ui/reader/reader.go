@@ -313,7 +313,7 @@ func (m Model) star(s mail.Summary) string {
 	if !s.Flagged {
 		return ""
 	}
-	return " " + m.st.star.Render("★")
+	return " " + m.st.star.Render("✱")
 }
 
 func (m Model) expandedLines(s mail.Summary, width int) []string {

@@ -91,7 +91,7 @@ func TestView_ThreadRowFormat(t *testing.T) {
 		t.Fatalf("got %d rows, want 3 threads:\n%s", len(got), strings.Join(got, "\n"))
 	}
 	plan := got[0]
-	for _, want := range []string{"●", "★", "Alice", "Re: Plan (3)"} {
+	for _, want := range []string{"●", "✱", "Alice", "Re: Plan (3)"} {
 		if !strings.Contains(plan, want) {
 			t.Errorf("plan row %q missing %q", plan, want)
 		}
@@ -99,7 +99,7 @@ func TestView_ThreadRowFormat(t *testing.T) {
 	if !strings.HasSuffix(plan, "14:30") {
 		t.Errorf("plan row %q should end with today's time 14:30", plan)
 	}
-	if lunch := got[1]; strings.Contains(lunch, "●") || strings.Contains(lunch, "★") || strings.Contains(lunch, "(") {
+	if lunch := got[1]; strings.Contains(lunch, "●") || strings.Contains(lunch, "✱") || strings.Contains(lunch, "(") {
 		t.Errorf("read, unstarred single-message row %q has markers or a count", lunch)
 	}
 	if !strings.HasSuffix(got[2], "2025-03-02") {
@@ -200,7 +200,7 @@ func TestUpdate_ExpandAndCollapse(t *testing.T) {
 			t.Errorf("message row %d = %q, want %s indented past the thread's sender column", i, row, wantSender)
 		}
 	}
-	if !strings.Contains(got[2], "★") || strings.Contains(got[2], "●") {
+	if !strings.Contains(got[2], "✱") || strings.Contains(got[2], "●") {
 		t.Errorf("Bob's row %q should be starred and read", got[2])
 	}
 	if !strings.Contains(got[3], "●") {
@@ -392,7 +392,7 @@ func TestSetFlagged(t *testing.T) {
 	m = m.SetFlagged([]mail.UID{12}, false).SetFlagged([]mail.UID{11}, true)
 
 	got := lines(m, 70)
-	if strings.Contains(got[0], "★") || !strings.Contains(got[1], "★") {
+	if strings.Contains(got[0], "✱") || !strings.Contains(got[1], "✱") {
 		t.Errorf("stars not updated:\n%s", strings.Join(got, "\n"))
 	}
 }
@@ -510,5 +510,21 @@ func TestMerge_CursorMessageGoneMovesToNextThread(t *testing.T) {
 
 	if uid := cursorUID(t, m); uid != 5 {
 		t.Errorf("cursor on %d, want the next thread (5)", uid)
+	}
+}
+
+func TestView_CursorRowIsGreyNotReversedAndKeepsStarColour(t *testing.T) {
+	m := New(clock).SetSummaries(inbox(), false)
+
+	row := strings.Split(m.View(60, 10), "\n")[0]
+
+	if !strings.Contains(row, "48;5;238") || !strings.Contains(row, "38;5;231") {
+		t.Errorf("cursor row should be white on grey 238: %q", row)
+	}
+	if strings.Contains(row, "\x1b[7m") || strings.Contains(row, ";7m") {
+		t.Errorf("cursor row should not use reverse video: %q", row)
+	}
+	if !strings.Contains(row, "38;5;220") || !strings.Contains(ansi.Strip(row), "✱") {
+		t.Errorf("cursor row should keep the yellow ✱: %q", row)
 	}
 }

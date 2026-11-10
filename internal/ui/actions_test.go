@@ -68,7 +68,7 @@ func TestTriage_StarOnThreadAndMessage(t *testing.T) {
 	if c := lastCall(t, f.personal, mailtest.MethodSetFlag); c.Flag != mail.FlagFlagged || !c.On || !slices.Equal(c.UIDs, []mail.UID{1, 3}) {
 		t.Errorf("thread star = %+v, want \\Flagged on 1 and 3", c)
 	}
-	if !strings.Contains(plain(m), "★") {
+	if !strings.Contains(plain(m), "✱") {
 		t.Errorf("no star shown:\n%s", plain(m))
 	}
 
@@ -128,10 +128,10 @@ func TestTriage_FailuresRollBack(t *testing.T) {
 	before := plain(m)
 
 	m = pressSettled(t, m, "s")
-	if !strings.Contains(m.status, "star: STORE refused") || plain(m) == before && strings.Contains(plain(m), "★") {
+	if !strings.Contains(m.status, "star: STORE refused") || plain(m) == before && strings.Contains(plain(m), "✱") {
 		t.Errorf("star failure: status %q", m.status)
 	}
-	if strings.Contains(plain(m), "★") {
+	if strings.Contains(plain(m), "✱") {
 		t.Errorf("star not rolled back:\n%s", plain(m))
 	}
 

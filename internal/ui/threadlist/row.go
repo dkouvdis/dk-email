@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	// "● ★  ": unread dot, star, then two spaces before the sender.
+	// "● ✱  ": unread dot, star, then two spaces before the sender.
 	markersW   = 5
 	msgIndent  = "  "
 	minSender  = 8
@@ -31,7 +31,7 @@ func defaultRowStyles() rowStyles {
 		star:      lipgloss.NewStyle().Foreground(lipgloss.Color("220")),
 		bold:      lipgloss.NewStyle().Bold(true),
 		dim:       lipgloss.NewStyle().Foreground(lipgloss.Color("244")),
-		cursor:    lipgloss.NewStyle().Reverse(true),
+		cursor:    lipgloss.NewStyle().Foreground(lipgloss.Color("231")).Background(lipgloss.Color("238")),
 	}
 }
 
@@ -63,7 +63,7 @@ func (st rowStyles) render(r rowData, width, dateW int, cursor bool) string {
 		dot = "●"
 	}
 	if r.starred {
-		star = "★"
+		star = "✱"
 	}
 
 	sender := r.sender
@@ -85,7 +85,7 @@ func (st rowStyles) render(r rowData, width, dateW int, cursor bool) string {
 	date := padLeft(r.date, dateW)
 
 	if cursor {
-		return st.cursor.Render(dot + " " + star + "  " + sender + " " + subject + " " + date)
+		return st.cursorRow(r, dot, star, "  "+sender+" "+subject+" "+date)
 	}
 	if r.unread {
 		dot = st.unreadDot.Render(dot)
@@ -98,6 +98,24 @@ func (st rowStyles) render(r rowData, width, dateW int, cursor bool) string {
 		subject = st.dim.Render(subject)
 	}
 	return dot + " " + star + "  " + sender + " " + subject + " " + st.dim.Render(date)
+}
+
+// cursorRow renders the selected row white on grey, keeping the unread dot
+// and star in their colours so the row reads the same as when unselected.
+func (st rowStyles) cursorRow(r rowData, dot, star, rest string) string {
+	text := st.cursor
+	if r.unread {
+		dot = st.cursor.Foreground(st.unreadDot.GetForeground()).Render(dot)
+		text = text.Bold(true)
+	} else {
+		dot = st.cursor.Render(dot)
+	}
+	if r.starred {
+		star = st.cursor.Foreground(st.star.GetForeground()).Render(star)
+	} else {
+		star = st.cursor.Render(star)
+	}
+	return dot + st.cursor.Render(" ") + star + text.Render(rest)
 }
 
 // formatDate shows the time for today, "Jan 2" earlier this year, and the

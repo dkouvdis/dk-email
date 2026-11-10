@@ -483,7 +483,7 @@ Every task also meets the standing bar before it counts as done:
 - **`e` and `d`:** these move to `mail.ArchiveFolder`/`mail.TrashFolder` (T16). Without such a folder the key is disabled with `can't archive in <account>: …`. In the archive or Trash folder itself it only says so ("never deletes mail permanently").
   - Moved messages leave the list at once and the cursor takes the next thread. The reader drops them too and closes, along with the popup, when none are left.
   - Only the source folder's unread count is adjusted: Gmail's All Mail already holds archived mail, so a destination bump would double-count. T19's refresh corrects counts.
-- The reader marks starred messages with `★`.
+- The reader marks starred messages with `✱`.
 
 **Dependencies:** T16, T14
 **Files:** `internal/ui/actions.go`, `internal/ui/actions_test.go`, `internal/ui/model.go`, `internal/ui/threadlist/threadlist.go`
