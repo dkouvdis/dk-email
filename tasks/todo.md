@@ -136,7 +136,7 @@ Every task also meets the standing bar before it counts as done:
 
 - [x] All tests pass locally. (CI runs once the local commits are pushed.)
 - [x] The live check lists real Gmail folders through `op read`. This proves the go-imap v2 beta works with Gmail.
-- [ ] You review before Phase 2.
+- [x] You review before Phase 2.
 
 ---
 
@@ -417,8 +417,8 @@ Every task also meets the standing bar before it counts as done:
 ### ✅ Checkpoint 2: Read-only client
 
 - [x] All tests pass and CI is green.
-- [ ] Manual check against real Gmail: browse folders and read threads in the narrow (folders │ threads) and list layouts, across two accounts.
-- [ ] **You review the read-only client.** No tag yet: the release pipeline (T15) moved to Phase 5.
+- [x] Manual check against real Gmail: browse folders and read threads in the narrow (folders │ threads) and list layouts, across two accounts.
+- [x] **You review the read-only client.** No tag yet: the release pipeline (T15) moved to Phase 5.
 
 ---
 
@@ -655,7 +655,7 @@ How it behaves:
 
 ### ✅ Checkpoint 4: Onboarding
 
-- [ ] Spec success criteria 1–3 are verified manually from an empty config folder.
+- [x] Spec success criteria 1–3 are verified manually from an empty config folder.
 
 ### UI changes (requested 2026-11-10)
 

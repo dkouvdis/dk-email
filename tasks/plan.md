@@ -46,7 +46,7 @@ The full details for every task are in [todo.md](todo.md).
 - [x] T12: IMAP `Message` fetch + reader pane + mark read on open
 - [x] T13: Narrow mode header + account/folder picker (`a`)
 - [x] T14: List + popup mode (`v`, forced below 80 columns)
-**Checkpoint 2:** read-only use against real Gmail works in all three layouts. You review; no tag yet.
+**Checkpoint 2:** read-only use against real Gmail works in both layouts (narrow and list). You review; no tag yet.
 
 ### Phase 3: Triage
 - [x] T16: IMAP `SetFlag` + `Move` + archive/Trash folder resolution
