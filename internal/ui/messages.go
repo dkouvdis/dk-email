@@ -33,7 +33,7 @@ func loadMessage(mb mail.Mailbox, account int, folder string, uid mail.UID) tea.
 	}
 }
 
-// openThread shows the thread under the list cursor in the reader. On a
+// openThread shows the thread under the list cursor in the reader popup. On a
 // message row inside an expanded thread, that message is the one expanded.
 func (m Model) openThread() (Model, tea.Cmd) {
 	th, uid, ok := m.list.Selected()
@@ -41,11 +41,7 @@ func (m Model) openThread() (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.read = m.read.Open(m.open.account, m.open.folder, th, uid)
-	if m.panes.Kind == KindList {
-		m.readerPopup = true
-	} else {
-		m.focus = PaneReader
-	}
+	m.readerPopup = true
 	m.log.Debug("open thread", "messages", th.Len(), "popup", m.readerPopup)
 	return m, m.fetchMissing()
 }

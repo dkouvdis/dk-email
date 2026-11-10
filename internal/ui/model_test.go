@@ -85,7 +85,7 @@ func TestModel_ResizeSwitchesLayoutLive(t *testing.T) {
 		w    int
 		want Kind
 	}{
-		{200, KindWide}, {119, KindNarrow}, {79, KindList}, {80, KindNarrow}, {120, KindWide},
+		{200, KindNarrow}, {79, KindList}, {80, KindNarrow}, {120, KindNarrow},
 	}
 	for _, s := range steps {
 		m = send(t, m, size(s.w, 30))
@@ -101,8 +101,8 @@ func TestModel_ToggleView(t *testing.T) {
 		t.Fatalf("after v at 130 cols: kind %v mode %v, want list", m.panes.Kind, m.mode)
 	}
 	m = send(t, m, press("v"))
-	if m.panes.Kind != KindWide {
-		t.Fatalf("after second v: kind %v, want wide", m.panes.Kind)
+	if m.panes.Kind != KindNarrow {
+		t.Fatalf("after second v: kind %v, want narrow", m.panes.Kind)
 	}
 
 	m = send(t, m, size(70, 30), press("v"))
@@ -138,14 +138,13 @@ func TestModel_FocusCycling(t *testing.T) {
 		key  string
 		want Pane
 	}{
-		{"tab", PaneReader},
 		{"tab", PaneSidebar}, // wraps
-		{"shift+tab", PaneReader},
-		{"l", PaneReader}, // no wrap
-		{"h", PaneList},
-		{"left", PaneSidebar},
+		{"tab", PaneList},
+		{"shift+tab", PaneSidebar},
 		{"h", PaneSidebar}, // no wrap
-		{"right", PaneList},
+		{"l", PaneList},
+		{"right", PaneList}, // no wrap
+		{"left", PaneSidebar},
 	}
 	for i, tt := range tests {
 		m = send(t, m, press(tt.key))
@@ -161,14 +160,10 @@ func TestModel_FocusMovesOffHiddenPane(t *testing.T) {
 		t.Fatalf("focus = %v, want sidebar", m.focus)
 	}
 
-	m = send(t, m, size(100, 30))
+	m = send(t, m, size(70, 30))
 
 	if m.focus != PaneList {
-		t.Errorf("after narrowing, focus = %v, want list (sidebar is hidden)", m.focus)
-	}
-	m = send(t, m, press("tab"), size(70, 30))
-	if m.focus != PaneList {
-		t.Errorf("after list mode, focus = %v, want list", m.focus)
+		t.Errorf("after list mode, focus = %v, want list (sidebar is hidden)", m.focus)
 	}
 	if m = send(t, m, press("tab")); m.focus != PaneList {
 		t.Errorf("tab in list mode moved focus to %v", m.focus)
@@ -180,15 +175,15 @@ func TestModel_HintsFollowFocus(t *testing.T) {
 	hints := func() string { return ansi.Strip(m.renderHints()) }
 
 	if !strings.Contains(hints(), "archive") || strings.Contains(hints(), "accounts") {
-		t.Errorf("wide list hints = %q, want triage keys and no account picker", hints())
+		t.Errorf("narrow list hints = %q, want triage keys and no account picker", hints())
 	}
 	m = send(t, m, press("h"))
 	if strings.Contains(hints(), "archive") {
 		t.Errorf("sidebar hints = %q, want no triage keys", hints())
 	}
-	m = send(t, m, size(100, 30))
+	m = send(t, m, size(90, 30), press("v"))
 	if !strings.Contains(hints(), "accounts") {
-		t.Errorf("narrow hints = %q, want the a picker key", hints())
+		t.Errorf("list hints = %q, want the a picker key", hints())
 	}
 	m = send(t, m, size(60, 30))
 	if h := hints(); !strings.HasSuffix(strings.TrimRight(h, " "), "? help • q quit") || !strings.Contains(h, "…") {
@@ -290,10 +285,10 @@ func TestModel_DebugLogRecordsMetadata(t *testing.T) {
 	var buf bytes.Buffer
 	log := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
-	send(t, New(testConfig(), nil, log), size(200, 30), size(201, 30), size(100, 30), press("tab"), press("?"), press("esc"))
+	send(t, New(testConfig(), nil, log), size(200, 30), size(201, 30), press("tab"), size(70, 30), press("?"), press("esc"))
 
 	out := buf.String()
-	for _, want := range []string{"msg=start accounts=2", "kind=wide", "kind=narrow", "pane=reader", "popup opened", "popup closed"} {
+	for _, want := range []string{"msg=start accounts=2", "kind=narrow", "kind=list", "pane=sidebar", "popup opened", "popup closed"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("debug log missing %q:\n%s", want, out)
 		}
@@ -327,15 +322,14 @@ func TestGolden(t *testing.T) {
 		workFail bool
 		keys     []string
 	}{
-		{"wide", 140, 24, false, nil},
-		{"wide-sidebar-focused", 140, 24, false, []string{"h", "j"}},
-		{"wide-account-error", 140, 24, true, nil},
-		{"wide-thread-expanded", 140, 24, false, []string{"space", "j"}},
-		{"wide-reading", 140, 24, false, []string{"enter"}},
-		{"narrow", 100, 24, false, nil},
-		{"narrow-picker", 100, 24, false, []string{"a", "j"}},
-		{"wide-move-picker", 140, 24, false, []string{"m"}},
+		{"narrow", 140, 24, false, nil},
+		{"narrow-sidebar-focused", 140, 24, false, []string{"h", "j"}},
+		{"narrow-account-error", 140, 24, true, nil},
+		{"narrow-thread-expanded", 140, 24, false, []string{"space", "j"}},
+		{"narrow-reading", 140, 24, false, []string{"enter"}},
+		{"narrow-move-picker", 140, 24, false, []string{"m"}},
 		{"list", 70, 20, false, nil},
+		{"list-picker", 70, 24, false, []string{"a", "j"}},
 		{"list-reader-popup", 70, 24, false, []string{"enter"}},
 		{"help", 120, 30, false, []string{"?"}},
 		{"help-scrolled", 120, 30, false, []string{"?", "G"}},

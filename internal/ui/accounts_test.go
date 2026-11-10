@@ -203,7 +203,7 @@ func TestAccounts_KeysWorkWhileConnecting(t *testing.T) {
 
 	start := time.Now()
 	m = send(t, m, press("tab"), press("?"))
-	if !m.showHelp || m.focus != PaneReader {
+	if !m.showHelp || m.focus != PaneSidebar {
 		t.Errorf("keys weren't handled while connecting: help %v focus %v", m.showHelp, m.focus)
 	}
 	if !strings.Contains(plain(m), "connecting") {
@@ -240,9 +240,9 @@ func TestAccounts_EnterOpensFolderUnderCursor(t *testing.T) {
 		t.Errorf("Summaries calls = %v, want [INBOX Receipts]", got)
 	}
 
-	m = send(t, m, size(100, 30))
+	m = send(t, m, size(70, 30))
 	if !strings.Contains(plain(m), "Personal › Receipts") {
-		t.Errorf("narrow header doesn't name the open folder:\n%s", plain(m))
+		t.Errorf("list-mode header doesn't name the open account and folder:\n%s", plain(m))
 	}
 }
 

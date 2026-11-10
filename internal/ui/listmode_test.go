@@ -54,21 +54,18 @@ func TestListMode_PopupKeysGoToReader(t *testing.T) {
 	}
 }
 
-func TestListMode_ReadingCarriesAcrossResize(t *testing.T) {
+func TestListMode_ReaderPopupStaysOpenAcrossResize(t *testing.T) {
 	m := started(t, newFixture(), 130, 30)
 	m = pressSettled(t, m, "enter")
-	if m.focus != PaneReader {
-		t.Fatalf("focus = %v, want reader", m.focus)
+	if !m.readerPopup {
+		t.Fatal("enter in narrow mode didn't open the reader popup")
 	}
 
-	m = send(t, m, size(70, 30))
-	if !m.readerPopup || !strings.Contains(plain(m), "Body of Re: Plan from Bob.") {
-		t.Errorf("narrowing didn't move the reader into a popup:\n%s", plain(m))
-	}
-
-	m = send(t, m, size(130, 30))
-	if m.readerPopup || m.focus != PaneReader || m.panes.Kind != KindWide {
-		t.Errorf("widening: popup %v focus %v kind %v; want the reader pane focused", m.readerPopup, m.focus, m.panes.Kind)
+	for _, w := range []int{70, 130} {
+		m = send(t, m, size(w, 30))
+		if !m.readerPopup || !strings.Contains(plain(m), "Body of Re: Plan from Bob.") {
+			t.Errorf("%d cols: the reader popup didn't stay open:\n%s", w, plain(m))
+		}
 	}
 }
 
@@ -78,7 +75,7 @@ func TestListMode_ResizeKeepsChosenModeAndCursor(t *testing.T) {
 		keys []string
 		want Kind
 	}{
-		{"split chosen", nil, KindWide},
+		{"split chosen", nil, KindNarrow},
 		{"list chosen", []string{"v"}, KindList},
 	}
 	for _, tt := range tests {

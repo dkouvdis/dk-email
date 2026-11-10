@@ -1,2 +1,2 @@
 [ui]
-list_width = 40
+default_layout = "list"

@@ -95,7 +95,7 @@ func (m Model) targets() []mail.Summary {
 	if m.open.account < 0 || m.open.loading {
 		return nil
 	}
-	if m.readerPopup || m.focus == PaneReader {
+	if m.readerPopup {
 		if uid := m.read.Current(); uid != 0 {
 			return m.list.Lookup([]mail.UID{uid})
 		}
@@ -240,9 +240,6 @@ func (m Model) startMove(targets []mail.Summary, to, label, verb string) (Model,
 	m.read = m.read.Remove(msg.uids)
 	if !m.read.IsOpen() {
 		m.readerPopup = false
-		if m.focus == PaneReader {
-			m.focus = PaneList
-		}
 	}
 	m.side = m.side.AdjustUnread(account, from, -msg.unread)
 	m.writes++

@@ -202,16 +202,16 @@ func TestTriage_InReaderActsOnCurrentMessage(t *testing.T) {
 	if c := lastCall(t, f.personal, mailtest.MethodMove); !slices.Equal(c.UIDs, []mail.UID{3}) {
 		t.Errorf("reader e = %+v, want UID 3 only", c)
 	}
-	if !m.read.IsOpen() || m.read.Current() != 1 || m.focus != PaneReader {
-		t.Errorf("reader open %v current %d focus %v; want Alice's message still shown", m.read.IsOpen(), m.read.Current(), m.focus)
+	if !m.read.IsOpen() || m.read.Current() != 1 || !m.readerPopup {
+		t.Errorf("reader open %v current %d popup %v; want Alice's message still shown", m.read.IsOpen(), m.read.Current(), m.readerPopup)
 	}
 	if !strings.Contains(plain(m), "Plan") || strings.Contains(plain(m), "Re: Plan (2)") {
 		t.Errorf("list should keep the thread with one message:\n%s", plain(m))
 	}
 
 	m = pressSettled(t, m, "d")
-	if m.read.IsOpen() || m.focus != PaneList {
-		t.Errorf("deleting the last message should close the reader (open %v, focus %v)", m.read.IsOpen(), m.focus)
+	if m.read.IsOpen() || m.readerPopup || m.focus != PaneList {
+		t.Errorf("deleting the last message should close the reader (open %v, popup %v, focus %v)", m.read.IsOpen(), m.readerPopup, m.focus)
 	}
 }
 

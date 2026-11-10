@@ -1,8 +1,6 @@
 # Mirrors the example in SPEC.md, so the documented config is always valid.
 [ui]
 default_layout   = "list"
-wide_breakpoint  = 140
-list_width       = 40
 refresh_interval = "90s"
 
 [[account]]

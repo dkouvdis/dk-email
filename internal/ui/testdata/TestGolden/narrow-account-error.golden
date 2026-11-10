@@ -1,0 +1,24 @@
+╭──────────────────────╮╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Personal             ││ Inbox · 2 unread                                                                                                 │
+│ ▶ Inbox            2 ││  ●    Bob                      Re: Plan (2)                                                                13:30 │
+│   Sent Mail          ││  ●    Carol                    Lunch?                                                                      Nov 8 │
+│   All Mail           ││                                                                                                                  │
+│   Trash              ││                                                                                                                  │
+│   Receipts         1 ││                                                                                                                  │
+│                      ││                                                                                                                  │
+│ Work                 ││                                                                                                                  │
+│   login to account   ││                                                                                                                  │
+│   "Work"             ││                                                                                                                  │
+│   (mail.example.com: ││                                                                                                                  │
+│   993) failed:       ││                                                                                                                  │
+│   invalid            ││                                                                                                                  │
+│   credentials        ││                                                                                                                  │
+│                      ││                                                                                                                  │
+│                      ││                                                                                                                  │
+│                      ││                                                                                                                  │
+│                      ││                                                                                                                  │
+│                      ││                                                                                                                  │
+│                      ││                                                                                                                  │
+╰──────────────────────╯╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+Work: login to account "Work" (mail.example.com:993) failed: invalid credentials                                                      narrow
+k/↑ up • j/↓ down • enter open • space expand • u read/unread • s star • e archive • d delete • m move • tab next pane • … • ? help • q quit

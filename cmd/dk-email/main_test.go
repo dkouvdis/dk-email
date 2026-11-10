@@ -69,14 +69,14 @@ func TestRun_FirstRunCreatesConfigDir(t *testing.T) {
 func TestRun_InvalidConfigFails(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	path := filepath.Join(t.TempDir(), "config.toml")
-	if err := os.WriteFile(path, []byte("[ui]\nlist_width = 5\n"), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte("[ui]\nrefresh_interval = \"0s\"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
 	err := run([]string{"--config", path}, &stdout, &stderr, noUI)
 
-	if err == nil || !strings.Contains(err.Error(), "ui.list_width") {
-		t.Fatalf("run() error = %v, want a list_width validation error", err)
+	if err == nil || !strings.Contains(err.Error(), "ui.refresh_interval") {
+		t.Fatalf("run() error = %v, want a refresh_interval validation error", err)
 	}
 }
 

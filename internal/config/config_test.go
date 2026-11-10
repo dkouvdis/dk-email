@@ -35,7 +35,7 @@ func TestLoad_MissingFileReturnsDefaults(t *testing.T) {
 	if len(cfg.Accounts) != 0 {
 		t.Errorf("Accounts = %v, want none", cfg.Accounts)
 	}
-	want := UI{DefaultLayout: "split", WideBreakpoint: 120, ListWidth: 35, RefreshInterval: Duration{120 * time.Second}}
+	want := UI{DefaultLayout: "split", RefreshInterval: Duration{120 * time.Second}}
 	if cfg.UI != want {
 		t.Errorf("UI = %+v, want %+v", cfg.UI, want)
 	}
@@ -50,7 +50,7 @@ func TestLoad_FullExample(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	wantUI := UI{DefaultLayout: "list", WideBreakpoint: 140, ListWidth: 40, RefreshInterval: Duration{90 * time.Second}}
+	wantUI := UI{DefaultLayout: "list", RefreshInterval: Duration{90 * time.Second}}
 	if cfg.UI != wantUI {
 		t.Errorf("UI = %+v, want %+v", cfg.UI, wantUI)
 	}
@@ -77,14 +77,14 @@ func TestLoad_FullExample(t *testing.T) {
 }
 
 func TestLoad_PartialUIKeepsOtherDefaults(t *testing.T) {
-	path := writeConfig(t, "[ui]\nlist_width = 50\n")
+	path := writeConfig(t, "[ui]\nrefresh_interval = \"30s\"\n")
 
 	cfg, err := Load(path)
 
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	want := UI{DefaultLayout: "split", WideBreakpoint: 120, ListWidth: 50, RefreshInterval: Duration{120 * time.Second}}
+	want := UI{DefaultLayout: "split", RefreshInterval: Duration{30 * time.Second}}
 	if cfg.UI != want {
 		t.Errorf("UI = %+v, want %+v", cfg.UI, want)
 	}
@@ -121,7 +121,7 @@ func TestLoad_AccountDefaults(t *testing.T) {
 }
 
 func TestLoad_InvalidTOMLReportsLine(t *testing.T) {
-	path := writeConfig(t, "[ui]\nlist_width = 40\nwide_breakpoint = = 3\n")
+	path := writeConfig(t, "[ui]\ndefault_layout = \"list\"\nrefresh_interval = = 3\n")
 
 	_, err := Load(path)
 
@@ -186,9 +186,6 @@ func TestLoad_ValidationErrors(t *testing.T) {
 		{"port out of range", "[[account]]\nname = \"A\"\nemail = \"a@x.com\"\nimap_host = \"h\"\nimap_port = 70000\n", "imap_port must be between 1 and 65535"},
 		{"duplicate names ignore case", "[[account]]\nname = \"Work\"\nemail = \"a@x.com\"\nimap_host = \"h\"\n[[account]]\nname = \"work\"\nemail = \"b@x.com\"\nimap_host = \"h\"\n", `duplicate account name "work"`},
 		{"unknown layout", "[ui]\ndefault_layout = \"grid\"\n", `ui.default_layout must be "split" or "list"`},
-		{"breakpoint below forced list width", "[ui]\nwide_breakpoint = 60\n", "ui.wide_breakpoint must be at least 80"},
-		{"list width too small", "[ui]\nlist_width = 5\n", "ui.list_width must be between 10 and 90"},
-		{"list width too large", "[ui]\nlist_width = 95\n", "ui.list_width must be between 10 and 90"},
 		{"non-positive refresh", "[ui]\nrefresh_interval = \"0s\"\n", "ui.refresh_interval must be positive"},
 		{"unparsable refresh", "[ui]\nrefresh_interval = \"soon\"\n", "invalid duration"},
 	}
@@ -209,14 +206,14 @@ func TestLoad_ValidationErrors(t *testing.T) {
 }
 
 func TestLoad_ReportsEveryProblemAtOnce(t *testing.T) {
-	path := writeConfig(t, "[ui]\nlist_width = 5\n[[account]]\nname = \"A\"\nimap_hots = \"h\"\n")
+	path := writeConfig(t, "[ui]\nrefresh_interval = \"0s\"\n[[account]]\nname = \"A\"\nimap_hots = \"h\"\n")
 
 	_, err := Load(path)
 
 	if err == nil {
 		t.Fatal("Load() error = nil, want errors")
 	}
-	for _, want := range []string{"ui.list_width", `unknown key "account.imap_hots"`, `account "A": imap_host is required`, `account "A": username or email is required`} {
+	for _, want := range []string{"ui.refresh_interval", `unknown key "account.imap_hots"`, `account "A": imap_host is required`, `account "A": username or email is required`} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("error = %q, want it to contain %q", err, want)
 		}

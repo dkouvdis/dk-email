@@ -61,24 +61,21 @@ func (k KeyMap) HelpSections() []popup.Section {
 	}
 }
 
-// hints are the keys shown in the hint bar for the focused pane, most
-// important first; the bar truncates from the end. ? and q are added by the
-// bar itself so they're never cut off.
-func (k KeyMap) hints(focus Pane, kind Kind) []key.Binding {
-	keys := []key.Binding{k.Up, k.Down, k.Open}
-	if focus == PaneReader {
-		keys = keys[:2]
+// hints are the keys shown in the hint bar for the focused pane, or for the
+// reader popup while reading, most important first; the bar truncates from
+// the end. ? and q are added by the bar itself so they're never cut off.
+func (k KeyMap) hints(focus Pane, reading bool, kind Kind) []key.Binding {
+	if reading {
+		return []key.Binding{k.Up, k.Down, k.Back, k.Expand, k.ToggleRead, k.Star, k.Archive, k.Delete, k.Move}
 	}
-	if kind != KindWide {
+	keys := []key.Binding{k.Up, k.Down, k.Open}
+	if kind == KindList {
 		keys = append(keys, k.Picker)
 	}
-	switch focus {
-	case PaneList:
+	if focus == PaneList {
 		keys = append(keys, k.Expand, k.ToggleRead, k.Star, k.Archive, k.Delete, k.Move)
-	case PaneReader:
-		keys = append(keys, k.Back, k.Expand, k.ToggleRead, k.Star, k.Archive, k.Delete, k.Move)
 	}
-	if kind != KindList {
+	if kind == KindNarrow {
 		keys = append(keys, k.NextPane)
 	}
 	return append(keys, k.ToggleView)

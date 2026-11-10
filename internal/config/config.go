@@ -20,9 +20,6 @@ const (
 
 	TLSImplicit = "implicit"
 	TLSStartTLS = "starttls"
-
-	// Below this width list + popup mode is forced, so the wide breakpoint can't be lower.
-	minWideBreakpoint = 80
 )
 
 type Config struct {
@@ -35,8 +32,6 @@ type Config struct {
 
 type UI struct {
 	DefaultLayout   string   `toml:"default_layout"`
-	WideBreakpoint  int      `toml:"wide_breakpoint"`
-	ListWidth       int      `toml:"list_width"`
 	RefreshInterval Duration `toml:"refresh_interval"`
 }
 
@@ -78,8 +73,6 @@ func (d Duration) MarshalText() ([]byte, error) {
 func Default() Config {
 	return Config{UI: UI{
 		DefaultLayout:   LayoutSplit,
-		WideBreakpoint:  120,
-		ListWidth:       35,
 		RefreshInterval: Duration{120 * time.Second},
 	}}
 }
@@ -168,12 +161,6 @@ func (c *Config) validate() error {
 	case LayoutSplit, LayoutList:
 	default:
 		errs = append(errs, fmt.Errorf("ui.default_layout must be %q or %q, got %q", LayoutSplit, LayoutList, c.UI.DefaultLayout))
-	}
-	if c.UI.WideBreakpoint < minWideBreakpoint {
-		errs = append(errs, fmt.Errorf("ui.wide_breakpoint must be at least %d, got %d", minWideBreakpoint, c.UI.WideBreakpoint))
-	}
-	if c.UI.ListWidth < 10 || c.UI.ListWidth > 90 {
-		errs = append(errs, fmt.Errorf("ui.list_width must be between 10 and 90, got %d", c.UI.ListWidth))
 	}
 	if c.UI.RefreshInterval.Duration <= 0 {
 		errs = append(errs, fmt.Errorf("ui.refresh_interval must be positive, got %s", c.UI.RefreshInterval))

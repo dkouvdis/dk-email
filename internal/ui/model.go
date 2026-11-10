@@ -36,7 +36,6 @@ type Pane int
 const (
 	PaneSidebar Pane = iota
 	PaneList
-	PaneReader
 )
 
 func (p Pane) String() string {
@@ -45,8 +44,6 @@ func (p Pane) String() string {
 		return "sidebar"
 	case PaneList:
 		return "list"
-	case PaneReader:
-		return "reader"
 	}
 	return fmt.Sprintf("pane(%d)", int(p))
 }
@@ -203,39 +200,22 @@ func (m *Model) resize(w, h int) {
 }
 
 func (m *Model) relayout() {
-	m.panes = Layout(m.width, m.height, m.mode, m.ui)
+	m.panes = Layout(m.width, m.height, m.mode)
 	m.helpPop.SetSize(m.panes.Popup.W, m.panes.Popup.H)
 	m.picker.SetSize(m.panes.Popup.W, m.panes.Popup.H)
 	m.connectPop.SetSize(m.panes.Popup.W, m.panes.Popup.H)
 	frame := m.styles.pane.GetVerticalFrameSize()
 	m.side = m.side.SetHeight(max(m.panes.Sidebar.H-frame, 0))
 	m.list = m.list.SetHeight(max(m.panes.List.H-frame-listHeaderRows, 0))
-	if m.panes.Kind == KindList {
-		m.read = m.read.SetSize(popup.FrameInner(m.panes.Popup.W, m.panes.Popup.H))
-	} else {
-		m.read = m.read.SetSize(max(m.panes.Reader.W-m.styles.pane.GetHorizontalFrameSize(), 0), max(m.panes.Reader.H-frame, 0))
-	}
-
-	// Reading carries across layouts: a focused reader pane becomes the
-	// popup in list mode, and the popup becomes the pane again when wider.
-	switch {
-	case m.panes.Kind == KindList && m.focus == PaneReader && m.read.IsOpen():
-		m.readerPopup = true
-	case m.panes.Kind != KindList && m.readerPopup:
-		m.readerPopup = false
-		m.focus = PaneReader
-	}
+	m.read = m.read.SetSize(popup.FrameInner(m.panes.Popup.W, m.panes.Popup.H))
 	if !slices.Contains(m.visiblePanes(), m.focus) {
 		m.focus = PaneList
 	}
 }
 
 func (m Model) visiblePanes() []Pane {
-	switch m.panes.Kind {
-	case KindWide:
-		return []Pane{PaneSidebar, PaneList, PaneReader}
-	case KindNarrow:
-		return []Pane{PaneList, PaneReader}
+	if m.panes.Kind == KindNarrow {
+		return []Pane{PaneSidebar, PaneList}
 	}
 	return []Pane{PaneList}
 }
@@ -317,7 +297,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.side, cmd = m.side.Update(msg)
 		return m, cmd
-	case (m.focus == PaneList || m.focus == PaneReader) && m.isTriageKey(msg):
+	case m.focus == PaneList && m.isTriageKey(msg):
 		return m.triage(msg)
 	case m.focus == PaneList && key.Matches(msg, m.keys.Open):
 		return m.openThread()
@@ -325,11 +305,6 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.list, cmd = m.list.Update(msg)
 		return m, cmd
-	case m.focus == PaneReader && key.Matches(msg, m.keys.Back):
-		m.focus = PaneList
-	case m.focus == PaneReader:
-		m.read, _ = m.read.Update(msg)
-		return m, m.fetchMissing()
 	}
 	return m, nil
 }
@@ -403,9 +378,6 @@ func (m Model) render() string {
 		cols = append(cols, m.renderPane(PaneSidebar, p.Sidebar, m.side.View))
 	}
 	cols = append(cols, m.renderPane(PaneList, p.List, m.listView))
-	if p.Reader.W > 0 {
-		cols = append(cols, m.renderPane(PaneReader, p.Reader, m.read.View))
-	}
 	screen := lipgloss.JoinVertical(lipgloss.Left,
 		lipgloss.JoinHorizontal(lipgloss.Top, cols...),
 		m.renderStatus(),
@@ -455,12 +427,12 @@ func (m Model) unreadNote() string {
 // listHeaderRows is the folder header above the thread rows.
 const listHeaderRows = 1
 
-// listView shows the open folder's name, plus its account outside wide mode
-// where there's no sidebar, above the thread rows.
+// listView shows the open folder's name above the thread rows, plus its
+// account in list mode where there's no sidebar.
 func (m Model) listView(w, h int) string {
 	var title string
 	switch {
-	case m.open.account >= 0 && m.panes.Kind == KindWide:
+	case m.open.account >= 0 && m.panes.Kind == KindNarrow:
 		title = m.styles.title.Render(m.open.label) + m.unreadNote()
 	case m.open.account >= 0:
 		title = m.styles.title.Render(m.accts[m.open.account].Name) + m.styles.dim.Render(" › "+m.open.label) + m.unreadNote()
@@ -472,6 +444,8 @@ func (m Model) listView(w, h int) string {
 
 	var body string
 	switch {
+	case m.open.account < 0 && m.side.Connecting():
+		body = m.styles.dim.Render("Connecting…")
 	case m.open.account < 0:
 		body = m.styles.dim.Render("Threads appear here once a folder is open.")
 	case m.open.loading:
@@ -514,11 +488,7 @@ func (m Model) renderHints() string {
 
 	var head []string
 	used := 0
-	focus := m.focus
-	if m.readerPopup {
-		focus = PaneReader
-	}
-	hints := m.keys.hints(focus, m.panes.Kind)
+	hints := m.keys.hints(m.focus, m.readerPopup, m.panes.Kind)
 	for i, b := range hints {
 		w := lipgloss.Width(item(b)) + lipgloss.Width(sep)
 		// Unless this is the last key, leave space for a "… • " marker.

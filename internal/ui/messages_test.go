@@ -37,8 +37,8 @@ func TestReader_EnterOpensThreadAndMarksRead(t *testing.T) {
 
 	m = pressSettled(t, m, "enter") // the Plan thread: Alice (read), Bob (unread)
 
-	if m.focus != PaneReader {
-		t.Errorf("focus = %v, want reader", m.focus)
+	if !m.readerPopup || m.focus != PaneList {
+		t.Errorf("popup %v focus %v, want the reader popup over the list", m.readerPopup, m.focus)
 	}
 	v := plain(m)
 	for _, want := range []string{"From: Bob", "Body of Re: Plan from Bob.", "Alice"} {
@@ -111,9 +111,9 @@ func TestReader_SlowFetchShowsLoadingAndKeysStillWork(t *testing.T) {
 	go func() { done <- cmd() }()
 
 	start := time.Now()
-	m = send(t, m, press("esc"), press("j"))
-	if m.focus != PaneList || time.Since(start) > 100*time.Millisecond {
-		t.Errorf("keys blocked while a message loaded (focus %v)", m.focus)
+	m = send(t, m, press("?"), press("esc"))
+	if m.showHelp || !m.readerPopup || time.Since(start) > 100*time.Millisecond {
+		t.Errorf("keys blocked while a message loaded (help %v, popup %v)", m.showHelp, m.readerPopup)
 	}
 	result := <-done
 	m = settle(t, m, func() tea.Msg { return result })

@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-func TestPicker_NarrowAOpensPickerWithEveryAccount(t *testing.T) {
-	m := started(t, newFixture(), 100, 30)
+func TestPicker_ListModeAOpensPickerWithEveryAccount(t *testing.T) {
+	m := started(t, newFixture(), 70, 30)
 
 	m = pressSettled(t, m, "a")
 
@@ -24,7 +24,7 @@ func TestPicker_NarrowAOpensPickerWithEveryAccount(t *testing.T) {
 
 func TestPicker_ChoosingAnotherAccountSwitchesAndLoads(t *testing.T) {
 	f := newFixture()
-	m := started(t, f, 100, 30)
+	m := started(t, f, 70, 30)
 
 	// Personal: Inbox, Sent Mail, All Mail, Trash, Receipts; then Work: Inbox.
 	for _, k := range []string{"a", "j", "j", "j", "j", "j", "enter"} {
@@ -47,7 +47,7 @@ func TestPicker_ChoosingAnotherAccountSwitchesAndLoads(t *testing.T) {
 
 func TestPicker_EscAndReselectChangeNothing(t *testing.T) {
 	f := newFixture()
-	m := started(t, f, 100, 30)
+	m := started(t, f, 70, 30)
 
 	m = pressSettled(t, m, "a")
 	m = pressSettled(t, m, "j")
@@ -64,7 +64,7 @@ func TestPicker_EscAndReselectChangeNothing(t *testing.T) {
 }
 
 func TestPicker_KeysDontLeakAndQClosesIt(t *testing.T) {
-	m := started(t, newFixture(), 100, 30)
+	m := started(t, newFixture(), 70, 30)
 	m = pressSettled(t, m, "a")
 
 	m = pressSettled(t, m, "tab")
@@ -77,20 +77,26 @@ func TestPicker_KeysDontLeakAndQClosesIt(t *testing.T) {
 	}
 }
 
-func TestPicker_WideModeFocusesSidebar(t *testing.T) {
+func TestPicker_NarrowModeFocusesSidebar(t *testing.T) {
 	m := started(t, newFixture(), 160, 30)
 
 	m = pressSettled(t, m, "a")
-
 	if m.showPicker || m.focus != PaneSidebar {
-		t.Errorf("wide a: picker %v focus %v, want the sidebar focused", m.showPicker, m.focus)
+		t.Errorf("narrow a: picker %v focus %v, want the sidebar focused", m.showPicker, m.focus)
+	}
+
+	m = pressSettled(t, m, "l")
+	m = pressSettled(t, m, "enter")
+	m = pressSettled(t, m, "a")
+	if m.readerPopup || m.showPicker || m.focus != PaneSidebar {
+		t.Errorf("a while reading: popup %v picker %v focus %v, want the popup closed and the sidebar focused", m.readerPopup, m.showPicker, m.focus)
 	}
 }
 
 func TestPicker_ShowsWhyAnAccountHasNoFolders(t *testing.T) {
 	f := newFixture()
 	f.errs["Work"] = errors.New("login failed\nHint: long advice")
-	m := started(t, f, 100, 30)
+	m := started(t, f, 70, 30)
 
 	m = pressSettled(t, m, "a")
 
@@ -101,12 +107,13 @@ func TestPicker_ShowsWhyAnAccountHasNoFolders(t *testing.T) {
 
 func TestHeader_UnreadCountFollowsReading(t *testing.T) {
 	f := newFixture()
-	m := started(t, f, 100, 30)
+	m := started(t, f, 70, 30)
 	if !strings.Contains(plain(m), "Personal › Inbox · 2 unread") {
 		t.Fatalf("header lacks the unread count:\n%s", plain(m))
 	}
 
 	m = pressSettled(t, m, "enter")
+	m = pressSettled(t, m, "esc")
 
 	if !strings.Contains(plain(m), "Personal › Inbox · 1 unread") {
 		t.Errorf("header count didn't follow reading:\n%s", plain(m))

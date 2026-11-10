@@ -1,17 +1,11 @@
 package ui
 
-import (
-	"fmt"
-
-	"github.com/dkouvdis/dk-email/internal/config"
-)
+import "fmt"
 
 const (
 	// listForcedBelow is the width under which list + popup mode is forced.
 	listForcedBelow = 80
 	sidebarWidth    = 24
-	// wideListPercent is the thread list's share of the space beside the sidebar.
-	wideListPercent = 35
 	popupPercent    = 90
 	// Status line and hint bar.
 	footerRows = 2
@@ -32,19 +26,18 @@ func (m Mode) String() string {
 	return "split"
 }
 
-// Kind is the layout actually used, after applying the breakpoints.
+// Kind is the layout actually used, after applying the breakpoint.
 type Kind int
 
 const (
-	KindWide Kind = iota
-	KindNarrow
+	// KindNarrow is the folders sidebar beside the thread list.
+	KindNarrow Kind = iota
+	// KindList is the thread list alone.
 	KindList
 )
 
 func (k Kind) String() string {
 	switch k {
-	case KindWide:
-		return "wide"
 	case KindNarrow:
 		return "narrow"
 	case KindList:
@@ -56,18 +49,19 @@ func (k Kind) String() string {
 // Rect is a screen area in cells. A zero width means the pane is hidden.
 type Rect struct{ X, Y, W, H int }
 
-// Panes is where everything goes for one terminal size.
+// Panes is where everything goes for one terminal size. Conversations are
+// always read in the popup.
 type Panes struct {
-	Kind                  Kind
-	Sidebar, List, Reader Rect
-	Status, Hints         Rect
+	Kind          Kind
+	Sidebar, List Rect
+	Status, Hints Rect
 	// Popup is the centered area used by popups in any kind.
 	Popup Rect
 }
 
 // Layout places the panes for a width × height terminal. It is pure so the
-// breakpoints can be table-tested.
-func Layout(width, height int, mode Mode, ui config.UI) Panes {
+// breakpoint can be table-tested.
+func Layout(width, height int, mode Mode) Panes {
 	width, height = max(width, 0), max(height, 0)
 	body := max(height-footerRows, 0)
 
@@ -76,22 +70,13 @@ func Layout(width, height int, mode Mode, ui config.UI) Panes {
 		Hints:  Rect{0, max(height-1, 0), width, min(max(height-1, 0), 1)},
 	}
 
-	switch {
-	case mode == ModeList || width < listForcedBelow:
+	if mode == ModeList || width < listForcedBelow {
 		p.Kind = KindList
 		p.List = Rect{0, 0, width, body}
-	case width >= ui.WideBreakpoint:
-		p.Kind = KindWide
-		rest := width - sidebarWidth
-		listW := rest * wideListPercent / 100
-		p.Sidebar = Rect{0, 0, sidebarWidth, body}
-		p.List = Rect{sidebarWidth, 0, listW, body}
-		p.Reader = Rect{sidebarWidth + listW, 0, rest - listW, body}
-	default:
+	} else {
 		p.Kind = KindNarrow
-		listW := width * ui.ListWidth / 100
-		p.List = Rect{0, 0, listW, body}
-		p.Reader = Rect{listW, 0, width - listW, body}
+		p.Sidebar = Rect{0, 0, sidebarWidth, body}
+		p.List = Rect{sidebarWidth, 0, width - sidebarWidth, body}
 	}
 
 	pw, ph := width*popupPercent/100, body*popupPercent/100

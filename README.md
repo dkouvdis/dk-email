@@ -1,11 +1,11 @@
 # dk-email
 
-A keyboard-driven terminal email client for triaging several IMAP accounts (Gmail included). It uses a Thunderbird-style layout of folders, threads and a reading pane, with lazygit-style single-key actions.
+A keyboard-driven terminal email client for triaging several IMAP accounts (Gmail included). It shows a folders sidebar beside a thread list, opens conversations in a popup, and uses lazygit-style single-key actions.
 
 - Shows each account's folders with unread counts.
 - Groups replies into threads, ordered by newest activity.
 - Lets you mark read/unread, star, archive, delete (to Trash) and move mail without leaving the keyboard.
-- Adapts to the terminal width. A split view and a list + popup view are available.
+- Has two layouts: narrow (folders │ threads, the default) and list (threads only), toggled with `v`. List is forced below 80 columns.
 - Reads passwords from 1Password (`op read`), any other command, or the OS keychain. They are never stored in a plain-text file.
 
 v0.x is a personal tool: it reads and triages mail but doesn't send it. Nothing is cached on disk.
@@ -63,8 +63,6 @@ The config folder lives at `$XDG_CONFIG_HOME/dk-email/` (default `~/.config/dk-e
 ```toml
 [ui]
 default_layout   = "split"   # "split" | "list"
-wide_breakpoint  = 120       # columns; at least 80
-list_width       = 35        # percent of the width for the thread list in narrow mode; 10–90
 refresh_interval = "120s"
 
 [[account]]
@@ -171,17 +169,17 @@ The Bridge password (from Bridge's mailbox details, not your Proton password) go
 | `u` | toggle read / unread | `s` | toggle star |
 | `e` | archive | `d` | delete (moves to Trash) |
 | `m` | move to folder | `r` | refresh |
-| `a` | account / folder picker | `A` | connect account |
+| `a` | focus folders (narrow) / folder picker (list) | `A` | connect account |
 | `v` | toggle split ↔ list + popup | `?` | key help |
 | `esc` | close popup / back | `q` | close the open popup, otherwise quit |
 | `ctrl+c` | quit, even with a popup open | | |
 
 - Actions on a collapsed thread apply to every message in it. On an expanded row, or in the reader, they apply to the selected message. Opening a message marks it read.
-- In the reader, `pgup`/`pgdn` (or `ctrl+u`/`ctrl+d`) scroll by a page, and `space` expands or collapses every message.
+- `enter` opens the conversation in a popup, and `esc` closes it. In the reader, `pgup`/`pgdn` (or `ctrl+u`/`ctrl+d`) scroll by a page, and `space` expands or collapses every message.
 - In the `?` help popup, `/` filters keys by key or description.
 - In the connect popup, `tab`/`↓` and `shift+tab`/`↑` move between fields, and `←`/`→` or `space` change a choice. `enter` submits and `esc` cancels.
 
-Below 80 columns, list + popup mode is forced.
+Below 80 columns, list mode is forced.
 
 ## Debugging
 

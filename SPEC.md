@@ -11,7 +11,7 @@ A keyboard-driven terminal email client for **triaging several IMAP accounts** (
 1. On first run with no accounts, a **connect-account popup** opens. I enter a name, email, IMAP host/port and a password source, the app tests the connection, then saves the account.
 2. I see the accounts and folders I'm working in, with **unread counts**.
 3. I see a folder's mail as a list of **threads**: replies grouped together, newest activity first, expandable inline.
-4. I read a whole conversation in the reading pane, or in a popup when using list mode.
+4. I read a whole conversation in a popup over the thread list.
 5. Without leaving the keyboard, I can **mark read/unread, star/flag, archive, delete, and move** a thread or message.
 6. The layout adapts to the terminal width, and I can switch between split and list + popup modes.
 7. My passwords come from **1Password** (`op read`) or the **OS keychain**, never from a plain-text file.
@@ -20,9 +20,10 @@ A keyboard-driven terminal email client for **triaging several IMAP accounts** (
 
 | Mode | When | Panes |
 |---|---|---|
-| **Wide** | split mode, width ≥ `wide_breakpoint` (default 120 cols) | folders sidebar (fixed ~24 cols) │ thread list (35% of the rest) │ reading pane |
-| **Narrow** | split mode, width < `wide_breakpoint` | thread list 35% │ reading pane 65%. The **account › folder** header sits at the top of the left pane, and `a` opens the account/folder picker |
-| **List + popup** | toggled with `v`, or **forced automatically when width < 80 cols** | thread list at full width. `enter` opens the thread in a centered popup (~90% × 90%) |
+| **Narrow** (default) | split mode, width ≥ 80 cols | folders sidebar (24 cols) │ thread list (the rest). `a` focuses the sidebar |
+| **List + popup** | toggled with `v`, or **forced automatically when width < 80 cols** | thread list at full width. The **account › folder** header sits at the top, and `a` opens the account/folder picker |
+
+There's no reading pane. In both layouts, `enter` opens the conversation in a centered popup (~90% × 90%), and `esc` closes it. Changed on 2026-11-10 at your request: the earlier three-pane wide layout and the list │ reader narrow layout were replaced by the two above, and `wide_breakpoint` and `list_width` were removed. Until the first folder opens, the thread list says "Connecting…".
 
 Every mode includes a bottom **hint bar** showing the keys for the focused pane, plus a status line for errors and progress (e.g. "Archiving…").
 
@@ -32,7 +33,7 @@ Every mode includes a bottom **hint bar** showing the keys for the focused pane,
 
 The selected thread row and the selected sidebar folder are drawn in white text on a grey background (256-colour 238), not in reverse video. The unread dot and the yellow `*` star keep their colours on the selected row.
 
-### Reading pane
+### Reader popup
 
 Messages in the conversation are stacked oldest to newest. The latest (or first unread) message is expanded; earlier ones are collapsed to one line each. Each header shows From, To, Cc and Date. `text/plain` bodies are preferred; if only HTML exists, it's converted to text. Attachments are listed by name and size only.
 
@@ -148,8 +149,6 @@ There's **one IMAP connection per account**, opened lazily and serialized behind
 ```toml
 [ui]
 default_layout   = "split"   # "split" | "list"
-wide_breakpoint  = 120       # columns
-list_width       = 35        # percent, narrow mode
 refresh_interval = "120s"
 
 [[account]]
@@ -167,7 +166,7 @@ password_cmd = "op read op://Personal/Gmail/app-password"   # omit to use the ke
 - **Defaults and validation:**
   - `tls` defaults to `implicit`. `imap_port` defaults to 993 for `implicit` and 143 for `starttls`. `username` defaults to `email`.
   - Unknown keys are rejected, so a typo such as `pasword_cmd` can't silently fall back to the keychain. A `password` key is rejected with a hint to use `password_cmd`.
-  - `[ui]` limits: `wide_breakpoint` ≥ 80, `list_width` between 10 and 90, `refresh_interval` positive.
+  - `[ui]` limits: `refresh_interval` positive.
   - All problems in a file are reported together.
   - The config dir and its `.gitignore` are only created for the default location, never next to a custom `--config` path.
   - `tls_cert` (optional) is a PEM file of certificates trusted for that account **instead of** the system roots. It's for local bridges with self-signed certificates, such as Proton Mail Bridge, whose 20-year certificate macOS rejects as "not standards compliant" even when trusted in Keychain. The host name and expiry are still verified. `~/` is expanded, and a relative path is resolved from the config file's folder. A missing file, or one with no PEM certificate, fails at load. Added 2026-11-09 with your approval.
@@ -193,7 +192,7 @@ password_cmd = "op read op://Personal/Gmail/app-password"   # omit to use the ke
 | `u` | toggle read/unread | `s` | toggle star/flag |
 | `e` | archive | `d` | delete (→ Trash) |
 | `m` | move to folder (picker) | `r` | refresh |
-| `a` | account/folder picker | `A` | connect account |
+| `a` | focus folders (narrow) / folder picker (list) | `A` | connect account |
 | `v` | toggle split ↔ list + popup | `?` | full key help |
 | `esc` | close popup / back | `q` | close the open popup, otherwise quit |
 | `ctrl+c` | quit, even with a popup open | | |
@@ -267,9 +266,9 @@ Naming: identifiers are lowercase, short and descriptive. Bubble Tea message typ
   - `render`: plain/HTML/multipart/alternative bodies, charsets, attachment listing.
   - `config`: parse and validate, defaults, XDG path resolution, text-append preserves comments, `.gitignore` written.
   - `secret`: `password_cmd` success, failure and empty output (using a fake runner); keychain read/write through the `go-keyring` mock.
-  - `ui`: layout widths per mode and breakpoint; key handling at the `Update` level (input key → state change plus the expected `mail` call on a fake `Mailbox`).
+  - `ui`: layout widths per mode and at the 80-column breakpoint; key handling at the `Update` level (input key → state change plus the expected `mail` call on a fake `Mailbox`).
 - **Integration tests:** `mail/imap` against an in-process `imapmemserver`, seeded with synthetic messages and special-use folders: list folders, page through summaries, set and clear flags, move, archive-folder resolution.
-- **TUI smoke tests:** `teatest` golden output for wide, narrow and list + popup at fixed sizes, run against a fake `Mailbox`.
+- **TUI smoke tests:** `teatest` golden output for narrow and list + popup at fixed sizes, run against a fake `Mailbox`.
 - **Coverage target:** ≥ 80% for `thread`, `render`, `config`, `secret` and `mail/imap`. UI packages are covered by behaviour tests with no numeric target.
 - **Fixtures:** synthetic `.eml` files in `testdata/` only. **Real mail is never committed.**
 - **Manual check before calling v1 done:** run against a real Gmail account, using an app password from 1Password.
@@ -301,8 +300,8 @@ The repo `.gitignore` will cover `bin/`, `dist/`, `coverage.out`, `*.db`, `debug
 
 1. With an empty config dir, launching opens the connect-account popup. A valid Gmail app password, supplied via an `op read` reference, connects successfully. `config.toml` gains an appended `[[account]]` block, the config `.gitignore` exists, and no password appears in any file.
 2. A wrong password or host shows an error **inside the popup** and saves nothing.
-3. With two accounts configured, the wide layout lists both accounts' folders with correct unread counts. In narrow mode, `a` switches between them and the header shows `Account › Folder`.
-4. Resizing across 120 columns switches between three and two panes without restarting. Below 80 columns, list + popup is forced. `v` toggles list + popup at 80 columns and above.
+3. With two accounts configured, the narrow layout's sidebar lists both accounts' folders with correct unread counts. In list mode, `a` switches between them and the header shows `Account › Folder`.
+4. Resizing across 80 columns switches between narrow and list + popup without restarting. Below 80 columns, list + popup is forced. `v` toggles list + popup at 80 columns and above.
 5. The Inbox shows threads, with replies grouped. `space` expands a thread and `enter` shows the full conversation.
 6. `u`, `s`, `e`, `d` and `m` each change state on the server, verified by reopening the folder after a restart. Delete lands in Trash and archive lands in All Mail on Gmail.
 7. The UI stays responsive (keys still move the cursor) while a slow folder is loading.

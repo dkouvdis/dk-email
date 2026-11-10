@@ -17,9 +17,11 @@ type pick struct {
 }
 
 // openPicker shows every account's folders, with the open one current. In
-// wide mode the sidebar already lists them, so a just focuses it.
+// narrow mode the sidebar already lists them, so a closes the reader popup
+// and focuses it.
 func (m Model) openPicker() (Model, tea.Cmd) {
-	if m.panes.Kind == KindWide {
+	if m.panes.Kind == KindNarrow {
+		m.readerPopup = false
 		m.focus = PaneSidebar
 		return m, nil
 	}
