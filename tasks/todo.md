@@ -550,14 +550,21 @@ Every task also meets the standing bar before it counts as done:
 
 **Acceptance criteria:**
 
-- [ ] Typing `arch` leaves only `e archive` under its section, and typing `q` while filtering filters instead of quitting.
-- [ ] The `esc` sequence works as described: clear and leave, then close. Reopening the popup starts with an empty filter.
-- [ ] A golden file covers the popup with an active filter.
+- [x] Typing `arch` leaves only `e archive` under its section, and typing `q` while filtering filters instead of quitting.
+- [x] The `esc` sequence works as described: clear and leave, then close. Reopening the popup starts with an empty filter.
+- [x] A golden file covers the popup with an active filter (`help-filtered`).
 
 **Verification:**
 
-- [ ] `go test -race ./internal/ui/...` passes.
+- [x] `go test -race ./internal/ui/...` passes (stable over 3 runs; popup coverage 98%).
 - [ ] Manual: `?`, `/`, type `star`, `esc`, `esc`.
+
+**Notes:**
+
+- The filter row (`/ press / to filter by key or description`) sits under the header at all times. The box is sized from the unfiltered list, so it never changes size while you type.
+- `esc` clears an active filter before it closes the popup, including a filter kept with `enter`. With no filter, `esc`, `q` or `?` close it. The help popup now receives every key except `ctrl+c` and reports when to close (`HelpClosed`).
+- Footers: `/ filter · j/k/pgup/pgdn scroll · esc/q close` (or `/ filter · esc/q close` when everything fits), and `enter keep · esc clear` while typing.
+- `bubbles/textinput` brings in `github.com/atotto/clipboard` as an indirect dependency.
 
 **Dependencies:** T8
 **Files:** `internal/ui/popup/help.go`, `internal/ui/popup/help_test.go`, `internal/ui/model.go`, `internal/ui/model_test.go`

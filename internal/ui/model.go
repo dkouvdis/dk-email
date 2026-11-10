@@ -225,6 +225,16 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.log.Debug("quit")
 		return m, tea.Quit
 	}
+	// Help sees every key, so q and ? can be typed into its filter.
+	if m.showHelp {
+		var r popup.HelpResult
+		m.helpPop, r = m.helpPop.Update(msg)
+		if r == popup.HelpClosed {
+			m.showHelp = false
+			m.log.Debug("popup closed", "popup", "help")
+		}
+		return m, nil
+	}
 	// q closes the topmost popup before it quits.
 	if key.Matches(msg, m.keys.Quit) {
 		if m.closeTopPopup() {
@@ -235,15 +245,6 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	if m.statusErr {
 		m.status, m.statusErr = "", false
-	}
-	if m.showHelp {
-		if key.Matches(msg, m.keys.Back, m.keys.Help) {
-			m.showHelp = false
-			m.log.Debug("popup closed", "popup", "help")
-			return m, nil
-		}
-		m.helpPop = m.helpPop.Update(msg)
-		return m, nil
 	}
 	if m.showPicker {
 		return m.handlePickerKey(msg)

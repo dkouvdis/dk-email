@@ -54,7 +54,7 @@ The full details for every task are in [todo.md](todo.md).
 - [x] T18: Move-to-folder picker (`m`)
 - [x] T19: Auto-refresh (120s) + `r`
 - [x] T24: `tls_cert` per account, for Proton Mail Bridge's self-signed certificate (added at your request)
-- [ ] T23: Filter in the `?` help popup (`/`); added after T8 review, lands before the README
+- [x] T23: Filter in the `?` help popup (`/`); added after T8 review, lands before the README
 
 **Checkpoint 3:** spec success criteria 5–7 are verified on real Gmail. You review; no tag yet.
 

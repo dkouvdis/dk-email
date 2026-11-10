@@ -319,6 +319,7 @@ func TestGolden(t *testing.T) {
 		{"help", 120, 30, false, []string{"?"}},
 		{"help-scrolled", 120, 30, false, []string{"?", "G"}},
 		{"help-fits", 120, 50, false, []string{"?"}},
+		{"help-filtered", 120, 30, false, []string{"?", "/", "a", "r", "c", "h"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -340,5 +341,40 @@ func TestGolden(t *testing.T) {
 			final := tm.FinalModel(t, teatest.WithFinalTimeout(5*time.Second)).(Model)
 			teatest.RequireEqualOutput(t, []byte(plain(final)))
 		})
+	}
+}
+
+func TestModel_HelpFilter(t *testing.T) {
+	m := send(t, New(testConfig(), nil, nil), size(120, 30), press("?"), press("/"))
+
+	for _, k := range []string{"a", "r", "c", "h"} {
+		m = send(t, m, press(k))
+	}
+	pop := ansi.Strip(m.helpPop.View())
+	if !strings.Contains(pop, "archive") || strings.Contains(pop, "star") || strings.Contains(pop, "Navigation") {
+		t.Errorf("typing arch should leave only e archive under Threads:\n%s", pop)
+	}
+
+	next, cmd := m.Update(press("q"))
+	m = next.(Model)
+	if cmd != nil || !m.showHelp || !strings.Contains(ansi.Strip(m.helpPop.View()), "No keys match") {
+		t.Error("q while filtering should be typed into the filter, not close or quit")
+	}
+
+	m = send(t, m, press("esc"))
+	if !m.showHelp {
+		t.Fatal("the first esc should only clear the filter")
+	}
+	m = send(t, m, press("esc"))
+	if m.showHelp {
+		t.Fatal("the second esc should close the popup")
+	}
+
+	m = send(t, m, press("?"))
+	if !strings.Contains(ansi.Strip(m.helpPop.View()), "press / to filter") {
+		t.Error("reopening the popup should start with an empty filter")
+	}
+	if _, cmd := m.Update(press("ctrl+c")); cmd == nil {
+		t.Error("ctrl+c should still quit with help open")
 	}
 }

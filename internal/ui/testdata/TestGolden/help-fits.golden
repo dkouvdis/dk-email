@@ -3,9 +3,9 @@
 │ ▶ Inbox            2 ││ ●    Bob      Re: … (2) 13:30 ││                                                             │
 │   Sent Mail          ││ ●    Carol    Lunch?    Nov 8 ││                                                             │
 │   All Mail           ││                               ││                                                             │
-│   Trash              ││                               ││                                                             │
-│   Receipts         1 ││               ╭──────────────────────────────────────╮                                       │
-│                      ││               │ Keys                      esc close  │                                       │
+│   Trash              ││               ╭──────────────────────────────────────╮                                       │
+│   Receipts         1 ││               │ Keys                      esc close  │                                       │
+│                      ││               │ / press / to filter by key or descr… │                                       │
 │ Work                 ││               │                                      │                                       │
 │   Inbox            1 ││               │ Navigation                           │                                       │
 │   Archive            ││               │   k/↑         up                     │                                       │
@@ -38,7 +38,7 @@
 │                      ││               │   q           quit                   │                                       │
 │                      ││               │   ctrl+c      quit now               │                                       │
 │                      ││               │                                      │                                       │
-│                      ││               │ close esc/q                          │                                       │
+│                      ││               │ / filter · esc/q close               │                                       │
 │                      ││               ╰──────────────────────────────────────╯                                       │
 │                      ││                               ││                                                             │
 │                      ││                               ││                                                             │

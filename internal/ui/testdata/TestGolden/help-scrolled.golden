@@ -1,29 +1,29 @@
 ╭──────────────────────╮╭───────────────────────────────╮╭─────────────────────────────────────────────────────────────╮
-│ Personal             ││ Inbox · 2 unr╭───────────────────────────────────────╮                                       │
-│ ▶ Inbox            2 ││ ●    Bob     │ Keys                       esc close  │                                       │
-│   Sent Mail          ││ ●    Carol   │                                       │                                       │
-│   All Mail           ││              │   enter       open                    │                                       │
-│   Trash              ││              │   space       expand                  │                                       │
-│   Receipts         1 ││              │   u           read/unread             │                                       │
-│                      ││              │   s           star                    │                                       │
-│ Work                 ││              │   e           archive                 │                                       │
-│   Inbox            1 ││              │   d           delete                  │                                       │
-│   Archive            ││              │   m           move                    │                                       │
-│                      ││              │   r           refresh               ┃ │                                       │
-│                      ││              │                                     ┃ │                                       │
-│                      ││              │ Accounts & view                     ┃ │                                       │
-│                      ││              │   a           accounts              ┃ │                                       │
-│                      ││              │   A           connect account       ┃ │                                       │
-│                      ││              │   v           split/list            ┃ │                                       │
-│                      ││              │                                     ┃ │                                       │
-│                      ││              │ General                             ┃ │                                       │
-│                      ││              │   ?           help                  ┃ │                                       │
-│                      ││              │   esc         back                  ┃ │                                       │
-│                      ││              │   q           quit                  ┃ │                                       │
-│                      ││              │   ctrl+c      quit now              ┃ │                                       │
-│                      ││              │                                       │                                       │
-│                      ││              │ scroll j/k/↑↓/pgup/pgdn · close esc/q │                                       │
-│                      ││              ╰───────────────────────────────────────╯                                       │
+│ Personal             ││ Inbox · 2 unre╭──────────────────────────────────────╮                                       │
+│ ▶ Inbox            2 ││ ●    Bob      │ Keys                      esc close  │                                       │
+│   Sent Mail          ││ ●    Carol    │ / press / to filter by key or descr… │                                       │
+│   All Mail           ││               │                                      │                                       │
+│   Trash              ││               │   space       expand                 │                                       │
+│   Receipts         1 ││               │   u           read/unread            │                                       │
+│                      ││               │   s           star                   │                                       │
+│ Work                 ││               │   e           archive                │                                       │
+│   Inbox            1 ││               │   d           delete                 │                                       │
+│   Archive            ││               │   m           move                   │                                       │
+│                      ││               │   r           refresh                │                                       │
+│                      ││               │                                      │                                       │
+│                      ││               │ Accounts & view                    ┃ │                                       │
+│                      ││               │   a           accounts             ┃ │                                       │
+│                      ││               │   A           connect account      ┃ │                                       │
+│                      ││               │   v           split/list           ┃ │                                       │
+│                      ││               │                                    ┃ │                                       │
+│                      ││               │ General                            ┃ │                                       │
+│                      ││               │   ?           help                 ┃ │                                       │
+│                      ││               │   esc         back                 ┃ │                                       │
+│                      ││               │   q           quit                 ┃ │                                       │
+│                      ││               │   ctrl+c      quit now             ┃ │                                       │
+│                      ││               │                                      │                                       │
+│                      ││               │ / filter · j/k/pgup/pgdn scroll · e… │                                       │
+│                      ││               ╰──────────────────────────────────────╯                                       │
 │                      ││                               ││                                                             │
 ╰──────────────────────╯╰───────────────────────────────╯╰─────────────────────────────────────────────────────────────╯
                                                                                                                     wide
