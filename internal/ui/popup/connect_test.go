@@ -257,3 +257,28 @@ func TestShellQuote(t *testing.T) {
 		}
 	}
 }
+
+func TestConnect_PasteIntoFields(t *testing.T) {
+	c := fill(newConnect(), "Gmail")
+	c = c.Paste(tea.PasteMsg{Content: "me@gmail.com\n"})
+	if got := c.inputs[fEmail].Value(); got != "me@gmail.com" || c.inputs[fHost].Value() != "imap.gmail.com" {
+		t.Errorf("pasted email = %q, host %q; want it trimmed and Gmail pre-filled", got, c.inputs[fHost].Value())
+	}
+
+	c, _ = keys(c, "tab", "tab", "tab", "tab", "tab", "tab") // to the reference
+	c = c.Paste(tea.PasteMsg{Content: "  op://Work Vault/IMAP/password\r\n"})
+	c, _ = keys(c, "enter")
+	if got := c.Request().Account.PasswordCmd; got != `op read 'op://Work Vault/IMAP/password'` {
+		t.Errorf("password_cmd = %q", got)
+	}
+
+	c, _ = keys(c, "shift+tab") // the source choice: pasting does nothing
+	before := c.Request()
+	if c.Paste(tea.PasteMsg{Content: "x"}).Request() != before {
+		t.Error("paste on a choice field changed the form")
+	}
+	c.SetBusy(true)
+	if c.Paste(tea.PasteMsg{Content: "x"}).Request() != before {
+		t.Error("paste while testing changed the form")
+	}
+}

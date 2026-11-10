@@ -158,6 +158,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.resize(msg.Width, msg.Height)
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
+	case tea.PasteMsg:
+		switch {
+		case m.showConnect:
+			m.connectPop = m.connectPop.Paste(msg)
+		case m.showHelp:
+			m.helpPop = m.helpPop.Paste(msg)
+		}
 	case spinner.TickMsg:
 		var cmd tea.Cmd
 		m.side, cmd = m.side.Update(msg)

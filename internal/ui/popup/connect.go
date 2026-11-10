@@ -212,6 +212,25 @@ func (c Connect) Update(msg tea.KeyPressMsg) (Connect, ConnectResult) {
 	return c, ConnectPending
 }
 
+// Paste inserts pasted text into the focused field, without line breaks.
+func (c Connect) Paste(msg tea.PasteMsg) Connect {
+	if c.busy || !isInput(c.focus) {
+		return c
+	}
+	before := c.inputs[c.focus].Value()
+	c.inputs[c.focus], _ = c.inputs[c.focus].Update(tea.PasteMsg{Content: singleLine(msg.Content)})
+	if c.inputs[c.focus].Value() != before {
+		c.edited(c.focus)
+	}
+	return c
+}
+
+// singleLine drops surrounding whitespace and any line breaks, which a
+// copied reference often ends with.
+func singleLine(s string) string {
+	return strings.NewReplacer("\r", "", "\n", "").Replace(strings.TrimSpace(s))
+}
+
 func (c *Connect) toggle() {
 	switch c.focus {
 	case fTLS:

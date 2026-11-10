@@ -127,6 +127,19 @@ func (h *Help) rebuild() {
 	h.offset = 0
 }
 
+// Paste types pasted text into the filter while it has focus.
+func (h Help) Paste(msg tea.PasteMsg) Help {
+	if !h.filter.Focused() {
+		return h
+	}
+	before := h.filter.Value()
+	h.filter, _ = h.filter.Update(tea.PasteMsg{Content: singleLine(msg.Content)})
+	if h.filter.Value() != before {
+		h.rebuild()
+	}
+	return h
+}
+
 // Filtering reports whether the filter input has focus, so every key,
 // q and ? included, goes to it.
 func (h Help) Filtering() bool { return h.filter.Focused() }

@@ -263,3 +263,18 @@ func TestHelp_FilterResetsScroll(t *testing.T) {
 		t.Errorf("offset = %d after filtering, want 0", h.offset)
 	}
 }
+
+func TestHelp_PasteIntoFilter(t *testing.T) {
+	h := NewHelp(sections())
+	h.SetSize(80, 40)
+	if h.Paste(tea.PasteMsg{Content: "b2"}).filter.Value() != "" {
+		t.Error("paste without the filter focused should do nothing")
+	}
+
+	h, _ = h.Update(keyMsg("/"))
+	h = h.Paste(tea.PasteMsg{Content: "b2\n"})
+
+	if plain := ansi.Strip(h.View()); !strings.Contains(plain, "b2") || strings.Contains(plain, "a0") {
+		t.Errorf("pasted filter not applied:\n%s", plain)
+	}
+}

@@ -646,6 +646,7 @@ How it behaves:
 - **Saving:** the keychain password is stored first, then `config.AppendAccount`, so a saved account always has its password. If appending fails after storing, a keychain entry is left behind, which is harmless.
 - **New accounts** join the sidebar through the startup path, without switching away from an open folder; with none open, their Inbox opens.
 - **`ui.Onboarding`** (`Dial`, `AddAccount`, `StorePassword`) comes from `main`, so the UI still never imports `secret` or `imap`. `main` wraps `secret.ErrNoPassword` in `ui.ErrNeedsPassword`.
+- **Paste:** after your report on 2026-11-10 that the reference couldn't be pasted, pasted text (`tea.PasteMsg`, bracketed paste) is routed to the focused field of the connect form and to the help filter. Surrounding whitespace and line breaks are dropped.
 - **Missing password:** the status line says "<account> needs a password: press A to enter it", and `A` opens a password prompt for that account. Its saved settings are shown read-only, and only a keychain password can be entered, since changing `password_cmd` would mean editing config.toml rather than appending. With no password missing, `A` adds an account. A failed login with a *wrong* password isn't offered a prompt yet.
 
 **Dependencies:** T20, T3, T9

@@ -280,3 +280,13 @@ func TestConnect_KeysGoToTheForm(t *testing.T) {
 		t.Error("ctrl+c should still quit")
 	}
 }
+
+func TestConnect_PasteReachesTheForm(t *testing.T) {
+	m := firstRun(t, newOnboarding(), nil)
+
+	m = send(t, m, tea.PasteMsg{Content: "Pasted Name"})
+
+	if !strings.Contains(plain(m), "Pasted Name") {
+		t.Errorf("paste didn't reach the connect form:\n%s", plain(m))
+	}
+}
