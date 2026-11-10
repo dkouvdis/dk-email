@@ -2,7 +2,7 @@
 
 A keyboard-driven terminal email client for triaging several IMAP accounts (Gmail included). It shows a folders sidebar beside a thread list, opens conversations in a popup, and uses lazygit-style single-key actions.
 
-- Shows each account's folders with unread counts.
+- Shows each account's folders as a tree with unread counts. Special folders (Inbox, Sent, Trash…) stay at the top.
 - Groups replies into threads, ordered by newest activity.
 - Lets you mark read/unread, star, archive, delete (to Trash) and move mail without leaving the keyboard.
 - Has two layouts: narrow (folders │ threads, the default) and list (threads only), toggled with `v`. List is forced below 80 columns.

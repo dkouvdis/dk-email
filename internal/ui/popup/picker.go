@@ -14,10 +14,24 @@ import (
 // Item is one choice in a Picker.
 type Item[T any] struct {
 	Label string
+	// Path replaces Label while filtering, e.g. "Work/Clients" for a
+	// nested folder. Empty means Label.
+	Path  string
+	Depth int // indent level, for nested folders
 	Count int // shown right-aligned when > 0, e.g. unread mail
 	Value T
 	// Current marks the item already in use; the cursor starts on it.
 	Current bool
+	// Disabled items are shown dimmed and can't be chosen, e.g. a parent
+	// that isn't a folder itself. They're hidden while filtering.
+	Disabled bool
+}
+
+func (it Item[T]) path() string {
+	if it.Path != "" {
+		return it.Path
+	}
+	return it.Label
 }
 
 // Group is a heading with its items, e.g. an account and its folders. Note
@@ -86,11 +100,15 @@ func NewPicker[T any](title string, groups []Group[T]) Picker[T] {
 	return p
 }
 
-// matches reports whether an item's label contains the filter, ignoring case.
-func (p Picker[T]) matches(it Item[T]) bool {
+// shown reports whether an item is listed: every item without a filter,
+// else enabled items whose label contains it, ignoring case.
+func (p Picker[T]) shown(it Item[T]) bool {
 	q := strings.ToLower(strings.TrimSpace(p.filter.Value()))
-	return q == "" || strings.Contains(strings.ToLower(it.Label), q)
+	return q == "" || !it.Disabled && strings.Contains(strings.ToLower(it.Label), q)
 }
+
+// selectable reports whether the cursor can be on an item.
+func (p Picker[T]) selectable(it Item[T]) bool { return !it.Disabled && p.shown(it) }
 
 func (p Picker[T]) filtered() bool { return strings.TrimSpace(p.filter.Value()) != "" }
 
@@ -105,7 +123,7 @@ func (p *Picker[T]) rebuild() {
 	cursor := 0
 	for g, grp := range p.groups {
 		for i, it := range grp.Items {
-			if !p.matches(it) {
+			if !p.selectable(it) {
 				continue
 			}
 			if prev != nil && *prev == (itemRef{g, i}) {
@@ -226,7 +244,11 @@ func (p Picker[T]) lines(width int) []pickerLine {
 	for _, grp := range p.groups {
 		var items []pickerLine
 		for _, it := range grp.Items {
-			if !p.matches(it) {
+			switch {
+			case !p.shown(it):
+				continue
+			case it.Disabled:
+				items = append(items, pickerLine{text: "  " + strings.Repeat("  ", it.Depth) + p.st.dim.Render(it.Label)})
 				continue
 			}
 			isCursor := n == p.cursor
@@ -263,13 +285,18 @@ func (p Picker[T]) itemRow(it Item[T], cursor bool, width int) string {
 	if it.Count > 0 {
 		count = fmt.Sprint(it.Count)
 	}
-	label := ansi.Truncate(it.Label, max(width-2-len(count)-1, 1), "…")
-	gap := strings.Repeat(" ", max(width-2-ansi.StringWidth(label)-len(count), 1))
-	row := marker + label + gap + count
+	name, indent := it.Label, strings.Repeat("  ", it.Depth)
+	if p.filtered() {
+		name, indent = it.path(), ""
+	}
+	inner := max(width-2-len(indent), 1)
+	label := ansi.Truncate(name, max(inner-len(count)-1, 1), "…")
+	gap := strings.Repeat(" ", max(inner-ansi.StringWidth(label)-len(count), 1))
+	row := marker + indent + label + gap + count
 	if cursor {
 		return p.cursorSt.Render(ansi.Truncate(row, width, ""))
 	}
-	return marker + label + gap + p.st.key.Render(count)
+	return marker + indent + label + gap + p.st.key.Render(count)
 }
 
 const (
@@ -291,7 +318,8 @@ func (p Picker[T]) contentW() int {
 	for _, g := range p.groups {
 		w = max(w, ansi.StringWidth(g.Name), 2+ansi.StringWidth(g.Note))
 		for _, it := range g.Items {
-			w = max(w, 2+ansi.StringWidth(it.Label)+1+len(fmt.Sprint(it.Count)))
+			count := len(fmt.Sprint(it.Count))
+			w = max(w, 2+2*it.Depth+ansi.StringWidth(it.Label)+1+count, 2+ansi.StringWidth(it.path())+1+count)
 		}
 	}
 	return w

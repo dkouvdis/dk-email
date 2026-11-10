@@ -28,13 +28,10 @@ func (m Model) openPicker() (Model, tea.Cmd) {
 	var groups []popup.Group[pick]
 	for i, a := range m.side.Accounts() {
 		g := popup.Group[pick]{Name: a.Name, Note: a.Note}
-		for _, f := range a.Folders {
-			g.Items = append(g.Items, popup.Item[pick]{
-				Label:   sidebar.Label(f),
-				Count:   f.Unread,
-				Value:   pick{i, f.Name},
-				Current: i == m.open.account && f.Name == m.open.folder,
-			})
+		for _, e := range a.Tree {
+			it := treeItem(i, e)
+			it.Current = e.Folder && i == m.open.account && e.Name == m.open.folder
+			g.Items = append(g.Items, it)
 		}
 		groups = append(groups, g)
 	}
@@ -45,19 +42,36 @@ func (m Model) openPicker() (Model, tea.Cmd) {
 	return m, nil
 }
 
-// openMovePicker lists the open account's other folders; choosing one moves
-// targets there.
+// treeItem is a picker item for one row of an account's folder tree.
+func treeItem(account int, e sidebar.Entry) popup.Item[pick] {
+	return popup.Item[pick]{
+		Label:    e.Label,
+		Path:     e.Path,
+		Depth:    e.Depth,
+		Count:    e.Unread,
+		Value:    pick{account, e.Name},
+		Disabled: !e.Folder,
+	}
+}
+
+// openMovePicker lists the open account's folders; choosing one moves
+// targets there. The open folder is shown dimmed, keeping the tree's shape.
 func (m Model) openMovePicker(targets []mail.Summary) (Model, tea.Cmd) {
 	account := m.open.account
 	a := m.side.Accounts()[account]
 	g := popup.Group[pick]{Name: a.Name}
-	for _, f := range a.Folders {
-		if f.Name == m.open.folder {
-			continue
+	others := 0
+	for _, e := range a.Tree {
+		it := treeItem(account, e)
+		if e.Name == m.open.folder {
+			it.Disabled = true
 		}
-		g.Items = append(g.Items, popup.Item[pick]{Label: sidebar.Label(f), Count: f.Unread, Value: pick{account, f.Name}})
+		if !it.Disabled {
+			others++
+		}
+		g.Items = append(g.Items, it)
 	}
-	if len(g.Items) == 0 {
+	if others == 0 {
 		m.setStatus("No other folder to move to.")
 		return m, nil
 	}

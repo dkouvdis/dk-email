@@ -267,8 +267,12 @@ func TestMove_PickerListsOtherFoldersOfThisAccountOnly(t *testing.T) {
 			t.Errorf("picker missing %q:\n%s", want, v)
 		}
 	}
-	if strings.Contains(v, "Work") || strings.Contains(v, "Archive") || strings.Contains(v, "Inbox") {
-		t.Errorf("picker lists another account's folder or the current one:\n%s", v)
+	if strings.Contains(v, "Work") || strings.Contains(v, "Archive") {
+		t.Errorf("picker lists another account's folder:\n%s", v)
+	}
+	m = pressSettled(t, m, "g")
+	if p, _ := m.picker.Selected(); p.folder == "INBOX" {
+		t.Error("the current folder can be chosen as the move target")
 	}
 }
 

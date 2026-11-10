@@ -2,6 +2,7 @@ package sidebar
 
 import (
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 
@@ -394,5 +395,84 @@ func TestView_ScrollingUpShowsTheAccountName(t *testing.T) {
 	}
 	if got := top(); got != "Work" {
 		t.Errorf("on Work's first folder, top row = %q, want the Work header:\n%s", got, ansi.Strip(m.View(22, 6)))
+	}
+}
+
+func nestedFolders() []mail.Folder {
+	return []mail.Folder{
+		{Name: "Work/Clients/Acme", Delimiter: "/", Unread: 2},
+		{Name: "INBOX", Delimiter: "/", Role: mail.RoleInbox},
+		{Name: "Receipts", Delimiter: "/"},
+		{Name: "Work/Clients", Delimiter: "/"},
+		{Name: "INBOX/Later", Delimiter: "/"},
+		{Name: "[Gmail]/Sent Mail", Delimiter: "/", Role: mail.RoleSent},
+		{Name: "[Gmail]/Starred", Delimiter: "/"},
+		{Name: "Work/Admin", Delimiter: "/"},
+	}
+}
+
+func TestTree_NestsByPathWithSpecialFoldersFlatOnTop(t *testing.T) {
+	got := Tree(nestedFolders())
+
+	want := []Entry{
+		{Name: "INBOX", Label: "Inbox", Path: "Inbox", Depth: 0, Folder: true},
+		{Name: "INBOX/Later", Label: "Later", Path: "INBOX/Later", Depth: 1, Folder: true},
+		{Name: "[Gmail]/Sent Mail", Label: "Sent Mail", Path: "Sent Mail", Depth: 0, Folder: true},
+		{Name: "[Gmail]", Label: "[Gmail]", Path: "[Gmail]", Depth: 0},
+		{Name: "[Gmail]/Starred", Label: "Starred", Path: "[Gmail]/Starred", Depth: 1, Folder: true},
+		{Name: "Receipts", Label: "Receipts", Path: "Receipts", Depth: 0, Folder: true},
+		{Name: "Work", Label: "Work", Path: "Work", Depth: 0},
+		{Name: "Work/Admin", Label: "Admin", Path: "Work/Admin", Depth: 1, Folder: true},
+		{Name: "Work/Clients", Label: "Clients", Path: "Work/Clients", Depth: 1, Folder: true},
+		{Name: "Work/Clients/Acme", Label: "Acme", Path: "Work/Clients/Acme", Depth: 2, Folder: true, Unread: 2},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("Tree = %d entries, want %d:\n%+v", len(got), len(want), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("entry %d = %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}
+
+func TestTree_DotDelimiterAndNoDelimiter(t *testing.T) {
+	got := Tree([]mail.Folder{{Name: "Lists.Go", Delimiter: "."}, {Name: "Lists", Delimiter: "."}, {Name: "a/b"}})
+
+	if len(got) != 3 || got[0].Label != "a/b" || got[0].Depth != 0 || got[1].Name != "Lists" || got[2].Label != "Go" || got[2].Depth != 1 || got[2].Path != "Lists/Go" {
+		t.Errorf("Tree = %+v", got)
+	}
+}
+
+func TestView_ShowsNestedFoldersIndentedAndSkipsParentsThatArentFolders(t *testing.T) {
+	m := New([]string{"Personal"}).SetFolders(0, nestedFolders(), nil)
+
+	lines := strings.Split(view(m), "\n")
+	for _, want := range []string{"    Later", "    Starred", "  Work", "    Admin", "      Acme"} {
+		if !slices.ContainsFunc(lines, func(l string) bool { return strings.HasPrefix(l, want) }) {
+			t.Errorf("no line starting %q:\n%s", want, strings.Join(lines, "\n"))
+		}
+	}
+
+	m, _ = m.Update(press("G"))
+	for _, want := range []string{"Work/Clients", "Work/Admin", "Receipts"} {
+		m, _ = m.Update(press("k"))
+		if _, f := m.Cursor(); f != want {
+			t.Fatalf("k moved to %q, want %q (the Work parent isn't a folder)", f, want)
+		}
+	}
+}
+
+func TestFilter_ShowsMatchesWithTheirPath(t *testing.T) {
+	m := New([]string{"Personal"}).SetFolders(0, nestedFolders(), nil)
+
+	m = typeKeys(m, "/acme")
+
+	if v := view(m); !strings.Contains(v, "Work/Clients/Acme") || strings.Contains(v, "  Work\n") {
+		t.Errorf("want the match with its path and no parents:\n%s", v)
+	}
+	m = typeKeys(New([]string{"Personal"}).SetFolders(0, nestedFolders(), nil), "/work")
+	if v := view(m); !strings.Contains(v, "No folders match") {
+		t.Errorf("a parent that isn't a folder shouldn't match:\n%s", v)
 	}
 }

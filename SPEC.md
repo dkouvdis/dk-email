@@ -27,6 +27,15 @@ There's no reading pane. In both layouts, `enter` opens the conversation in a ce
 
 Every mode includes a bottom **hint bar** showing the keys for the focused pane, plus a status line for errors and progress (e.g. "Archiving…"). The hint bar is written lazygit style, description first and then the key (`Archive: e | Delete: d | … | Help: ? | Quit: q`), all in a soft blue (256-colour 110) so it reads easily on a dark background.
 
+### Folder tree
+
+The sidebar and the folder pickers show each account's folders as a tree, indented two spaces per level (added 2026-11-10 at your request):
+
+- Special folders (Inbox, Drafts, Sent, Archive, All Mail, Trash, Junk) stay at the top level in that order, so Gmail's `[Gmail]/…` folders don't nest. Folders inside a special folder, such as `INBOX/Later`, nest under it.
+- Other folders follow, nested by path and sorted by name at each level. A parent that isn't a folder itself (e.g. `Work` when only `Work/Clients` exists, or Gmail's `[Gmail]` above Starred and Important) is shown dimmed and can't be selected.
+- The tree is always expanded. While a `/` filter is typed, matches are listed flat with their full path (`Work/Clients/Acme`).
+- In the move picker (`m`), the open folder is shown dimmed rather than left out, so the tree keeps its shape.
+
 ### Thread list row
 
 ` ● *  Sender name            Subject (n)                     12:00` for an unread, starred thread of n messages, with one space of left padding. A collapsed thread shows its latest message. `space` expands it to show one indented row per message.

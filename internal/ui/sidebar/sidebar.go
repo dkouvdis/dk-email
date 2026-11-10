@@ -42,6 +42,7 @@ type account struct {
 	state   state
 	err     error
 	folders []mail.Folder
+	tree    []Entry // folders arranged for display, see Tree
 }
 
 type ref struct {
@@ -122,10 +123,11 @@ func (m Model) Paste(msg tea.PasteMsg) Model {
 
 func (m Model) query() string { return strings.ToLower(strings.TrimSpace(m.filter.Value())) }
 
-// matches reports whether a folder's label contains the filter, ignoring case.
-func (m Model) matches(f mail.Folder) bool {
+// matches reports whether a folder's label contains the filter, ignoring
+// case. Parents that aren't folders never match.
+func (m Model) matches(e Entry) bool {
 	q := m.query()
-	return q == "" || strings.Contains(strings.ToLower(Label(f)), q)
+	return e.Folder && (q == "" || strings.Contains(strings.ToLower(e.Label), q))
 }
 
 // refilter moves the cursor to the first match if its folder no longer matches.
@@ -201,6 +203,7 @@ func (m Model) SetFolders(i int, folders []mail.Folder, err error) Model {
 	if i < 0 || i >= len(m.accounts) {
 		return m
 	}
+	m.accounts = slices.Clone(m.accounts)
 	a := &m.accounts[i]
 	a.err = err
 	if err != nil {
@@ -211,7 +214,7 @@ func (m Model) SetFolders(i int, folders []mail.Folder, err error) Model {
 		a.folders = slices.Clone(folders)
 		slices.SortStableFunc(a.folders, compareFolders)
 	}
-	m.accounts = slices.Clone(m.accounts)
+	a.tree = Tree(a.folders)
 
 	if !slices.Contains(m.selectable(), m.cursor) {
 		m.cursor = noRef
@@ -245,14 +248,15 @@ type Account struct {
 	Name string
 	// Note explains a missing folder list: connecting, an error, or no folders.
 	Note    string
-	Folders []mail.Folder // in display order
+	Folders []mail.Folder
+	Tree    []Entry // Folders arranged for display
 }
 
 // Accounts lists every account with its folders in display order.
 func (m Model) Accounts() []Account {
 	out := make([]Account, len(m.accounts))
 	for i, a := range m.accounts {
-		out[i] = Account{Name: a.name, Folders: slices.Clone(a.folders)}
+		out[i] = Account{Name: a.name, Folders: slices.Clone(a.folders), Tree: slices.Clone(a.tree)}
 		switch {
 		case a.state == connecting:
 			out[i].Note = "connecting…"
@@ -284,6 +288,7 @@ func (m Model) AdjustUnread(account int, name string, delta int) Model {
 			a.folders[i].Unread = max(a.folders[i].Unread+delta, 0)
 		}
 	}
+	a.tree = Tree(a.folders)
 	return m
 }
 
@@ -363,9 +368,9 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 func (m Model) selectable() []ref {
 	var out []ref
 	for i, a := range m.accounts {
-		for _, f := range a.folders {
-			if m.matches(f) {
-				out = append(out, ref{i, f.Name})
+		for _, e := range a.tree {
+			if m.matches(e) {
+				out = append(out, ref{i, e.Name})
 			}
 		}
 	}
@@ -408,9 +413,14 @@ func (m Model) rows(width int) []row {
 			if len(a.folders) == 0 {
 				rows = append(rows, row{text: m.st.dim.Render("  no folders"), ref: noRef})
 			}
-			for _, f := range a.folders {
-				r := ref{i, f.Name}
-				rows = append(rows, row{text: m.folderRow(f, r, width), ref: r})
+			for _, e := range a.tree {
+				if !e.Folder {
+					indent := strings.Repeat("  ", e.Depth)
+					rows = append(rows, row{text: "  " + indent + m.st.dim.Render(ansi.Truncate(e.Label, max(width-2-len(indent), 1), "…")), ref: noRef})
+					continue
+				}
+				r := ref{i, e.Name}
+				rows = append(rows, row{text: m.folderRow(e.Label, e.Depth, e.Unread, r, width), ref: r})
 			}
 		}
 	}
@@ -421,10 +431,10 @@ func (m Model) filteredRows(width int) []row {
 	var rows []row
 	for i, a := range m.accounts {
 		var folders []row
-		for _, f := range a.folders {
-			if m.matches(f) {
-				r := ref{i, f.Name}
-				folders = append(folders, row{text: m.folderRow(f, r, width), ref: r})
+		for _, e := range a.tree {
+			if m.matches(e) {
+				r := ref{i, e.Name}
+				folders = append(folders, row{text: m.folderRow(e.Path, 0, e.Unread, r, width), ref: r})
 			}
 		}
 		if len(folders) == 0 {
@@ -442,28 +452,31 @@ func (m Model) filteredRows(width int) []row {
 	return rows
 }
 
-func (m Model) folderRow(f mail.Folder, r ref, width int) string {
+// folderRow is one folder: the open marker, the label indented by depth,
+// and the unread count right-aligned.
+func (m Model) folderRow(name string, depth, unread int, r ref, width int) string {
 	marker := "  "
 	if r == m.open {
 		marker = m.st.open.Render("▶ ")
 	}
+	indent := strings.Repeat("  ", depth)
 	count := ""
-	if f.Unread > 0 {
-		count = fmt.Sprint(f.Unread)
+	if unread > 0 {
+		count = fmt.Sprint(unread)
 	}
-	labelW := max(width-2-len(count)-1, 1)
-	label := ansi.Truncate(Label(f), labelW, "…")
-	gap := strings.Repeat(" ", max(width-2-ansi.StringWidth(label)-len(count), 1))
+	inner := max(width-2-len(indent), 1)
+	label := ansi.Truncate(name, max(inner-len(count)-1, 1), "…")
+	gap := strings.Repeat(" ", max(inner-ansi.StringWidth(label)-len(count), 1))
 
 	text := label
-	if f.Unread > 0 {
+	if unread > 0 {
 		text = m.st.unread.Render(label)
 	}
 	line := text + gap + m.st.count.Render(count)
 	if r == m.cursor {
-		line = m.st.cursor.Bold(f.Unread > 0).Render(label + gap + count)
+		line = m.st.cursor.Bold(unread > 0).Render(label + gap + count)
 	}
-	return marker + line
+	return marker + indent + line
 }
 
 // Label is how a folder is shown: "Inbox" for INBOX, otherwise the last

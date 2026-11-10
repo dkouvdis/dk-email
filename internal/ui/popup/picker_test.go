@@ -2,6 +2,7 @@ package popup
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -263,5 +264,41 @@ func TestPicker_ScrollingUpShowsTheAccountName(t *testing.T) {
 	lines := strings.Split(ansi.Strip(p.View()), "\n")
 	if first := strings.Trim(lines[4], "│ "); first != "Personal" {
 		t.Errorf("first item line = %q, want the Personal heading:\n%s", first, strings.Join(lines, "\n"))
+	}
+}
+
+func TestPicker_NestedAndDisabledItems(t *testing.T) {
+	p := NewPicker("Go to folder", []Group[string]{{Name: "Personal", Items: []Item[string]{
+		{Label: "Inbox", Value: "INBOX", Path: "Inbox"},
+		{Label: "Work", Value: "Work", Path: "Work", Disabled: true},
+		{Label: "Clients", Value: "Work/Clients", Path: "Work/Clients", Depth: 1},
+		{Label: "Acme", Value: "Work/Clients/Acme", Path: "Work/Clients/Acme", Depth: 2, Count: 3},
+	}}})
+	p.SetSize(80, 30)
+
+	lines := strings.Split(ansi.Strip(p.View()), "\n")
+	for _, want := range []string{"│   Work", "│     Clients", "│       Acme"} {
+		if !slices.ContainsFunc(lines, func(l string) bool { return strings.HasPrefix(l, want) }) {
+			t.Errorf("no line starting %q:\n%s", want, strings.Join(lines, "\n"))
+		}
+	}
+	if !rowEndsWith(lines, "Acme", "3") {
+		t.Errorf("nested count not right-aligned:\n%s", strings.Join(lines, "\n"))
+	}
+
+	p, _ = p.Update(pickerKey("j"))
+	if v, _ := p.Selected(); v != "Work/Clients" {
+		t.Errorf("j moved to %q, want to skip the disabled Work", v)
+	}
+
+	p = typeKeys(p, "/acme")
+	if plain := ansi.Strip(p.View()); !strings.Contains(plain, "▸ Work/Clients/Acme") || strings.Contains(plain, "  Work\n") {
+		t.Errorf("while filtering, want the match with its path:\n%s", plain)
+	}
+	q := NewPicker("x", p.groups)
+	q.SetSize(80, 30)
+	q = typeKeys(q, "/work")
+	if !strings.Contains(ansi.Strip(q.View()), "No folders match") {
+		t.Errorf("a disabled item shouldn't match:\n%s", ansi.Strip(q.View()))
 	}
 }
