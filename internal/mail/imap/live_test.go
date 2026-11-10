@@ -120,7 +120,7 @@ func TestLiveSummaries(t *testing.T) {
 			mark = "●"
 		}
 		if s.Flagged {
-			mark += "✱"
+			mark += "*"
 		} else {
 			mark += " "
 		}

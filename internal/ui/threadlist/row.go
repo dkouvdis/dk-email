@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	// "● ✱  ": unread dot, star, then two spaces before the sender.
-	markersW   = 5
+	// " ● *  ": left padding, unread dot, star, then two spaces before the sender.
+	markersW   = 6
 	msgIndent  = "  "
 	minSender  = 8
 	maxSender  = 24
@@ -63,7 +63,7 @@ func (st rowStyles) render(r rowData, width, dateW int, cursor bool) string {
 		dot = "●"
 	}
 	if r.starred {
-		star = "✱"
+		star = "*"
 	}
 
 	sender := r.sender
@@ -97,7 +97,7 @@ func (st rowStyles) render(r rowData, width, dateW int, cursor bool) string {
 	if r.message {
 		subject = st.dim.Render(subject)
 	}
-	return dot + " " + star + "  " + sender + " " + subject + " " + st.dim.Render(date)
+	return " " + dot + " " + star + "  " + sender + " " + subject + " " + st.dim.Render(date)
 }
 
 // cursorRow renders the selected row white on grey, keeping the unread dot
@@ -115,7 +115,7 @@ func (st rowStyles) cursorRow(r rowData, dot, star, rest string) string {
 	} else {
 		star = st.cursor.Render(star)
 	}
-	return dot + st.cursor.Render(" ") + star + text.Render(rest)
+	return st.cursor.Render(" ") + dot + st.cursor.Render(" ") + star + text.Render(rest)
 }
 
 // formatDate shows the time for today, "Jan 2" earlier this year, and the

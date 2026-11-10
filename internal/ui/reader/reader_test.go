@@ -246,7 +246,7 @@ func TestCurrent(t *testing.T) {
 
 func TestSetFlaggedAndRemove(t *testing.T) {
 	m := open(conversation(), 0).SetFlagged([]mail.UID{1}, true)
-	if !strings.Contains(view(m), "✱") {
+	if !strings.Contains(view(m), "*") {
 		t.Errorf("starred message has no star:\n%s", view(m))
 	}
 

@@ -28,9 +28,9 @@ Every mode includes a bottom **hint bar** showing the keys for the focused pane,
 
 ### Thread list row
 
-`● ✱  Sender name            Subject (n)                     12:00` for an unread, starred thread of n messages. A collapsed thread shows its latest message. `space` expands it to show one indented row per message.
+` ● *  Sender name            Subject (n)                     12:00` for an unread, starred thread of n messages, with one space of left padding. A collapsed thread shows its latest message. `space` expands it to show one indented row per message.
 
-The selected thread row and the selected sidebar folder are drawn in white text on a grey background (256-colour 238), not in reverse video. The unread dot and the yellow `✱` star keep their colours on the selected row.
+The selected thread row and the selected sidebar folder are drawn in white text on a grey background (256-colour 238), not in reverse video. The unread dot and the yellow `*` star keep their colours on the selected row.
 
 ### Reading pane
 
