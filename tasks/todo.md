@@ -416,8 +416,8 @@ Every task also meets the standing bar before it counts as done:
 
 ### ✅ Checkpoint 2: Read-only client
 
-- [ ] All tests pass and CI is green.
-- [ ] Manual check against real Gmail: browse folders and read threads in the wide, narrow and list + popup layouts, across two accounts.
+- [x] All tests pass and CI is green.
+- [ ] Manual check against real Gmail: browse folders and read threads in the narrow (folders │ threads) and list layouts, across two accounts.
 - [ ] **You review the read-only client.** No tag yet: the release pipeline (T15) moved to Phase 5.
 
 ---
@@ -687,7 +687,7 @@ Add `release.yml`, triggered by `v*` tags, which runs the tests and then `gorele
 
 **Verification:**
 
-- [ ] CI is green, including `goreleaser check`.
+- [x] CI is green, including `goreleaser check`.
 - [x] Local snapshot build, if `goreleaser` is installed, or a manual run of the workflow on a branch with `--snapshot`.
 
 **Notes:**
