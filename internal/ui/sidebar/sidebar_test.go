@@ -17,8 +17,17 @@ func press(k string) tea.KeyPressMsg {
 		return tea.KeyPressMsg{Code: tea.KeyEnter}
 	case "down":
 		return tea.KeyPressMsg{Code: tea.KeyDown}
+	case "esc":
+		return tea.KeyPressMsg{Code: tea.KeyEscape}
 	}
 	return tea.KeyPressMsg{Code: []rune(k)[0], Text: k}
+}
+
+func typeKeys(m Model, text string) Model {
+	for _, r := range text {
+		m, _ = m.Update(press(string(r)))
+	}
+	return m
 }
 
 func gmailFolders() []mail.Folder {
@@ -282,5 +291,78 @@ func TestView_CursorFolderIsPurpleNotReversed(t *testing.T) {
 	}
 	if strings.Contains(row, "\x1b[7m") || strings.Contains(row, ";7m") {
 		t.Errorf("cursor folder should not use reverse video: %q", row)
+	}
+}
+
+func TestFilter_SlashFiltersFoldersAndEnterOpens(t *testing.T) {
+	m := New([]string{"Personal", "Work"})
+	m = m.SetFolders(0, gmailFolders(), nil)
+	m = m.SetFolders(1, []mail.Folder{{Name: "INBOX", Role: mail.RoleInbox}, {Name: "Clients"}}, nil)
+
+	m = typeKeys(m, "/MAIL")
+
+	if !m.Filtering() {
+		t.Fatal("/ didn't start filtering")
+	}
+	v := view(m)
+	for _, want := range []string{"/ MAIL", "Personal", "Sent Mail", "All Mail"} {
+		if !strings.Contains(v, want) {
+			t.Errorf("filtered view missing %q:\n%s", want, v)
+		}
+	}
+	for _, gone := range []string{"Inbox", "Receipts", "Work", "Clients"} {
+		if strings.Contains(v, gone) {
+			t.Errorf("filtered view still shows %q:\n%s", gone, v)
+		}
+	}
+	if a, f := m.Cursor(); a != 0 || f != "[Gmail]/Sent Mail" {
+		t.Errorf("cursor on %d/%q, want the first match", a, f)
+	}
+
+	m, _ = m.Update(press("down"))
+	m, cmd := m.Update(press("enter"))
+	if cmd == nil {
+		t.Fatal("enter while filtering returned no command")
+	}
+	if sel, _ := cmd().(SelectedMsg); sel.Folder != "[Gmail]/All Mail" {
+		t.Errorf("enter opened %+v, want All Mail", sel)
+	}
+	if m.Filtering() || !strings.Contains(view(m), "Clients") {
+		t.Errorf("enter should clear the filter and show every folder again:\n%s", view(m))
+	}
+	if _, f := m.Cursor(); f != "[Gmail]/All Mail" {
+		t.Errorf("cursor on %q after opening, want All Mail", f)
+	}
+}
+
+func TestFilter_TakesEveryKeyAndEscClears(t *testing.T) {
+	m := New([]string{"Personal"}).SetFolders(0, gmailFolders(), nil)
+
+	m = typeKeys(m, "/jkzz")
+
+	if v := view(m); !strings.Contains(v, "No folders match") || !strings.Contains(v, "/ jkzz") {
+		t.Errorf("want the typed filter and a no-match note:\n%s", v)
+	}
+	if _, cmd := m.Update(press("enter")); cmd != nil {
+		t.Error("enter with no matches should do nothing")
+	}
+	m, _ = m.Update(press("esc"))
+	if m.Filtering() || !strings.Contains(view(m), "Receipts") || strings.Contains(view(m), "/ ") {
+		t.Errorf("esc should clear the filter:\n%s", view(m))
+	}
+}
+
+func TestFilter_Paste(t *testing.T) {
+	m := New([]string{"Personal"}).SetFolders(0, gmailFolders(), nil)
+
+	m = m.Paste(tea.PasteMsg{Content: "spam"})
+	if m.Filtering() {
+		t.Error("paste started a filter without /")
+	}
+	m, _ = m.Update(press("/"))
+	m = m.Paste(tea.PasteMsg{Content: "spam"})
+
+	if _, f := m.Cursor(); f != "[Gmail]/Spam" || strings.Contains(view(m), "Inbox") {
+		t.Errorf("paste didn't filter to Spam (cursor %q):\n%s", f, view(m))
 	}
 }

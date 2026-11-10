@@ -201,6 +201,8 @@ Actions on a **collapsed thread** apply to every message in it. On an expanded r
 
 The **`?` help popup** is sized to its content, groups keys into sections, and scrolls with `j`/`k`, `↑`/`↓`, `pgup`/`pgdn` and `g`/`G`. Inside it, `/` filters the keys by key or description.
 
+In the folders sidebar and the folder pickers (`a` in list mode, `m` for move), **`/` filters folders** by name, ignoring case. Only matching folders show, under their account, and accounts with no match are hidden. While typing, every key goes to the filter (`q` included): `↑`/`↓` move between matches, `enter` opens the highlighted folder and clears the filter, and `esc` clears it. The picker keeps its size while filtering. Added 2026-11-10 at your request.
+
 ## Versioning & Release
 
 - **Version scheme: [SemVer 2.0](https://semver.org).** Tags are `vMAJOR.MINOR.PATCH`, with optional pre-release suffixes: `v0.1.0-beta.1`, `v0.1.0-rc.1`, then `v0.1.0`.

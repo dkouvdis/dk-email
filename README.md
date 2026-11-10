@@ -177,6 +177,7 @@ The Bridge password (from Bridge's mailbox details, not your Proton password) go
 - Actions on a collapsed thread apply to every message in it. On an expanded row, or in the reader, they apply to the selected message. Opening a message marks it read.
 - `enter` opens the conversation in a popup, and `esc` closes it. In the reader, `pgup`/`pgdn` (or `ctrl+u`/`ctrl+d`) scroll by a page, and `space` expands or collapses every message.
 - In the `?` help popup, `/` filters keys by key or description.
+- In the folders sidebar and the folder pickers (`a` in list mode, `m` to move), `/` filters folders by name. While typing, every key goes to the filter: `↑`/`↓` move between matches, `enter` opens the highlighted folder, and `esc` clears the filter.
 - In the connect popup, `tab`/`↓` and `shift+tab`/`↑` move between fields, and `←`/`→` or `space` change a choice. `enter` submits and `esc` cancels.
 
 Below 80 columns, list mode is forced.

@@ -29,6 +29,7 @@
 │                      ││               │                                      │                                       │
 │                      ││               │ Accounts & view                      │                                       │
 │                      ││               │   a           accounts               │                                       │
+│                      ││               │   /           filter folders         │                                       │
 │                      ││               │   A           connect account        │                                       │
 │                      ││               │   v           split/list             │                                       │
 │                      ││               │                                      │                                       │
@@ -40,7 +41,6 @@
 │                      ││               │                                      │                                       │
 │                      ││               │ / filter · esc/q close               │                                       │
 │                      ││               ╰──────────────────────────────────────╯                                       │
-│                      ││                                                                                              │
 │                      ││                                                                                              │
 │                      ││                                                                                              │
 │                      ││                                                                                              │

@@ -3,16 +3,16 @@
 │ ▶ Inbox            2 ││  ●    Bob     │ Keys                      esc close  │                                 13:30 │
 │   Sent Mail          ││  ●    Carol   │ / press / to filter by key or descr… │                                 Nov 8 │
 │   All Mail           ││               │                                      │                                       │
-│   Trash              ││               │   space       expand                 │                                       │
-│   Receipts         1 ││               │   u           read/unread            │                                       │
-│                      ││               │   s           star                   │                                       │
-│ Work                 ││               │   e           archive                │                                       │
-│   Inbox            1 ││               │   d           delete                 │                                       │
-│   Archive            ││               │   m           move                   │                                       │
-│                      ││               │   r           refresh                │                                       │
+│   Trash              ││               │   u           read/unread            │                                       │
+│   Receipts         1 ││               │   s           star                   │                                       │
+│                      ││               │   e           archive                │                                       │
+│ Work                 ││               │   d           delete                 │                                       │
+│   Inbox            1 ││               │   m           move                   │                                       │
+│   Archive            ││               │   r           refresh                │                                       │
 │                      ││               │                                      │                                       │
-│                      ││               │ Accounts & view                    ┃ │                                       │
+│                      ││               │ Accounts & view                      │                                       │
 │                      ││               │   a           accounts             ┃ │                                       │
+│                      ││               │   /           filter folders       ┃ │                                       │
 │                      ││               │   A           connect account      ┃ │                                       │
 │                      ││               │   v           split/list           ┃ │                                       │
 │                      ││               │                                    ┃ │                                       │

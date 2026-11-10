@@ -11,6 +11,7 @@ import (
 
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/spinner"
+	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -50,7 +51,7 @@ type ref struct {
 
 var noRef = ref{account: -1}
 
-type keys struct{ up, down, top, bottom, open key.Binding }
+type keys struct{ up, down, top, bottom, open, filter, clear, arrowUp, arrowDown key.Binding }
 
 type styles struct {
 	header, folder, unread, count, cursor, open, dim, err lipgloss.Style
@@ -63,6 +64,7 @@ type Model struct {
 	offset   int
 	height   int
 	spinner  spinner.Model
+	filter   textinput.Model
 	keys     keys
 	st       styles
 }
@@ -78,6 +80,11 @@ func New(names []string) Model {
 			top:    key.NewBinding(key.WithKeys("g", "home")),
 			bottom: key.NewBinding(key.WithKeys("G", "end")),
 			open:   key.NewBinding(key.WithKeys("enter")),
+			filter: key.NewBinding(key.WithKeys("/")),
+			clear:  key.NewBinding(key.WithKeys("esc")),
+			// While filtering, j and k are text, so only the arrows move.
+			arrowUp:   key.NewBinding(key.WithKeys("up")),
+			arrowDown: key.NewBinding(key.WithKeys("down")),
 		},
 		st: styles{
 			header: lipgloss.NewStyle().Bold(true),
@@ -90,10 +97,85 @@ func New(names []string) Model {
 			err:    lipgloss.NewStyle().Foreground(lipgloss.Color("203")),
 		},
 	}
+	m.filter = textinput.New()
+	m.filter.Prompt = "/ "
 	for _, n := range names {
 		m.accounts = append(m.accounts, account{name: n})
 	}
 	return m
+}
+
+// Filtering reports whether the folder filter has focus, so every key, q
+// included, goes to it.
+func (m Model) Filtering() bool { return m.filter.Focused() }
+
+// Paste types pasted text into the filter while it has focus.
+func (m Model) Paste(msg tea.PasteMsg) Model {
+	if !m.filter.Focused() {
+		return m
+	}
+	content := strings.Join(strings.Fields(msg.Content), " ")
+	m.filter, _ = m.filter.Update(tea.PasteMsg{Content: content})
+	m.refilter()
+	return m
+}
+
+func (m Model) query() string { return strings.ToLower(strings.TrimSpace(m.filter.Value())) }
+
+// matches reports whether a folder's label contains the filter, ignoring case.
+func (m Model) matches(f mail.Folder) bool {
+	q := m.query()
+	return q == "" || strings.Contains(strings.ToLower(Label(f)), q)
+}
+
+// refilter moves the cursor to the first match if its folder no longer matches.
+func (m *Model) refilter() {
+	if sel := m.selectable(); len(sel) > 0 && !slices.Contains(sel, m.cursor) {
+		m.cursor = sel[0]
+	}
+	m.offset = 0
+	m.ensureVisible()
+}
+
+func (m *Model) clearFilter() {
+	m.filter.Reset()
+	m.filter.Blur()
+	m.ensureVisible()
+}
+
+// handleFilterKey types into the filter. ↑/↓ move between matches, enter
+// opens the folder under the cursor and clears the filter, esc clears it.
+func (m Model) handleFilterKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	sel := m.selectable()
+	i := slices.Index(sel, m.cursor)
+	switch {
+	case key.Matches(msg, m.keys.clear):
+		m.clearFilter()
+		return m, nil
+	case key.Matches(msg, m.keys.open):
+		if i < 0 {
+			return m, nil
+		}
+		c := m.cursor
+		m.clearFilter()
+		return m, func() tea.Msg { return SelectedMsg{Account: c.account, Folder: c.folder} }
+	case key.Matches(msg, m.keys.arrowUp):
+		i--
+	case key.Matches(msg, m.keys.arrowDown):
+		i++
+	default:
+		before := m.filter.Value()
+		m.filter, _ = m.filter.Update(msg)
+		if m.filter.Value() != before {
+			m.refilter()
+		}
+		return m, nil
+	}
+	if len(sel) > 0 {
+		m.cursor = sel[min(max(i, 0), len(sel)-1)]
+		m.ensureVisible()
+	}
+	return m, nil
 }
 
 // AddAccount adds an account at the end, already connected with folders
@@ -244,6 +326,14 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 }
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	if m.filter.Focused() {
+		return m.handleFilterKey(msg)
+	}
+	if key.Matches(msg, m.keys.filter) {
+		m.filter.Focus()
+		m.ensureVisible()
+		return m, nil
+	}
 	sel := m.selectable()
 	if len(sel) == 0 {
 		return m, nil
@@ -269,11 +359,14 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
+// selectable lists the folders the cursor can be on: those matching the filter.
 func (m Model) selectable() []ref {
 	var out []ref
 	for i, a := range m.accounts {
 		for _, f := range a.folders {
-			out = append(out, ref{i, f.Name})
+			if m.matches(f) {
+				out = append(out, ref{i, f.Name})
+			}
 		}
 	}
 	return out
@@ -284,7 +377,13 @@ type row struct {
 	ref  ref // noRef for headers and status lines
 }
 
+// rows lists each account and its folders. While a filter is typed, only
+// matching folders show, under their account, and accounts without a
+// match are left out.
 func (m Model) rows(width int) []row {
+	if m.query() != "" {
+		return m.filteredRows(width)
+	}
 	var rows []row
 	for i, a := range m.accounts {
 		if i > 0 {
@@ -313,6 +412,31 @@ func (m Model) rows(width int) []row {
 				rows = append(rows, row{text: m.folderRow(f, r, width), ref: r})
 			}
 		}
+	}
+	return rows
+}
+
+func (m Model) filteredRows(width int) []row {
+	var rows []row
+	for i, a := range m.accounts {
+		var folders []row
+		for _, f := range a.folders {
+			if m.matches(f) {
+				r := ref{i, f.Name}
+				folders = append(folders, row{text: m.folderRow(f, r, width), ref: r})
+			}
+		}
+		if len(folders) == 0 {
+			continue
+		}
+		if len(rows) > 0 {
+			rows = append(rows, row{ref: noRef})
+		}
+		rows = append(rows, row{text: m.st.header.Render(ansi.Truncate(a.name, width, "…")), ref: noRef})
+		rows = append(rows, folders...)
+	}
+	if len(rows) == 0 {
+		rows = []row{{text: m.st.dim.Render("No folders match"), ref: noRef}}
 	}
 	return rows
 }
@@ -361,10 +485,16 @@ func (m Model) View(width, height int) string {
 	if width <= 0 || height <= 0 {
 		return ""
 	}
+	var lines []string
+	if m.filter.Focused() {
+		f := m.filter
+		f.SetWidth(max(width-ansi.StringWidth(f.Prompt)-1, 1))
+		lines = append(lines, ansi.Truncate(f.View(), width, "…"))
+		height--
+	}
 	rows := m.rows(width)
 	offset := clampOffset(m.offset, cursorRow(rows, m.cursor), height, len(rows))
-	end := min(offset+height, len(rows))
-	lines := make([]string, 0, end-offset)
+	end := min(offset+max(height, 0), len(rows))
 	for _, r := range rows[offset:end] {
 		lines = append(lines, ansi.Truncate(r.text, width, ""))
 	}
@@ -372,11 +502,15 @@ func (m Model) View(width, height int) string {
 }
 
 func (m *Model) ensureVisible() {
-	if m.height <= 0 {
+	h := m.height
+	if m.filter.Focused() {
+		h--
+	}
+	if h <= 0 {
 		return
 	}
 	rows := m.rows(1)
-	m.offset = clampOffset(m.offset, cursorRow(rows, m.cursor), m.height, len(rows))
+	m.offset = clampOffset(m.offset, cursorRow(rows, m.cursor), h, len(rows))
 }
 
 func cursorRow(rows []row, c ref) int {

@@ -1,7 +1,9 @@
 package ui
 
 import (
+	tea "charm.land/bubbletea/v2"
 	"errors"
+	"github.com/charmbracelet/x/ansi"
 	"strings"
 	"testing"
 )
@@ -117,5 +119,68 @@ func TestHeader_UnreadCountFollowsReading(t *testing.T) {
 
 	if !strings.Contains(plain(m), "Personal › Inbox · 1 unread") {
 		t.Errorf("header count didn't follow reading:\n%s", plain(m))
+	}
+}
+
+func TestFolderFilter_SidebarTakesEveryKeyAndOpensTheMatch(t *testing.T) {
+	f := newFixture()
+	m := started(t, f, 160, 30)
+
+	for _, k := range []string{"a", "/", "q", "v", "r", "?"} {
+		m = pressSettled(t, m, k)
+	}
+	if !m.side.Filtering() || m.showHelp || m.mode != ModeSplit {
+		t.Fatalf("global keys leaked out of the sidebar filter: filtering %v help %v mode %v", m.side.Filtering(), m.showHelp, m.mode)
+	}
+	if !strings.Contains(plain(m), "/ qvr?") {
+		t.Errorf("filter didn't get the typed keys:\n%s", plain(m))
+	}
+
+	m = send(t, m, press("esc"), press("/"), tea.PasteMsg{Content: "rece"})
+	m = pressSettled(t, m, "enter")
+
+	if m.open.folder != "Receipts" || m.side.Filtering() {
+		t.Errorf("open %q, filtering %v; want Receipts opened and the filter cleared", m.open.folder, m.side.Filtering())
+	}
+}
+
+func TestFolderFilter_PickerTakesEveryKey(t *testing.T) {
+	f := newFixture()
+	m := started(t, f, 70, 30)
+
+	m = pressSettled(t, m, "a")
+	m = pressSettled(t, m, "/")
+	m = send(t, m, tea.PasteMsg{Content: "inb"})
+	m = pressSettled(t, m, "q")
+	if !m.showPicker || !m.picker.Filtering() {
+		t.Fatalf("q closed the picker while filtering (open %v)", m.showPicker)
+	}
+	if !strings.Contains(plain(m), "No folders match") {
+		t.Errorf("typed q didn't reach the filter:\n%s", plain(m))
+	}
+
+	m = pressSettled(t, m, "esc")
+	m = pressSettled(t, m, "/")
+	for _, k := range []string{"r", "e", "c"} {
+		m = pressSettled(t, m, k)
+	}
+	m = pressSettled(t, m, "enter")
+	if m.showPicker || m.open.folder != "Receipts" {
+		t.Errorf("picker %v open %q, want Receipts opened", m.showPicker, m.open.folder)
+	}
+}
+
+func TestFolderFilter_KeyIsInHelpAndSidebarHints(t *testing.T) {
+	m := started(t, newFixture(), 160, 30)
+
+	m = pressSettled(t, m, "a")
+	if h := ansi.Strip(m.renderHints()); !strings.Contains(h, "/ filter") {
+		t.Errorf("sidebar hints = %q, want / filter", h)
+	}
+	for _, k := range []string{"?", "/", "f", "o", "l", "d"} {
+		m = pressSettled(t, m, k)
+	}
+	if !strings.Contains(plain(m), "filter folders") {
+		t.Errorf("help popup doesn't list the folder filter:\n%s", plain(m))
 	}
 }

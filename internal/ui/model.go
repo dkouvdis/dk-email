@@ -161,6 +161,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.connectPop = m.connectPop.Paste(msg)
 		case m.showHelp:
 			m.helpPop = m.helpPop.Paste(msg)
+		case m.showPicker:
+			m.picker = m.picker.Paste(msg)
+		case m.focus == PaneSidebar:
+			m.side = m.side.Paste(msg)
 		}
 	case spinner.TickMsg:
 		var cmd tea.Cmd
@@ -238,6 +242,15 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.log.Debug("popup closed", "popup", "help")
 		}
 		return m, nil
+	}
+	// A folder filter takes every key too, q included.
+	if m.showPicker && m.picker.Filtering() {
+		return m.handlePickerKey(msg)
+	}
+	if m.focus == PaneSidebar && m.side.Filtering() && !m.popupOpen() {
+		var cmd tea.Cmd
+		m.side, cmd = m.side.Update(msg)
+		return m, cmd
 	}
 	// q closes the topmost popup before it quits.
 	if key.Matches(msg, m.keys.Quit) {

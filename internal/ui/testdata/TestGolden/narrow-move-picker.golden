@@ -3,18 +3,18 @@
 │ ▶ Inbox            2 ││  ●    Bob                      Re: Plan (2)                                                                13:30 │
 │   Sent Mail          ││  ●    Carol                    Lunch?                                                                      Nov 8 │
 │   All Mail           ││                                                                                                                  │
-│   Trash              ││                         ╭──────────────────────────────────────╮                                                 │
-│   Receipts         1 ││                         │ Move 2 messages to        esc close  │                                                 │
-│                      ││                         │                                      │                                                 │
-│ Work                 ││                         │ Personal                             │                                                 │
-│   Inbox            1 ││                         │ ▸ Sent Mail                          │                                                 │
-│   Archive            ││                         │   All Mail                           │                                                 │
-│                      ││                         │   Trash                              │                                                 │
-│                      ││                         │   Receipts                         1 │                                                 │
-│                      ││                         │                                      │                                                 │
-│                      ││                         │ j/k move · enter open · esc/q close  │                                                 │
-│                      ││                         ╰──────────────────────────────────────╯                                                 │
-│                      ││                                                                                                                  │
+│   Trash              ││                    ╭────────────────────────────────────────────────╮                                            │
+│   Receipts         1 ││                    │ Move 2 messages to                  esc close  │                                            │
+│                      ││                    │ / press / to filter folders                    │                                            │
+│ Work                 ││                    │                                                │                                            │
+│   Inbox            1 ││                    │ Personal                                       │                                            │
+│   Archive            ││                    │ ▸ Sent Mail                                    │                                            │
+│                      ││                    │   All Mail                                     │                                            │
+│                      ││                    │   Trash                                        │                                            │
+│                      ││                    │   Receipts                                   1 │                                            │
+│                      ││                    │                                                │                                            │
+│                      ││                    │ / filter · j/k move · enter open · esc/q close │                                            │
+│                      ││                    ╰────────────────────────────────────────────────╯                                            │
 │                      ││                                                                                                                  │
 │                      ││                                                                                                                  │
 │                      ││                                                                                                                  │

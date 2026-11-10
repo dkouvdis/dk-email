@@ -17,8 +17,17 @@ func pickerKey(k string) tea.KeyPressMsg {
 		return tea.KeyPressMsg{Code: tea.KeyEscape}
 	case "down":
 		return tea.KeyPressMsg{Code: tea.KeyDown}
+	case "up":
+		return tea.KeyPressMsg{Code: tea.KeyUp}
 	}
 	return tea.KeyPressMsg{Code: []rune(k)[0], Text: k}
+}
+
+func typeKeys[T any](p Picker[T], text string) Picker[T] {
+	for _, r := range text {
+		p, _ = p.Update(pickerKey(string(r)))
+	}
+	return p
 }
 
 func groups() []Group[string] {
@@ -150,5 +159,88 @@ func TestPicker_ScrollsAndClamps(t *testing.T) {
 	p.SetSize(10, 3)
 	if p.View() != "" {
 		t.Error("tiny picker should render nothing")
+	}
+}
+
+func TestPicker_SlashFiltersFoldersByLabel(t *testing.T) {
+	p := NewPicker("Go to folder", groups())
+	p.SetSize(80, 30)
+
+	p = typeKeys(p, "/INB")
+
+	if !p.Filtering() {
+		t.Fatal("/ didn't start filtering")
+	}
+	plain := ansi.Strip(p.View())
+	if strings.Contains(plain, "Receipts") || strings.Contains(plain, "Sent Mail") || strings.Contains(plain, "Broken") {
+		t.Errorf("non-matching folders or empty accounts still shown:\n%s", plain)
+	}
+	if !strings.Contains(plain, "/ INB") || !strings.Contains(plain, "Personal") || !strings.Contains(plain, "Work") {
+		t.Errorf("filter or matching accounts missing:\n%s", plain)
+	}
+	if v, _ := p.Selected(); v != "p/inbox" {
+		t.Errorf("cursor on %q, want the first match once the current folder is filtered out", v)
+	}
+
+	p, _ = p.Update(pickerKey("down"))
+	if v, _ := p.Selected(); v != "w/inbox" {
+		t.Errorf("↓ while filtering = %q, want the next match", v)
+	}
+	p, r := p.Update(pickerKey("enter"))
+	if v, _ := p.Selected(); r != Chosen || v != "w/inbox" {
+		t.Errorf("enter while filtering = %v %q, want Chosen w/inbox", r, v)
+	}
+}
+
+func TestPicker_FilterTakesEveryKeyAndEscClearsFirst(t *testing.T) {
+	p := NewPicker("Go to folder", groups())
+	p.SetSize(80, 30)
+
+	p = typeKeys(p, "/jkq") // j, k and q are text while filtering
+	if !strings.Contains(ansi.Strip(p.View()), "No folders match") {
+		t.Errorf("no-match message missing:\n%s", ansi.Strip(p.View()))
+	}
+	if _, ok := p.Selected(); ok {
+		t.Error("Selected() ok with no matches")
+	}
+	if _, r := p.Update(pickerKey("enter")); r != Pending {
+		t.Errorf("enter with no matches = %v, want Pending", r)
+	}
+
+	p, r := p.Update(pickerKey("esc"))
+	if r != Pending || p.Filtering() || !strings.Contains(ansi.Strip(p.View()), "Receipts") {
+		t.Errorf("first esc = %v (filtering %v), want the filter cleared and the popup open", r, p.Filtering())
+	}
+	if _, r = p.Update(pickerKey("esc")); r != Cancelled {
+		t.Errorf("second esc = %v, want Cancelled", r)
+	}
+}
+
+func TestPicker_PasteIntoFilter(t *testing.T) {
+	p := NewPicker("Go to folder", groups())
+	p.SetSize(80, 30)
+
+	p = p.Paste(tea.PasteMsg{Content: "rece"})
+	if p.Filtering() {
+		t.Error("paste started a filter without /")
+	}
+	p, _ = p.Update(pickerKey("/"))
+	p = p.Paste(tea.PasteMsg{Content: "rece\nipts"})
+
+	if v, _ := p.Selected(); v != "p/receipts" || strings.Contains(ansi.Strip(p.View()), "Inbox") {
+		t.Errorf("paste didn't filter to Receipts: %q\n%s", v, ansi.Strip(p.View()))
+	}
+}
+
+func TestPicker_SizeStaysPutWhileFiltering(t *testing.T) {
+	p := NewPicker("Go to folder", groups())
+	p.SetSize(80, 30)
+	beforeW, beforeH := lipgloss.Size(p.View())
+
+	for _, k := range []string{"/", "w", "o", "r", "k", "-", "x"} {
+		p, _ = p.Update(pickerKey(k))
+		if w, h := lipgloss.Size(p.View()); w != beforeW || h != beforeH {
+			t.Fatalf("after %q the popup is %dx%d, want it to stay %dx%d", k, w, h, beforeW, beforeH)
+		}
 	}
 }

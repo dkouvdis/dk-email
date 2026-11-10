@@ -15,7 +15,8 @@ type KeyMap struct {
 	ToggleRead, Star       key.Binding
 	Archive, Delete, Move  key.Binding
 	Refresh                key.Binding
-	Picker, Connect        key.Binding
+	Picker, Filter         key.Binding
+	Connect                key.Binding
 	ToggleView, Help, Back key.Binding
 	Quit, ForceQuit        key.Binding
 }
@@ -42,6 +43,7 @@ func DefaultKeyMap() KeyMap {
 		Move:       b([]string{"m"}, "m", "move"),
 		Refresh:    b([]string{"r"}, "r", "refresh"),
 		Picker:     b([]string{"a"}, "a", "accounts"),
+		Filter:     b([]string{"/"}, "/", "filter folders"),
 		Connect:    b([]string{"A"}, "A", "connect account"),
 		ToggleView: b([]string{"v"}, "v", "split/list"),
 		Help:       b([]string{"?"}, "?", "help"),
@@ -56,7 +58,7 @@ func (k KeyMap) HelpSections() []popup.Section {
 	return []popup.Section{
 		{Title: "Navigation", Keys: []key.Binding{k.Up, k.Down, k.Top, k.Bottom, k.Left, k.Right, k.NextPane, k.PrevPane}},
 		{Title: "Threads", Keys: []key.Binding{k.Open, k.Expand, k.ToggleRead, k.Star, k.Archive, k.Delete, k.Move, k.Refresh}},
-		{Title: "Accounts & view", Keys: []key.Binding{k.Picker, k.Connect, k.ToggleView}},
+		{Title: "Accounts & view", Keys: []key.Binding{k.Picker, k.Filter, k.Connect, k.ToggleView}},
 		{Title: "General", Keys: []key.Binding{k.Help, k.Back, k.Quit, k.ForceQuit}},
 	}
 }
@@ -72,8 +74,11 @@ func (k KeyMap) hints(focus Pane, reading bool, kind Kind) []key.Binding {
 	if kind == KindList {
 		keys = append(keys, k.Picker)
 	}
-	if focus == PaneList {
+	switch focus {
+	case PaneList:
 		keys = append(keys, k.Expand, k.ToggleRead, k.Star, k.Archive, k.Delete, k.Move)
+	case PaneSidebar:
+		keys = append(keys, key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "filter")))
 	}
 	if kind == KindNarrow {
 		keys = append(keys, k.NextPane)
