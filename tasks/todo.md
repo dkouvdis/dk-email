@@ -636,7 +636,7 @@ How it behaves:
 **Verification:**
 
 - [x] `go test -race ./...` passes (UI tests stable over 3 runs; popup coverage 98%). A pty smoke test of the binary with an empty config folder opened the popup, pre-filled Gmail, typed `q` instead of quitting, and wrote nothing before saving.
-- [ ] **Manual:** with `XDG_CONFIG_HOME=$(mktemp -d)`, add a Gmail account using an `op://` reference. Check that `config.toml` gains the block, the config-folder `.gitignore` exists, and the inbox loads.
+- [x] **Manual:** with `XDG_CONFIG_HOME=$(mktemp -d)`, add a Gmail account using an `op://` reference. Check that `config.toml` gains the block, the config-folder `.gitignore` exists, and the inbox loads. (Confirmed by you 2026-11-10, after the paste fix.)
 
 **Notes:**
 
