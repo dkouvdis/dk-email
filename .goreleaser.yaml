@@ -1,0 +1,68 @@
+# Releases dk-email from v* tags (see .github/workflows/release.yml).
+# Dry run: goreleaser release --snapshot --clean
+version: 2
+
+project_name: dk-email
+
+builds:
+  - id: dk-email
+    main: ./cmd/dk-email
+    binary: dk-email
+    env:
+      - CGO_ENABLED=0
+    goos: [darwin, linux]
+    goarch: [amd64, arm64]
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{.Version}} -X main.commit={{.ShortCommit}} -X main.date={{.Date}}
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+archives:
+  - formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  sort: asc
+  use: git
+  filters:
+    exclude:
+      - '^(docs|test|chore)(\(.+\))?!?:'
+  groups:
+    - title: Features
+      regexp: '^feat(\(.+\))?!?:'
+      order: 0
+    - title: Bug fixes
+      regexp: '^fix(\(.+\))?!?:'
+      order: 1
+    - title: Other
+      order: 999
+
+release:
+  # -beta.N and -rc.N tags become GitHub pre-releases.
+  prerelease: auto
+
+homebrew_casks:
+  - name: dk-email
+    binaries: [dk-email]
+    homepage: https://github.com/dkouvdis/dk-email
+    description: Keyboard-driven terminal email client for triaging IMAP accounts
+    directory: Casks
+    # Pre-release tags never update the tap.
+    skip_upload: auto
+    repository:
+      owner: dkouvdis
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    commit_msg_template: "Brew cask update for {{ .ProjectName }} {{ .Tag }}"
+    hooks:
+      post:
+        # The binary is unsigned, so clear the quarantine flag macOS sets on
+        # downloads. The README documents the manual fallback.
+        install_steps: |
+          on_macos do
+            run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ .StagedPath }}/dk-email"]
+          end

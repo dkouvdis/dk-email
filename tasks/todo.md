@@ -675,14 +675,20 @@ Add `release.yml`, triggered by `v*` tags, which runs the tests and then `gorele
 
 **Acceptance criteria:**
 
-- [ ] `goreleaser check` passes and the config uses no deprecated keys.
-- [ ] `goreleaser release --snapshot --clean` produces four archives whose binaries print the snapshot version.
-- [ ] Pre-release tags never update the tap (`skip_upload: auto`).
+- [x] `goreleaser check` passes and the config uses no deprecated keys.
+- [x] `goreleaser release --snapshot --clean` produces four archives whose binaries print the snapshot version.
+- [x] Pre-release tags never update the tap (`skip_upload: auto`).
 
 **Verification:**
 
 - [ ] CI is green, including `goreleaser check`.
-- [ ] Local snapshot build, if `goreleaser` is installed, or a manual run of the workflow on a branch with `--snapshot`.
+- [x] Local snapshot build, if `goreleaser` is installed, or a manual run of the workflow on a branch with `--snapshot`.
+
+**Notes:**
+
+- Checked with GoReleaser v2.20.0. The quarantine step is configured as `hooks.post.install_steps` (the non-deprecated key since v2.19), which GoReleaser renders as the cask's `postflight_steps`.
+- The snapshot darwin/arm64 binary printed `dk-email 0.0.0-SNAPSHOT-b4b7f65 (b4b7f65, 2026-11-10)`. `--version` now trims GoReleaser's RFC3339 date to `YYYY-MM-DD`.
+- `dkouvdis/dk-email` is private, so release asset URLs in the cask return 404 for `brew install` until the repo is public (or the cask uses a private download strategy plus `HOMEBREW_GITHUB_API_TOKEN`).
 
 **Dependencies:** T1, T21 (moved to Phase 5 at your request: the pipeline lands once the client is feature-complete)
 **Prerequisites (yours):** the `dkouvdis/homebrew-tap` repo exists and the `HOMEBREW_TAP_GITHUB_TOKEN` secret is set on `dkouvdis/dk-email`.

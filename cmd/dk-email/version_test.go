@@ -87,3 +87,11 @@ func TestResolveVersion_NoBuildInfo(t *testing.T) {
 		t.Errorf("resolveVersion() = %+v, want defaults", got)
 	}
 }
+
+func TestFormatVersion_GoReleaserDate(t *testing.T) {
+	got := buildVersion{"v0.1.0-beta.1", "abc1234", "2026-11-20T10:15:00Z"}.String()
+
+	if want := "dk-email 0.1.0-beta.1 (abc1234, 2026-11-20)"; got != want {
+		t.Errorf("String() = %q, want %q", got, want)
+	}
+}

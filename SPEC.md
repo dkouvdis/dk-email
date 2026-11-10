@@ -222,7 +222,7 @@ The **`?` help popup** is sized to its content, groups keys into sections, and s
   - It uses `homebrew_casks` because the older `brews` section is deprecated as of GoReleaser v2.10.
   - `skip_upload: auto` means **pre-releases never reach the tap**; only stable tags update the cask.
   - The workflow pushes to the tap using the repo secret `HOMEBREW_TAP_GITHUB_TOKEN`: a fine-grained personal access token with contents write access to the tap repo only.
-  - The binaries are unsigned, so macOS may quarantine them. The cask clears the quarantine attribute using the declarative `postflight_steps`, and the README documents the manual fallback (`xattr -d com.apple.quarantine`). Apple code signing and notarization are out of scope until 1.0.
+  - The binaries are unsigned, so macOS may quarantine them. The cask clears the quarantine attribute using the declarative `postflight_steps` (configured as `hooks.post.install_steps` in `.goreleaser.yaml`), and the README documents the manual fallback (`xattr -d com.apple.quarantine`). Apple code signing and notarization are out of scope until 1.0.
 - **CI** (`.github/workflows/ci.yml`): runs `go test -race ./...`, `go vet ./...` and `gofmt -l .` on every push and pull request, plus `goreleaser check` once `.goreleaser.yaml` exists.
 - **Prerequisites (one-time setup, done by you):**
   - Install GoReleaser locally (`brew install goreleaser`) for snapshot dry-runs. It's optional, since CI does the real releases.

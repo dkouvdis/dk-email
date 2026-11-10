@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"runtime/debug"
 	"strings"
+	"time"
 )
 
 // Set at build time by GoReleaser via -ldflags "-X main.version=... -X main.commit=... -X main.date=...".
@@ -23,7 +24,16 @@ func defaultVersion() buildVersion {
 }
 
 func (b buildVersion) String() string {
-	return fmt.Sprintf("dk-email %s (%s, %s)", strings.TrimPrefix(b.version, "v"), b.commit, b.date)
+	return fmt.Sprintf("dk-email %s (%s, %s)", strings.TrimPrefix(b.version, "v"), b.commit, day(b.date))
+}
+
+// day shortens an RFC 3339 timestamp, such as GoReleaser's {{.Date}}, to
+// its date. Anything else is shown as is.
+func day(date string) string {
+	if t, err := time.Parse(time.RFC3339, date); err == nil {
+		return t.UTC().Format(time.DateOnly)
+	}
+	return date
 }
 
 // Matches Go pseudo-versions such as v0.0.0-20261108191108-2b38c82e1234
