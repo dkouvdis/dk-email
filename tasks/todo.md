@@ -746,5 +746,6 @@ The **keychain section** (requested 2026-11-09) must cover:
 ### ✅ Checkpoint 5: v0.1.0
 
 - [ ] All of spec success criteria 1–9 are met.
-- [ ] **You approve tagging `v0.1.0-beta.1`.** After it's tagged, a GitHub pre-release with four archives exists and the tap is untouched (spec success criterion 9).
+- [x] **You approve tagging `v0.1.0-beta.1`.** After it's tagged, a GitHub pre-release with four archives exists and the tap is untouched (spec success criterion 9).
+  - Released 2026-11-10 from `4580b3e`: a GitHub pre-release with four archives and `checksums.txt`. The darwin/arm64 binary prints `dk-email 0.1.0-beta.1 (4580b3e, 2026-11-10)`, and `dkouvdis/homebrew-tap` is still empty.
 - [ ] **You approve tagging `v0.1.0-rc.1`, then `v0.1.0`.** Afterwards, `brew install dkouvdis/tap/dk-email && dk-email --version` prints `dk-email 0.1.0 (…)`.
