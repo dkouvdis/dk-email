@@ -536,9 +536,11 @@ func cursorRow(rows []row, c ref) int {
 	return slices.IndexFunc(rows, func(r row) bool { return r.ref == c })
 }
 
-// headerRow is the row of the account name above the cursor row, or -1.
+// headerRow is the row of the account name when the cursor is on the
+// account's first folder (only rows that can't be selected, such as a
+// dimmed parent, sit between them), or -1.
 func headerRow(rows []row, cursor int) int {
-	for i := cursor; i >= 0; i-- {
+	for i := cursor - 1; i >= 0 && rows[i].ref == noRef; i-- {
 		if rows[i].header {
 			return i
 		}
@@ -546,8 +548,8 @@ func headerRow(rows []row, cursor int) int {
 	return -1
 }
 
-// clampOffset scrolls just enough to show the cursor row, and the cursor's
-// account name (header) too whenever both fit.
+// clampOffset scrolls just enough to show the cursor row, plus the account
+// name (header) above it on an account's first folder, when both fit.
 func clampOffset(offset, cursor, header, height, total int) int {
 	if cursor >= 0 {
 		top := cursor

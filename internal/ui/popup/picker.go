@@ -231,9 +231,10 @@ func (p Picker[T]) Update(msg tea.KeyPressMsg) (Picker[T], Result) {
 }
 
 type pickerLine struct {
-	text   string
-	cursor bool
-	header bool // a group heading, e.g. an account name
+	text       string
+	cursor     bool
+	header     bool // a group heading, e.g. an account name
+	selectable bool
 }
 
 // lines lists the groups and their matching items. While filtering,
@@ -252,7 +253,7 @@ func (p Picker[T]) lines(width int) []pickerLine {
 				continue
 			}
 			isCursor := n == p.cursor
-			items = append(items, pickerLine{text: p.itemRow(it, isCursor, width), cursor: isCursor})
+			items = append(items, pickerLine{text: p.itemRow(it, isCursor, width), cursor: isCursor, selectable: true})
 			n++
 		}
 		if p.filtered() && len(items) == 0 {
@@ -339,20 +340,22 @@ func (p *Picker[T]) scrollToCursor() {
 		return
 	}
 	lines := p.lines(max(p.innerW(), 1))
-	row, header := 0, 0
+	row := 0
 	for i, l := range lines {
-		if l.header {
-			header = i
-		}
 		if l.cursor {
 			row = i
 			break
 		}
 	}
-	// Show the cursor's group heading too whenever both fit.
+	// On a group's first item, show its heading too when both fit.
 	top := row
-	if row-header < vh {
-		top = header
+	for i := row - 1; i >= 0 && !lines[i].selectable; i-- {
+		if lines[i].header {
+			if row-i < vh {
+				top = i
+			}
+			break
+		}
 	}
 	if top < p.offset {
 		p.offset = top

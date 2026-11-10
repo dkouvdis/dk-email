@@ -2,6 +2,7 @@ package sidebar
 
 import (
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -474,5 +475,26 @@ func TestFilter_ShowsMatchesWithTheirPath(t *testing.T) {
 	m = typeKeys(New([]string{"Personal"}).SetFolders(0, nestedFolders(), nil), "/work")
 	if v := view(m); !strings.Contains(v, "No folders match") {
 		t.Errorf("a parent that isn't a folder shouldn't match:\n%s", v)
+	}
+}
+
+func TestView_ScrollingUpMovesOneRowAtATime(t *testing.T) {
+	var fs []mail.Folder
+	for i := range 15 {
+		fs = append(fs, mail.Folder{Name: fmt.Sprintf("f%02d", i)})
+	}
+	m := New([]string{"Personal"}).SetFolders(0, fs, nil).SetHeight(8)
+
+	m, _ = m.Update(press("G"))
+	prev := m.offset
+	for range 14 {
+		m, _ = m.Update(press("k"))
+		if _, f := m.Cursor(); f != "f00" && prev-m.offset > 1 {
+			t.Fatalf("k on %s scrolled up %d rows, want at most 1", f, prev-m.offset)
+		}
+		prev = m.offset
+	}
+	if top := strings.Split(ansi.Strip(m.View(22, 8)), "\n")[0]; strings.TrimSpace(top) != "Personal" {
+		t.Errorf("on the first folder, top row = %q, want the account name", top)
 	}
 }
