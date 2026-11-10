@@ -557,7 +557,7 @@ Every task also meets the standing bar before it counts as done:
 **Verification:**
 
 - [x] `go test -race ./internal/ui/...` passes (stable over 3 runs; popup coverage 98%).
-- [ ] Manual: `?`, `/`, type `star`, `esc`, `esc`.
+- [x] Manual: `?`, `/`, type `star`, `esc`, `esc`. (Confirmed by you 2026-11-10.)
 
 **Notes:**
 
