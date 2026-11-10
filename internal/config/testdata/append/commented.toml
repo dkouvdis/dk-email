@@ -1,0 +1,10 @@
+# My dk-email config. Keep these comments!
+[ui]
+default_layout = "split"   # trailing comment
+
+[[account]]
+name      = "Personal"
+email     = "me@gmail.com"
+imap_host = "imap.gmail.com"
+password_cmd = "op read op://Personal/Gmail/app-password"
+# end of file comment

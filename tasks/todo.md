@@ -596,13 +596,19 @@ Every task also meets the standing bar before it counts as done:
 
 **Acceptance criteria:**
 
-- [ ] Fixtures cover a file with comments, one with no trailing newline, CRLF line endings, and an empty or missing file. Comments are kept exactly and the result parses.
-- [ ] Values are escaped as valid TOML, including quotes and backslashes in an `op://` reference.
-- [ ] A failed parse leaves the original file byte-for-byte unchanged.
+- [x] Fixtures cover a file with comments, one with no trailing newline, CRLF line endings, and an empty or missing file. Comments are kept exactly and the result parses.
+- [x] Values are escaped as valid TOML, including quotes and backslashes in an `op://` reference.
+- [x] A failed parse leaves the original file byte-for-byte unchanged.
 
 **Verification:**
 
-- [ ] `go test -race ./internal/config/...` passes with at least 80% coverage.
+- [x] `go test -race ./internal/config/...` passes with at least 80% coverage (91.4%).
+
+**Notes:**
+
+- The new bytes are parsed **and validated** (via `Load`'s new in-memory `parse`) *before* anything is written, rather than writing then restoring. A rejected account (duplicate name, missing host, bad `tls`) or an already-broken file never touches the file; its bytes and mtime are unchanged.
+- The write is atomic (temp file in the same folder, then rename). It keeps an existing file's mode, creates new files with 0600, and writes through a symlinked `config.toml` (e.g. from dotfiles) instead of replacing the link. The folder must already exist.
+- The block matches the file's line endings, ends an unterminated last line and adds one blank line before `[[account]]`. Optional keys are written only when set, and `username` only when it differs from `email`.
 
 **Dependencies:** T2
 **Files:** `internal/config/append.go`, `internal/config/append_test.go`, `internal/config/testdata/*.toml`

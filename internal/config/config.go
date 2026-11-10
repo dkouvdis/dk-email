@@ -97,6 +97,14 @@ func Load(path string) (*Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read config: %w", err)
 	}
+	return parse(path, data)
+}
+
+// parse decodes and validates config file contents. path is used for
+// messages and to resolve relative tls_cert paths.
+func parse(path string, data []byte) (*Config, error) {
+	cfg := Default()
+	cfg.Path = path
 
 	md, err := toml.Decode(string(data), &cfg)
 	if err != nil {
