@@ -96,6 +96,14 @@ func New(names []string) Model {
 	return m
 }
 
+// AddAccount adds an account at the end, already connected with folders
+// (as after the connect popup), and returns its index.
+func (m Model) AddAccount(name string, folders []mail.Folder) (Model, int) {
+	m.accounts = append(slices.Clone(m.accounts), account{name: name, state: connecting})
+	i := len(m.accounts) - 1
+	return m.SetFolders(i, folders, nil), i
+}
+
 // Tick starts the connecting spinner.
 func (m Model) Tick() tea.Cmd { return m.spinner.Tick }
 

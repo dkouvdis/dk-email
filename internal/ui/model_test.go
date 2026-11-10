@@ -36,6 +36,14 @@ func press(k string) tea.KeyPressMsg {
 		return tea.KeyPressMsg{Code: tea.KeyRight}
 	case "ctrl+c":
 		return tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl}
+	case "enter":
+		return tea.KeyPressMsg{Code: tea.KeyEnter}
+	case "space":
+		return tea.KeyPressMsg{Code: tea.KeySpace, Text: " "}
+	case "up":
+		return tea.KeyPressMsg{Code: tea.KeyUp}
+	case "down":
+		return tea.KeyPressMsg{Code: tea.KeyDown}
 	}
 	r := []rune(k)[0]
 	return tea.KeyPressMsg{Code: r, Text: k}
@@ -299,6 +307,19 @@ func TestModel_DebugLogRecordsMetadata(t *testing.T) {
 // spinner and load timing can't change the output), then run the model in
 // a real teatest program at fixed sizes and compare the final screen without ANSI
 // styling. Update them with go test ./internal/ui/ -run Golden -update
+func TestGolden_FirstRunConnect(t *testing.T) {
+	m := firstRun(t, newOnboarding(), nil)
+	m = typeKeys(t, m, "Gmail")
+	m = send(t, m, press("tab"))
+	m = typeKeys(t, m, "me@gmail.com")
+
+	tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(140, 34))
+	tm.Send(press("ctrl+c"))
+
+	final := tm.FinalModel(t, teatest.WithFinalTimeout(5*time.Second)).(Model)
+	teatest.RequireEqualOutput(t, []byte(plain(final)))
+}
+
 func TestGolden(t *testing.T) {
 	tests := []struct {
 		name     string

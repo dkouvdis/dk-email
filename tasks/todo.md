@@ -630,13 +630,23 @@ How it behaves:
 
 **Acceptance criteria:**
 
-- [ ] Update-level tests cover the Gmail pre-fill, validation of required fields, a failed test leaving no saved state, a successful test calling append and store, and the first run opening the popup automatically.
-- [ ] The password is never written to `config.toml` or to logs, which a test asserts.
+- [x] Update-level tests cover the Gmail pre-fill, validation of required fields, a failed test leaving no saved state, a successful test calling append and store, and the first run opening the popup automatically.
+- [x] The password is never written to `config.toml` or to logs, which a test asserts.
 
 **Verification:**
 
-- [ ] `go test -race ./...` passes.
+- [x] `go test -race ./...` passes (UI tests stable over 3 runs; popup coverage 98%). A pty smoke test of the binary with an empty config folder opened the popup, pre-filled Gmail, typed `q` instead of quitting, and wrote nothing before saving.
 - [ ] **Manual:** with `XDG_CONFIG_HOME=$(mktemp -d)`, add a Gmail account using an `op://` reference. Check that `config.toml` gains the block, the config-folder `.gitignore` exists, and the inbox loads.
+
+**Notes:**
+
+- **Form:** `tab`/`↑↓` move between fields, `←→`/`space` toggle TLS and the password source, `enter` advances (and tests & saves on the last field or the button), `esc` cancels. `q` and `?` are typed into the form; `ctrl+c` still quits. A 1Password reference with spaces is shell-quoted: `password_cmd = "op read 'op://Work Vault/IMAP/password'"`. Empty username and port fall back to the config defaults.
+- **Gmail pre-fill** only fills an empty or auto-filled host, and changing the address away from Gmail clears what it filled in.
+- **Test & save** runs in the background: dial, list folders, then save. On any failure the error shows in the popup, the test mailbox is closed and nothing is saved. A result arriving after `esc` is dropped.
+- **Saving:** the keychain password is stored first, then `config.AppendAccount`, so a saved account always has its password. If appending fails after storing, a keychain entry is left behind, which is harmless.
+- **New accounts** join the sidebar through the startup path, without switching away from an open folder; with none open, their Inbox opens.
+- **`ui.Onboarding`** (`Dial`, `AddAccount`, `StorePassword`) comes from `main`, so the UI still never imports `secret` or `imap`. `main` wraps `secret.ErrNoPassword` in `ui.ErrNeedsPassword`.
+- **Missing password:** the status line says "<account> needs a password: press A to enter it", and `A` opens a password prompt for that account. Its saved settings are shown read-only, and only a keychain password can be entered, since changing `password_cmd` would mean editing config.toml rather than appending. With no password missing, `A` adds an account. A failed login with a *wrong* password isn't offered a prompt yet.
 
 **Dependencies:** T20, T3, T9
 **Files:** `internal/ui/popup/connect.go`, `internal/ui/popup/connect_test.go`, `internal/ui/model.go`, `internal/ui/accounts.go`

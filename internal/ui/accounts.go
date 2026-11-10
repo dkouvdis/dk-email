@@ -90,6 +90,11 @@ func (m Model) handleAccount(msg accountMsg) (Model, tea.Cmd) {
 	}
 	m.side = m.side.SetFolders(msg.index, msg.folders, msg.err)
 	m.log.Debug("account connected", "account", name, "ok", msg.err == nil, "folders", len(msg.folders), "took", msg.took.Round(time.Millisecond))
+	if errors.Is(msg.err, ErrNeedsPassword) {
+		m.needsPassword[msg.index] = true
+		m.setError(fmt.Errorf("%s needs a password: press A to enter it", name))
+		return m, nil
+	}
 	if msg.err != nil {
 		m.setError(fmt.Errorf("%s: %w", name, msg.err))
 		return m, nil

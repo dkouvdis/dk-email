@@ -250,3 +250,19 @@ func TestAccounts(t *testing.T) {
 		t.Errorf("error note = %q, want its first line", note)
 	}
 }
+
+func TestAddAccount(t *testing.T) {
+	m := New([]string{"Personal"})
+
+	m, i := m.AddAccount("Work", []mail.Folder{{Name: "INBOX", Role: mail.RoleInbox, Unread: 4}})
+
+	if i != 1 || m.Accounts()[1].Name != "Work" {
+		t.Fatalf("AddAccount = %d, accounts %+v", i, m.Accounts())
+	}
+	if f, ok := m.Folder(1, "INBOX"); !ok || f.Unread != 4 {
+		t.Errorf("Work INBOX = %+v, %v", f, ok)
+	}
+	if a, f := m.Cursor(); a != 1 || f != "INBOX" {
+		t.Errorf("cursor = %d/%q, want the new account's Inbox when nothing else was selectable", a, f)
+	}
+}

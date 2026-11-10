@@ -62,7 +62,10 @@ func startUI(cfg *config.Config) error {
 	}
 	defer closeLog()
 
-	final, err := tea.NewProgram(ui.New(*cfg, newConnector(secret.New(), log), log)).Run()
+	resolver := secret.New()
+	model := ui.New(*cfg, newConnector(resolver, log), log).
+		WithOnboarding(newOnboarding(cfg.Path, resolver, secret.Store, log))
+	final, err := tea.NewProgram(model).Run()
 	if m, ok := final.(ui.Model); ok {
 		_ = m.Close()
 	}
@@ -81,17 +84,52 @@ func newConnector(pw passwordResolver, log *slog.Logger) ui.Connector {
 		start := time.Now()
 		password, err := pw.Resolve(ctx, acct)
 		log.Debug("password resolved", "account", acct.Name, "ok", err == nil, "took", time.Since(start).Round(time.Millisecond))
+		if errors.Is(err, secret.ErrNoPassword) {
+			return nil, fmt.Errorf("%w: %w", ui.ErrNeedsPassword, err)
+		}
 		if err != nil {
 			return nil, err
 		}
+		return dial(ctx, acct, password, log)
+	}
+}
 
-		start = time.Now()
-		c, err := imap.Dial(ctx, acct, password)
-		log.Debug("imap login", "account", acct.Name, "ok", err == nil, "took", time.Since(start).Round(time.Millisecond))
-		if err != nil {
-			return nil, err
-		}
-		return c, nil
+// dial logs in over IMAP. It returns a nil interface, never a typed nil,
+// on failure.
+func dial(ctx context.Context, acct config.Account, password string, log *slog.Logger) (mail.Mailbox, error) {
+	start := time.Now()
+	c, err := imap.Dial(ctx, acct, password)
+	log.Debug("imap login", "account", acct.Name, "ok", err == nil, "took", time.Since(start).Round(time.Millisecond))
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
+// newOnboarding lets the connect popup test and save accounts. A new
+// account's keychain password is stored before the account is appended to
+// configPath, so a saved account always has its password.
+func newOnboarding(configPath string, pw passwordResolver, store func(account, password string) error, log *slog.Logger) ui.Onboarding {
+	return ui.Onboarding{
+		Dial: func(ctx context.Context, acct config.Account, password string) (mail.Mailbox, error) {
+			acct = acct.WithDefaults()
+			if password == "" {
+				var err error
+				if password, err = pw.Resolve(ctx, acct); err != nil {
+					return nil, err
+				}
+			}
+			return dial(ctx, acct, password, log)
+		},
+		AddAccount: func(acct config.Account, password string) error {
+			if password != "" {
+				if err := store(acct.Name, password); err != nil {
+					return err
+				}
+			}
+			return config.AppendAccount(configPath, acct)
+		},
+		StorePassword: store,
 	}
 }
 

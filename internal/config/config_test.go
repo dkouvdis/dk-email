@@ -324,3 +324,13 @@ func TestResolvePath(t *testing.T) {
 		t.Errorf("~ = %q, want the home directory", got)
 	}
 }
+
+func TestAccount_WithDefaults(t *testing.T) {
+	a := Account{Email: "me@example.com", TLS: TLSStartTLS}
+
+	got := a.WithDefaults()
+
+	if got.IMAPPort != 143 || got.Username != "me@example.com" || a.IMAPPort != 0 {
+		t.Errorf("WithDefaults() = %+v (original %+v)", got, a)
+	}
+}

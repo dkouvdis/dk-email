@@ -34,7 +34,7 @@ type helpLine struct {
 }
 
 type helpStyles struct {
-	box, title, badge, section, key, desc, dim, thumb lipgloss.Style
+	box, title, badge, section, key, desc, dim, thumb, alert lipgloss.Style
 }
 
 // Help is the scrollable key reference opened with ?. Its size follows the
@@ -70,6 +70,7 @@ func NewHelp(sections []Section) Help {
 		desc:    lipgloss.NewStyle(),
 		dim:     lipgloss.NewStyle().Foreground(lipgloss.Color("244")),
 		thumb:   lipgloss.NewStyle().Foreground(lipgloss.Color("63")),
+		alert:   lipgloss.NewStyle().Foreground(lipgloss.Color("203")),
 	}}
 	h.scroll.up = key.NewBinding(key.WithKeys("k", "up"))
 	h.scroll.down = key.NewBinding(key.WithKeys("j", "down"))

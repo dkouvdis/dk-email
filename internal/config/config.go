@@ -136,6 +136,14 @@ func checkUndecoded(keys []toml.Key) error {
 	return errors.Join(errs...)
 }
 
+// WithDefaults returns a with the defaults Load applies: implicit TLS, the
+// port for the TLS mode, and username = email. Used to dial an account
+// before it's saved.
+func (a Account) WithDefaults() Account {
+	a.applyDefaults()
+	return a
+}
+
 func (a *Account) applyDefaults() {
 	if a.TLS == "" {
 		a.TLS = TLSImplicit

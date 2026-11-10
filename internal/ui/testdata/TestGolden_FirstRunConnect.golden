@@ -1,0 +1,34 @@
+╭──────────────────────╮╭──────────────────────────────────────╮╭──────────────────────────────────────────────────────────────────────────╮
+│                      ││ No account                           ││ No message selected.                                                     │
+│                      ││ Threads appear here once a folder i… ││                                                                          │
+│                      ││                                      ││                                                                          │
+│                      ││                                      ││                                                                          │
+│                      ││                                      ││                                                                          │
+│                      ││                                      ││                                                                          │
+│                      ││              ╭────────────────────────────────────────────────────────────╮                                      │
+│                      ││              │ Connect account                                 esc close  │                                      │
+│                      ││              │                                                            │                                      │
+│                      ││              │ Name       Gmail                                           │                                      │
+│                      ││              │ Email      me@gmail.com                                    │                                      │
+│                      ││              │ Username   same as email                                   │                                      │
+│                      ││              │ IMAP host  imap.gmail.com                                  │                                      │
+│                      ││              │ Port       993                                             │                                      │
+│                      ││              │ TLS        ● implicit   ○ starttls                         │                                      │
+│                      ││              │ Password   ● 1Password   ○ keychain                        │                                      │
+│                      ││              │ Reference  op://Vault/Item/password                        │                                      │
+│                      ││              │            Stored as password_cmd = "op read <reference>"  │                                      │
+│                      ││              │                                                            │                                      │
+│                      ││              │ [ Test & save ]                                            │                                      │
+│                      ││              │                                                            │                                      │
+│                      ││              │ tab next · ←→ choose · enter test & save · esc cancel      │                                      │
+│                      ││              ╰────────────────────────────────────────────────────────────╯                                      │
+│                      ││                                      ││                                                                          │
+│                      ││                                      ││                                                                          │
+│                      ││                                      ││                                                                          │
+│                      ││                                      ││                                                                          │
+│                      ││                                      ││                                                                          │
+│                      ││                                      ││                                                                          │
+│                      ││                                      ││                                                                          │
+╰──────────────────────╯╰──────────────────────────────────────╯╰──────────────────────────────────────────────────────────────────────────╯
+No accounts yet: press A to add one.                                                                                                    wide
+k/↑ up • j/↓ down • enter open • space expand • u read/unread • s star • e archive • d delete • m move • tab next pane • … • ? help • q quit

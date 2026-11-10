@@ -60,7 +60,7 @@ The full details for every task are in [todo.md](todo.md).
 
 ### Phase 4: Account onboarding
 - [x] T20: Append an account to the config without re-encoding the file
-- [ ] T21: Connect-account popup (first run, `A`, re-entering a missing password)
+- [x] T21: Connect-account popup (first run, `A`, re-entering a missing password)
 
 **Checkpoint 4:** spec success criteria 1–3 are verified.
 

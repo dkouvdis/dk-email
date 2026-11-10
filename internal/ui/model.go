@@ -83,6 +83,14 @@ type Model struct {
 	// readerPopup shows the reader in a popup over the list (list mode).
 	readerPopup bool
 	picker      popup.Picker[pick]
+	// The connect popup: connectFor is the account a password is being
+	// entered for, or -1 for a new account.
+	onboard       Onboarding
+	showConnect   bool
+	connectPop    popup.Connect
+	connectFor    int
+	connectGen    int
+	needsPassword map[int]bool
 	// moveTargets is set while the picker chooses where to move them.
 	moveTargets []mail.Summary
 	status      string
@@ -105,22 +113,24 @@ func New(cfg config.Config, connect Connector, log *slog.Logger) Model {
 	}
 	keys := DefaultKeyMap()
 	m := Model{
-		ui:      cfg.UI,
-		accts:   slices.Clone(cfg.Accounts),
-		connect: connect,
-		boxes:   make([]mail.Mailbox, len(cfg.Accounts)),
-		side:    sidebar.New(names),
-		open:    openFolder{account: -1},
-		every:   tick,
-		list:    threadlist.New(time.Now),
-		read:    reader.New(time.Now),
-		log:     log,
-		keys:    keys,
-		styles:  defaultStyles(),
-		help:    help.New(),
-		helpPop: popup.NewHelp(keys.HelpSections()),
-		mode:    mode,
-		focus:   PaneList,
+		ui:            cfg.UI,
+		accts:         slices.Clone(cfg.Accounts),
+		connect:       connect,
+		boxes:         make([]mail.Mailbox, len(cfg.Accounts)),
+		side:          sidebar.New(names),
+		open:          openFolder{account: -1},
+		every:         tick,
+		needsPassword: map[int]bool{},
+		connectFor:    -1,
+		list:          threadlist.New(time.Now),
+		read:          reader.New(time.Now),
+		log:           log,
+		keys:          keys,
+		styles:        defaultStyles(),
+		help:          help.New(),
+		helpPop:       popup.NewHelp(keys.HelpSections()),
+		mode:          mode,
+		focus:         PaneList,
 	}
 	if len(names) == 0 {
 		m.status = "No accounts configured yet."
@@ -170,6 +180,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleTick()
 	case refreshMsg:
 		return m.handleRefresh(msg)
+	case connectedMsg:
+		return m.handleConnected(msg)
 	}
 	return m, nil
 }
@@ -187,6 +199,7 @@ func (m *Model) relayout() {
 	m.panes = Layout(m.width, m.height, m.mode, m.ui)
 	m.helpPop.SetSize(m.panes.Popup.W, m.panes.Popup.H)
 	m.picker.SetSize(m.panes.Popup.W, m.panes.Popup.H)
+	m.connectPop.SetSize(m.panes.Popup.W, m.panes.Popup.H)
 	frame := m.styles.pane.GetVerticalFrameSize()
 	m.side = m.side.SetHeight(max(m.panes.Sidebar.H-frame, 0))
 	m.list = m.list.SetHeight(max(m.panes.List.H-frame-listHeaderRows, 0))
@@ -224,6 +237,10 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if key.Matches(msg, m.keys.ForceQuit) {
 		m.log.Debug("quit")
 		return m, tea.Quit
+	}
+	// The connect form takes every key, so q can be typed into it.
+	if m.showConnect {
+		return m.handleConnectKey(msg)
 	}
 	// Help sees every key, so q and ? can be typed into its filter.
 	if m.showHelp {
@@ -287,6 +304,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.openPicker()
 	case key.Matches(msg, m.keys.Refresh):
 		return m.startRefresh(true)
+	case key.Matches(msg, m.keys.Connect):
+		return m.openConnect()
 	case m.focus == PaneSidebar:
 		var cmd tea.Cmd
 		m.side, cmd = m.side.Update(msg)
@@ -397,6 +416,8 @@ func (m Model) render() string {
 		pop = m.helpPop.View()
 	case m.showPicker:
 		pop = m.picker.View()
+	case m.showConnect:
+		pop = m.connectPop.View()
 	}
 	x, y := popup.Center(m.width, m.height-footerRows, pop)
 	screen = popup.Overlay(screen, pop, x, y)
