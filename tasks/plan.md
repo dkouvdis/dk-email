@@ -66,7 +66,7 @@ The full details for every task are in [todo.md](todo.md).
 
 ### Phase 5: Release v0.1.0
 - [x] T15: Release pipeline (GoReleaser, `release.yml`, Homebrew cask)
-- [ ] T22: README (install, config, keys, quarantine fallback)
+- [x] T22: README (install, config, keys, quarantine fallback)
 
 **Checkpoint 5:** all of spec success criteria 1–9 are met. You approve tagging `v0.1.0-beta.1` (checks that pre-releases skip the tap), then `v0.1.0-rc.1`, then `v0.1.0`.
 

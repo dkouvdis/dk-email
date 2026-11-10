@@ -704,8 +704,8 @@ Add `release.yml`, triggered by `v*` tags, which runs the tests and then `gorele
 - a config reference with 1Password and keychain examples
 - the keybinding table
 - the release process for maintainers (tag format, prerequisites, token expiry)
-  m
-  The **keychain section** (requested 2026-11-09) must cover:
+
+The **keychain section** (requested 2026-11-09) must cover:
 - Omit `password_cmd` to use the keychain. The entry's service is `dk-email` and its account is the config `name`, which must match exactly (case and spaces).
 - A config example without `password_cmd`, noting the defaults: `imap_port` 993 for `implicit` and 143 for `starttls`, and `username` defaulting to `email`. For Gmail, use `imap.gmail.com` and an app password.
 - Storing the password by hand on macOS, so it never lands in shell history: `security add-generic-password -s dk-email -a "<name>" -U -w` (`-w` with no value prompts; `-U` replaces an existing entry). Mention the "enter once → keychain" option in the connect popup (`A`, T21) as the in-app way.
@@ -716,12 +716,19 @@ Add `release.yml`, triggered by `v*` tags, which runs the tests and then `gorele
 
 **Acceptance criteria:**
 
-- [ ] Every command and key in the README matches the spec and the code.
-- [ ] The keychain section above is included, and its `security` commands are checked against a real keychain entry that dk-email reads.
+- [x] Every command and key in the README matches the spec and the code.
+- [x] The keychain section above is included, and its `security` commands are checked against a real keychain entry that dk-email reads.
 
 **Verification:**
 
 - [ ] Manual review.
+
+**Notes:**
+
+- Checked on macOS with a throwaway entry, since deleted. `security add-generic-password -s dk-email -a "<name>" -U -w` prompts, and dk-email's resolver read the value back. A name differing only in case gave `no password: …`. An entry stored by dk-email prints as `go-keyring-base64:…` from `security find-generic-password -w`; the README explains this.
+- go-keyring reads the macOS keychain through `/usr/bin/security`, so the access prompt (if any) names `security`, not dk-email, and rebuilding dk-email doesn't re-trigger it. The README says this instead of the earlier assumption.
+- Linux: go-keyring v0.2.8 searches the Secret Service "login" collection by the attributes `service` and `username`, which matches the `secret-tool store` command.
+- No screenshot yet. It needs a real capture, best done after the planned UI improvements.
 
 **Dependencies:** T21, T15 (the README documents the release process)
 **Files:** `README.md`
