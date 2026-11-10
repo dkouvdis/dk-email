@@ -582,9 +582,9 @@ Every task also meets the standing bar before it counts as done:
 
 ### ✅ Checkpoint 3: Triage
 
-- [ ] All tests pass and CI is green.
-- [ ] Spec success criteria 5–7 are verified on real Gmail.
-- [ ] **You review triage.** No tag yet: releases start in Phase 5.
+- [x] All tests pass and CI is green (CI green through `4ca8f4e`, the last pushed commit).
+- [x] Spec success criteria 5–7 are verified on real Gmail.
+- [x] **You review triage.** No tag yet: releases start in Phase 5. (Confirmed by you 2026-11-10.)
 
 ---
 
