@@ -1,6 +1,6 @@
 # Spec: dk-email (v1)
 
-Status: **Draft, awaiting approval.** Source of intent: [docs/intent/terminal-email-client.md](docs/intent/terminal-email-client.md).
+Status: **Approved; v1 built, with `v0.1.0-beta.1` released on 2026-11-10.** Source of intent: [docs/intent/terminal-email-client.md](docs/intent/terminal-email-client.md).
 
 ## Objective
 
@@ -103,7 +103,7 @@ DK_EMAIL_DEBUG=1 go run ./cmd/dk-email
 
 CLI flags: `--config <path>`, `--version`.
 
-Release commands (require `goreleaser`; not installed yet, see Versioning & Release):
+Release commands (local runs need `goreleaser`, e.g. `brew install goreleaser`; CI does the real releases, see Versioning & Release):
 
 ```sh
 goreleaser check                          # validate .goreleaser.yaml

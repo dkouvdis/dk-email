@@ -659,7 +659,7 @@ How it behaves:
 
 ### UI changes (requested 2026-11-10)
 
-- [x] The selected row is white on purple 63 (the picker's highlight) instead of reverse video. The star is a yellow `*`, and thread rows have one space of left padding (`c4eb097`, `2dc6501`).
+- [x] The selected row is white on purple 63 (the picker's highlight) instead of reverse video. The star is a yellow `*`, and thread rows have one space of left padding (`c4eb097`, `2dc6501`, `764f2c0`).
 - [x] Two layouts only. Narrow (the default, 80+ columns) is the folders sidebar (24 columns) │ thread list, and `a` focuses the sidebar. List (`v`, or forced below 80 columns) is the thread list alone, with the `a` picker. There's no reading pane: `enter` opens the conversation in the popup in both layouts. `wide_breakpoint` and `list_width` are removed. The thread list says "Connecting…" until the first folder opens.
 - [x] The hint bar reads lazygit style (`Archive: e | Delete: d`) in soft blue 110 instead of dark grey.
 - [x] Folders show as a tree (two spaces per level) in the sidebar and pickers. Special folders stay flat on top, parents that aren't folders are dimmed and can't be selected, and filtered matches show their full path.
@@ -730,7 +730,7 @@ The **keychain section** (requested 2026-11-09) must cover:
 
 **Verification:**
 
-- [ ] Manual review.
+- [x] Manual review. Closed 2026-11-10 at your request; you'll form a new plan.
 
 **Notes:**
 
@@ -745,7 +745,7 @@ The **keychain section** (requested 2026-11-09) must cover:
 
 ### ✅ Checkpoint 5: v0.1.0
 
-- [ ] All of spec success criteria 1–9 are met.
+- [x] All of spec success criteria 1–9 are met. Closed 2026-11-10 at your request. The stable half of criterion 9 (`v0.1.0` updating the tap and `brew install`) waits on the release below.
 - [x] **You approve tagging `v0.1.0-beta.1`.** After it's tagged, a GitHub pre-release with four archives exists and the tap is untouched (spec success criterion 9).
   - Released 2026-11-10 from `4580b3e`: a GitHub pre-release with four archives and `checksums.txt`. The darwin/arm64 binary prints `dk-email 0.1.0-beta.1 (4580b3e, 2026-11-10)`, and `dkouvdis/homebrew-tap` is still empty.
 - [ ] **You approve tagging `v0.1.0-rc.1`, then `v0.1.0`.** Afterwards, `brew install dkouvdis/tap/dk-email && dk-email --version` prints `dk-email 0.1.0 (…)`.

@@ -40,7 +40,7 @@ The full details for every task are in [todo.md](todo.md).
 - [x] T6: Threading package
 - [x] T7: IMAP `Summaries` with UID paging
 - [x] T8: UI shell (layout engine, hint bar, status line, help, debug log)
-- [x] T9: Sidebar with folder selection (wide mode)
+- [x] T9: Sidebar with folder selection (now part of the narrow layout)
 - [x] T10: Thread list (expand/collapse, navigation, paging)
 - [x] T11: Render package (MIME → text)
 - [x] T12: IMAP `Message` fetch + reader pane + mark read on open
