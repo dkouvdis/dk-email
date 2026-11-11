@@ -8,6 +8,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
+
+	"github.com/dkouvdis/dk-email/internal/ui/theme"
 )
 
 func bind(k, desc string) key.Binding {
@@ -46,7 +48,7 @@ func keyMsg(k string) tea.KeyPressMsg {
 }
 
 func TestHelp_SizesToContentWhenItFits(t *testing.T) {
-	h := NewHelp(sections())
+	h := NewHelp(theme.Default(), sections())
 	h.SetSize(200, 100)
 
 	view := h.View()
@@ -70,7 +72,7 @@ func TestHelp_SizesToContentWhenItFits(t *testing.T) {
 }
 
 func TestHelp_ClampsToMaxSizeAndScrolls(t *testing.T) {
-	h := NewHelp(sections())
+	h := NewHelp(theme.Default(), sections())
 	h.SetSize(50, 12) // 5 rows of content
 	view := h.View()
 
@@ -107,7 +109,7 @@ func TestHelp_ClampsToMaxSizeAndScrolls(t *testing.T) {
 }
 
 func TestHelp_ResetAndResizeKeepOffsetValid(t *testing.T) {
-	h := NewHelp(sections())
+	h := NewHelp(theme.Default(), sections())
 	h.SetSize(50, 12)
 	h, _ = h.Update(keyMsg("G"))
 
@@ -124,7 +126,7 @@ func TestHelp_ResetAndResizeKeepOffsetValid(t *testing.T) {
 }
 
 func TestHelp_TooSmallRendersNothing(t *testing.T) {
-	h := NewHelp(sections())
+	h := NewHelp(theme.Default(), sections())
 	for _, s := range [][2]int{{0, 0}, {20, 30}, {50, 7}} {
 		h.SetSize(s[0], s[1])
 		if v := h.View(); v != "" {
@@ -134,7 +136,7 @@ func TestHelp_TooSmallRendersNothing(t *testing.T) {
 }
 
 func TestHelp_LongDescriptionsAreTruncatedNotWrapped(t *testing.T) {
-	h := NewHelp([]Section{{"x", []key.Binding{bind("z", strings.Repeat("long ", 30))}}})
+	h := NewHelp(theme.Default(), []Section{{"x", []key.Binding{bind("z", strings.Repeat("long ", 30))}}})
 	h.SetSize(40, 20)
 
 	view := h.View()
@@ -155,7 +157,7 @@ func typeText(h Help, text string) Help {
 }
 
 func TestHelp_FilterNarrowsAndHidesEmptySections(t *testing.T) {
-	h := NewHelp(sections())
+	h := NewHelp(theme.Default(), sections())
 	h.SetSize(80, 40)
 	size := lipgloss.Height(h.View())
 
@@ -200,7 +202,7 @@ func TestHelp_FilterNarrowsAndHidesEmptySections(t *testing.T) {
 }
 
 func TestHelp_FilterTakesEveryPrintableKey(t *testing.T) {
-	h := NewHelp(sections())
+	h := NewHelp(theme.Default(), sections())
 	h.SetSize(80, 40)
 	h, _ = h.Update(keyMsg("/"))
 
@@ -217,7 +219,7 @@ func TestHelp_FilterTakesEveryPrintableKey(t *testing.T) {
 }
 
 func TestHelp_EscClearsThenCloses(t *testing.T) {
-	h := NewHelp(sections())
+	h := NewHelp(theme.Default(), sections())
 	h.SetSize(80, 40)
 
 	h, _ = h.Update(keyMsg("/"))
@@ -252,7 +254,7 @@ func TestHelp_EscClearsThenCloses(t *testing.T) {
 }
 
 func TestHelp_FilterResetsScroll(t *testing.T) {
-	h := NewHelp(sections())
+	h := NewHelp(theme.Default(), sections())
 	h.SetSize(50, 12)
 	h, _ = h.Update(keyMsg("G"))
 
@@ -265,7 +267,7 @@ func TestHelp_FilterResetsScroll(t *testing.T) {
 }
 
 func TestHelp_PasteIntoFilter(t *testing.T) {
-	h := NewHelp(sections())
+	h := NewHelp(theme.Default(), sections())
 	h.SetSize(80, 40)
 	if h.Paste(tea.PasteMsg{Content: "b2"}).filter.Value() != "" {
 		t.Error("paste without the filter focused should do nothing")

@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/charmbracelet/x/ansi"
+
+	"github.com/dkouvdis/dk-email/internal/ui/theme"
 )
 
 func TestOverlay(t *testing.T) {
@@ -31,13 +33,13 @@ func TestCenter(t *testing.T) {
 }
 
 func TestFrame(t *testing.T) {
-	got := ansi.Strip(Frame("hello\nworld", 12, 5))
+	got := ansi.Strip(Frame(theme.Default(), "hello\nworld", 12, 5))
 
 	lines := strings.Split(got, "\n")
 	if len(lines) != 5 || ansi.StringWidth(lines[0]) != 12 || !strings.Contains(got, "hello") {
 		t.Errorf("Frame =\n%s\nwant a 12×5 box", got)
 	}
-	if Frame("x", 3, 2) != "" {
+	if Frame(theme.Default(), "x", 3, 2) != "" {
 		t.Error("a frame too small for content should render nothing")
 	}
 }

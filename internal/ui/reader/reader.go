@@ -14,7 +14,9 @@ import (
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+
 	"github.com/charmbracelet/x/ansi"
+	"github.com/dkouvdis/dk-email/internal/ui/theme"
 
 	"github.com/dkouvdis/dk-email/internal/mail"
 	"github.com/dkouvdis/dk-email/internal/render"
@@ -41,7 +43,8 @@ type keys struct{ up, down, pgUp, pgDown, top, bottom, expandAll key.Binding }
 type styles struct{ subject, label, sender, dim, dot, star, sep, err lipgloss.Style }
 
 type Model struct {
-	now func() time.Time
+	theme theme.Theme
+	now   func() time.Time
 
 	open     bool
 	account  int
@@ -57,9 +60,10 @@ type Model struct {
 }
 
 // New returns an empty reader. now is used for the date's time zone.
-func New(now func() time.Time) Model {
+func New(th theme.Theme, now func() time.Time) Model {
 	return Model{
-		now: now,
+		theme: th,
+		now:   now,
 		keys: keys{
 			up:        key.NewBinding(key.WithKeys("k", "up")),
 			down:      key.NewBinding(key.WithKeys("j", "down")),
@@ -71,13 +75,13 @@ func New(now func() time.Time) Model {
 		},
 		st: styles{
 			subject: lipgloss.NewStyle().Bold(true),
-			label:   lipgloss.NewStyle().Foreground(lipgloss.Color("244")),
+			label:   th.Muted,
 			sender:  lipgloss.NewStyle().Bold(true),
-			dim:     lipgloss.NewStyle().Foreground(lipgloss.Color("244")),
-			dot:     lipgloss.NewStyle().Foreground(lipgloss.Color("111")),
-			star:    lipgloss.NewStyle().Foreground(lipgloss.Color("220")),
-			sep:     lipgloss.NewStyle().Foreground(lipgloss.Color("238")),
-			err:     lipgloss.NewStyle().Foreground(lipgloss.Color("203")),
+			dim:     th.Muted,
+			dot:     th.Unread,
+			star:    th.Star,
+			sep:     lipgloss.NewStyle().Foreground(th.BorderColor),
+			err:     th.Error,
 		},
 	}
 }
@@ -103,7 +107,7 @@ func (m Model) Open(account int, folder string, th thread.Thread, focus mail.UID
 
 // Close empties the reader, e.g. when another folder opens.
 func (m Model) Close() Model {
-	return New(m.now).SetSize(m.width, m.height)
+	return New(m.theme, m.now).SetSize(m.width, m.height)
 }
 
 func (m Model) IsOpen() bool { return m.open }

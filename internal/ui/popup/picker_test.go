@@ -9,6 +9,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
+
+	"github.com/dkouvdis/dk-email/internal/ui/theme"
 )
 
 func pickerKey(k string) tea.KeyPressMsg {
@@ -47,7 +49,7 @@ func groups() []Group[string] {
 }
 
 func TestPicker_StartsOnCurrentAndMovesAcrossGroups(t *testing.T) {
-	p := NewPicker("Go to folder", groups())
+	p := NewPicker(theme.Default(), "Go to folder", groups())
 	p.SetSize(80, 30)
 
 	if v, _ := p.Selected(); v != "p/receipts" {
@@ -75,7 +77,7 @@ func TestPicker_StartsOnCurrentAndMovesAcrossGroups(t *testing.T) {
 }
 
 func TestPicker_EnterChoosesAndEscCancels(t *testing.T) {
-	p := NewPicker("Go to folder", groups())
+	p := NewPicker(theme.Default(), "Go to folder", groups())
 
 	_, r := p.Update(pickerKey("enter"))
 	if r != Chosen {
@@ -92,7 +94,7 @@ func TestPicker_EnterChoosesAndEscCancels(t *testing.T) {
 }
 
 func TestPicker_Empty(t *testing.T) {
-	p := NewPicker("Go to folder", []Group[string]{{Name: "Personal", Note: "connecting…"}})
+	p := NewPicker(theme.Default(), "Go to folder", []Group[string]{{Name: "Personal", Note: "connecting…"}})
 	p.SetSize(80, 30)
 
 	if _, ok := p.Selected(); ok {
@@ -107,7 +109,7 @@ func TestPicker_Empty(t *testing.T) {
 }
 
 func TestPicker_View(t *testing.T) {
-	p := NewPicker("Go to folder", groups())
+	p := NewPicker(theme.Default(), "Go to folder", groups())
 	p.SetSize(80, 30)
 	p, _ = p.Update(pickerKey("g"))
 
@@ -143,7 +145,7 @@ func TestPicker_ScrollsAndClamps(t *testing.T) {
 	for i := range 40 {
 		items = append(items, Item[int]{Label: "folder", Value: i})
 	}
-	p := NewPicker("Go to folder", []Group[int]{{Name: "Personal", Items: items}})
+	p := NewPicker(theme.Default(), "Go to folder", []Group[int]{{Name: "Personal", Items: items}})
 	p.SetSize(50, 14)
 
 	p, _ = p.Update(pickerKey("G"))
@@ -165,7 +167,7 @@ func TestPicker_ScrollsAndClamps(t *testing.T) {
 }
 
 func TestPicker_SlashFiltersFoldersByLabel(t *testing.T) {
-	p := NewPicker("Go to folder", groups())
+	p := NewPicker(theme.Default(), "Go to folder", groups())
 	p.SetSize(80, 30)
 
 	p = typeKeys(p, "/INB")
@@ -195,7 +197,7 @@ func TestPicker_SlashFiltersFoldersByLabel(t *testing.T) {
 }
 
 func TestPicker_FilterTakesEveryKeyAndEscClearsFirst(t *testing.T) {
-	p := NewPicker("Go to folder", groups())
+	p := NewPicker(theme.Default(), "Go to folder", groups())
 	p.SetSize(80, 30)
 
 	p = typeKeys(p, "/jkq") // j, k and q are text while filtering
@@ -219,7 +221,7 @@ func TestPicker_FilterTakesEveryKeyAndEscClearsFirst(t *testing.T) {
 }
 
 func TestPicker_PasteIntoFilter(t *testing.T) {
-	p := NewPicker("Go to folder", groups())
+	p := NewPicker(theme.Default(), "Go to folder", groups())
 	p.SetSize(80, 30)
 
 	p = p.Paste(tea.PasteMsg{Content: "rece"})
@@ -235,7 +237,7 @@ func TestPicker_PasteIntoFilter(t *testing.T) {
 }
 
 func TestPicker_SizeStaysPutWhileFiltering(t *testing.T) {
-	p := NewPicker("Go to folder", groups())
+	p := NewPicker(theme.Default(), "Go to folder", groups())
 	p.SetSize(80, 30)
 	beforeW, beforeH := lipgloss.Size(p.View())
 
@@ -255,7 +257,7 @@ func TestPicker_ScrollingUpShowsTheAccountName(t *testing.T) {
 		}
 		return g
 	}
-	p := NewPicker("Go to folder", []Group[string]{group("Personal"), group("Work"), group("Proton")})
+	p := NewPicker(theme.Default(), "Go to folder", []Group[string]{group("Personal"), group("Work"), group("Proton")})
 	p.SetSize(50, 6+1+6) // chrome, filter row and 6 item lines
 
 	p, _ = p.Update(pickerKey("G"))
@@ -268,7 +270,7 @@ func TestPicker_ScrollingUpShowsTheAccountName(t *testing.T) {
 }
 
 func TestPicker_NestedAndDisabledItems(t *testing.T) {
-	p := NewPicker("Go to folder", []Group[string]{{Name: "Personal", Items: []Item[string]{
+	p := NewPicker(theme.Default(), "Go to folder", []Group[string]{{Name: "Personal", Items: []Item[string]{
 		{Label: "Inbox", Value: "INBOX", Path: "Inbox"},
 		{Label: "Work", Value: "Work", Path: "Work", Disabled: true},
 		{Label: "Clients", Value: "Work/Clients", Path: "Work/Clients", Depth: 1},
@@ -295,7 +297,7 @@ func TestPicker_NestedAndDisabledItems(t *testing.T) {
 	if plain := ansi.Strip(p.View()); !strings.Contains(plain, "▸ Work/Clients/Acme") || strings.Contains(plain, "  Work\n") {
 		t.Errorf("while filtering, want the match with its path:\n%s", plain)
 	}
-	q := NewPicker("x", p.groups)
+	q := NewPicker(theme.Default(), "x", p.groups)
 	q.SetSize(80, 30)
 	q = typeKeys(q, "/work")
 	if !strings.Contains(ansi.Strip(q.View()), "No folders match") {

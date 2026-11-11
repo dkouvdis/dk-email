@@ -12,6 +12,7 @@ import (
 
 	"github.com/dkouvdis/dk-email/internal/mail"
 	"github.com/dkouvdis/dk-email/internal/thread"
+	"github.com/dkouvdis/dk-email/internal/ui/theme"
 )
 
 var now = time.Date(2026, 11, 9, 15, 30, 0, 0, time.UTC)
@@ -52,7 +53,7 @@ func withBody(s mail.Summary, text string) mail.Message {
 func view(m Model) string { return ansi.Strip(m.View(60, 200)) }
 
 func open(th thread.Thread, focus mail.UID) Model {
-	return New(func() time.Time { return now }).SetSize(60, 200).Open(0, "INBOX", th, focus)
+	return New(theme.Default(), func() time.Time { return now }).SetSize(60, 200).Open(0, "INBOX", th, focus)
 }
 
 func TestOpen_ExpandsFirstUnreadAndAsksForItsBody(t *testing.T) {
@@ -176,7 +177,7 @@ func TestSetSeen_UpdatesMarkers(t *testing.T) {
 
 func TestScrolling(t *testing.T) {
 	long := strings.Repeat("line\n", 100)
-	m := New(func() time.Time { return now }).SetSize(40, 10).Open(0, "INBOX", conversation(), 0)
+	m := New(theme.Default(), func() time.Time { return now }).SetSize(40, 10).Open(0, "INBOX", conversation(), 0)
 	m = m.SetMessage(2, withBody(conversation().Messages[1], long), nil)
 
 	top := ansi.Strip(m.View(40, 10))
@@ -211,7 +212,7 @@ func TestScrolling(t *testing.T) {
 }
 
 func TestEmptyAndClose(t *testing.T) {
-	m := New(time.Now)
+	m := New(theme.Default(), time.Now)
 	if m.IsOpen() || !strings.Contains(ansi.Strip(m.View(40, 5)), "No message selected.") {
 		t.Error("new reader should be empty")
 	}
@@ -239,7 +240,7 @@ func TestCurrent(t *testing.T) {
 	if got := open(conversation(), 1).Current(); got != 1 {
 		t.Errorf("Current() = %d, want the focused message (1)", got)
 	}
-	if got := New(time.Now).Current(); got != 0 {
+	if got := New(theme.Default(), time.Now).Current(); got != 0 {
 		t.Errorf("Current() on an empty reader = %d, want 0", got)
 	}
 }

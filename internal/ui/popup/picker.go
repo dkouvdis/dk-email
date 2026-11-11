@@ -8,7 +8,9 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+
 	"github.com/charmbracelet/x/ansi"
+	"github.com/dkouvdis/dk-email/internal/ui/theme"
 )
 
 // Item is one choice in a Picker.
@@ -69,12 +71,12 @@ type Picker[T any] struct {
 
 type itemRef struct{ group, item int }
 
-func NewPicker[T any](title string, groups []Group[T]) Picker[T] {
+func NewPicker[T any](th theme.Theme, title string, groups []Group[T]) Picker[T] {
 	p := Picker[T]{
 		title:    title,
 		groups:   groups,
-		st:       NewHelp(nil).st,
-		cursorSt: lipgloss.NewStyle().Background(lipgloss.Color("63")).Foreground(lipgloss.Color("231")),
+		st:       newHelpStyles(th),
+		cursorSt: th.Cursor,
 	}
 	p.keys.up = key.NewBinding(key.WithKeys("k", "up"))
 	p.keys.down = key.NewBinding(key.WithKeys("j", "down"))

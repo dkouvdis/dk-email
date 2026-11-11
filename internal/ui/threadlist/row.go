@@ -6,7 +6,9 @@ import (
 	"time"
 
 	"charm.land/lipgloss/v2"
+
 	"github.com/charmbracelet/x/ansi"
+	"github.com/dkouvdis/dk-email/internal/ui/theme"
 
 	"github.com/dkouvdis/dk-email/internal/mail"
 )
@@ -25,13 +27,13 @@ type rowStyles struct {
 	unreadDot, star, bold, dim, cursor lipgloss.Style
 }
 
-func defaultRowStyles() rowStyles {
+func newRowStyles(th theme.Theme) rowStyles {
 	return rowStyles{
-		unreadDot: lipgloss.NewStyle().Foreground(lipgloss.Color("111")),
-		star:      lipgloss.NewStyle().Foreground(lipgloss.Color("220")),
+		unreadDot: th.Unread,
+		star:      th.Star,
 		bold:      lipgloss.NewStyle().Bold(true),
-		dim:       lipgloss.NewStyle().Foreground(lipgloss.Color("244")),
-		cursor:    lipgloss.NewStyle().Foreground(lipgloss.Color("231")).Background(lipgloss.Color("63")),
+		dim:       th.Muted,
+		cursor:    th.Cursor,
 	}
 }
 

@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/dkouvdis/dk-email/internal/config"
+	"github.com/dkouvdis/dk-email/internal/ui/theme"
 )
 
 func ck(k string) tea.KeyPressMsg {
@@ -58,7 +59,7 @@ func fill(c Connect, values ...string) Connect {
 }
 
 func newConnect() Connect {
-	c := NewConnect([]string{"Personal"})
+	c := NewConnect(theme.Default(), []string{"Personal"})
 	c.SetSize(100, 40)
 	return c
 }
@@ -207,7 +208,7 @@ func TestConnect_BusyIgnoresInputAndShowsError(t *testing.T) {
 
 func TestConnect_PasswordOnlyMode(t *testing.T) {
 	acct := config.Account{Name: "Personal", Email: "me@gmail.com", IMAPHost: "imap.gmail.com", IMAPPort: 993, TLS: config.TLSImplicit}
-	c := NewPasswordPrompt(acct)
+	c := NewPasswordPrompt(theme.Default(), acct)
 	c.SetSize(100, 40)
 
 	v := ansi.Strip(c.View())
@@ -227,7 +228,7 @@ func TestConnect_PasswordOnlyMode(t *testing.T) {
 	if req := c.Request(); req.Account != acct || req.Password != "app-pass" || !c.PasswordOnly() {
 		t.Errorf("Request() = %+v", req)
 	}
-	if _, r = keys(NewPasswordPrompt(acct), "tab", "enter"); r != ConnectPending {
+	if _, r = keys(NewPasswordPrompt(theme.Default(), acct), "tab", "enter"); r != ConnectPending {
 		t.Error("an empty password must not submit")
 	}
 }

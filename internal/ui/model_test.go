@@ -200,8 +200,8 @@ func TestModel_HintBarReadsDescriptionThenKey(t *testing.T) {
 	if !strings.HasPrefix(h, "Up: k/↑ | Down: j/↓ | Open: enter | Expand: space") || strings.Contains(h, "•") {
 		t.Errorf("hint bar = %q, want lazygit style: Description: key | …", h)
 	}
-	if !strings.Contains(bar, "38;5;110") {
-		t.Errorf("hint bar isn't drawn in the soft blue (110): %q", bar)
+	if !strings.Contains(bar, "\x1b[36m") {
+		t.Errorf("hint bar isn't drawn in the hint colour (ANSI cyan): %q", bar)
 	}
 }
 

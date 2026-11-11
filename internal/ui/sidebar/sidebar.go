@@ -14,7 +14,9 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+
 	"github.com/charmbracelet/x/ansi"
+	"github.com/dkouvdis/dk-email/internal/ui/theme"
 
 	"github.com/dkouvdis/dk-email/internal/mail"
 )
@@ -71,7 +73,7 @@ type Model struct {
 	st       styles
 }
 
-func New(names []string) Model {
+func New(th theme.Theme, names []string) Model {
 	m := Model{
 		cursor:  noRef,
 		open:    noRef,
@@ -92,11 +94,11 @@ func New(names []string) Model {
 			header: lipgloss.NewStyle().Bold(true),
 			folder: lipgloss.NewStyle(),
 			unread: lipgloss.NewStyle().Bold(true),
-			count:  lipgloss.NewStyle().Foreground(lipgloss.Color("111")),
-			cursor: lipgloss.NewStyle().Foreground(lipgloss.Color("231")).Background(lipgloss.Color("63")),
-			open:   lipgloss.NewStyle().Foreground(lipgloss.Color("63")),
-			dim:    lipgloss.NewStyle().Foreground(lipgloss.Color("244")),
-			err:    lipgloss.NewStyle().Foreground(lipgloss.Color("203")),
+			count:  th.Unread,
+			cursor: th.Cursor,
+			open:   th.Accent,
+			dim:    th.Muted,
+			err:    th.Error,
 		},
 	}
 	m.filter = textinput.New()

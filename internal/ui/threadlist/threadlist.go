@@ -16,6 +16,7 @@ import (
 
 	"github.com/dkouvdis/dk-email/internal/mail"
 	"github.com/dkouvdis/dk-email/internal/thread"
+	"github.com/dkouvdis/dk-email/internal/ui/theme"
 )
 
 // LoadMoreMsg asks the root model for the page of messages older than Before.
@@ -50,7 +51,7 @@ type Model struct {
 }
 
 // New returns an empty list. now is used for relative dates.
-func New(now func() time.Time) Model {
+func New(th theme.Theme, now func() time.Time) Model {
 	return Model{
 		now:      now,
 		expanded: map[mail.UID]bool{},
@@ -61,7 +62,7 @@ func New(now func() time.Time) Model {
 			bottom: key.NewBinding(key.WithKeys("G", "end")),
 			expand: key.NewBinding(key.WithKeys("space")),
 		},
-		st: defaultRowStyles(),
+		st: newRowStyles(th),
 	}
 }
 

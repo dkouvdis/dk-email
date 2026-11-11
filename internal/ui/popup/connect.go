@@ -9,7 +9,9 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+
 	"github.com/charmbracelet/x/ansi"
+	"github.com/dkouvdis/dk-email/internal/ui/theme"
 
 	"github.com/dkouvdis/dk-email/internal/config"
 )
@@ -77,8 +79,8 @@ type Connect struct {
 
 // NewConnect is an empty form for a new account. existing are the account
 // names already taken.
-func NewConnect(existing []string) Connect {
-	c := newForm()
+func NewConnect(th theme.Theme, existing []string) Connect {
+	c := newForm(th)
 	for _, n := range existing {
 		c.existing = append(c.existing, strings.ToLower(strings.TrimSpace(n)))
 	}
@@ -88,8 +90,8 @@ func NewConnect(existing []string) Connect {
 
 // NewPasswordPrompt asks for a saved account's password, to keep in the
 // keychain. Only the password can be edited.
-func NewPasswordPrompt(acct config.Account) Connect {
-	c := newForm()
+func NewPasswordPrompt(th theme.Theme, acct config.Account) Connect {
+	c := newForm(th)
 	c.passwordOnly, c.account = true, acct
 	c.source = sourceKeychain
 	c.setFocus(fSecret)
@@ -97,8 +99,8 @@ func NewPasswordPrompt(acct config.Account) Connect {
 	return c
 }
 
-func newForm() Connect {
-	c := Connect{tls: config.TLSImplicit, st: NewHelp(nil).st}
+func newForm(th theme.Theme) Connect {
+	c := Connect{tls: config.TLSImplicit, st: newHelpStyles(th)}
 	placeholders := map[int]string{
 		fName:  "Personal",
 		fEmail: "me@example.com",

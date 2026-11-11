@@ -22,6 +22,7 @@ import (
 	"github.com/dkouvdis/dk-email/internal/ui/popup"
 	"github.com/dkouvdis/dk-email/internal/ui/reader"
 	"github.com/dkouvdis/dk-email/internal/ui/sidebar"
+	"github.com/dkouvdis/dk-email/internal/ui/theme"
 	"github.com/dkouvdis/dk-email/internal/ui/threadlist"
 )
 
@@ -69,6 +70,7 @@ type Model struct {
 
 	log           *slog.Logger
 	keys          KeyMap
+	theme         theme.Theme
 	styles        styles
 	helpPop       popup.Help
 	width, height int
@@ -109,22 +111,24 @@ func New(cfg config.Config, connect Connector, log *slog.Logger) Model {
 		names = append(names, a.Name)
 	}
 	keys := DefaultKeyMap()
+	th := theme.New(cfg.Colors)
 	m := Model{
 		ui:            cfg.UI,
 		accts:         slices.Clone(cfg.Accounts),
 		connect:       connect,
 		boxes:         make([]mail.Mailbox, len(cfg.Accounts)),
-		side:          sidebar.New(names),
+		side:          sidebar.New(th, names),
 		open:          openFolder{account: -1},
 		every:         tick,
 		needsPassword: map[int]bool{},
 		connectFor:    -1,
-		list:          threadlist.New(time.Now),
-		read:          reader.New(time.Now),
+		list:          threadlist.New(th, time.Now),
+		read:          reader.New(th, time.Now),
 		log:           log,
 		keys:          keys,
-		styles:        defaultStyles(),
-		helpPop:       popup.NewHelp(keys.HelpSections()),
+		theme:         th,
+		styles:        newStyles(th),
+		helpPop:       popup.NewHelp(th, keys.HelpSections()),
 		mode:          mode,
 		focus:         PaneList,
 	}
@@ -404,7 +408,7 @@ func (m Model) render() string {
 	if m.readerPopup {
 		p := m.panes.Popup
 		w, h := popup.FrameInner(p.W, p.H)
-		screen = popup.Overlay(screen, popup.Frame(m.read.View(w, h), p.W, p.H), p.X, p.Y)
+		screen = popup.Overlay(screen, popup.Frame(m.theme, m.read.View(w, h), p.W, p.H), p.X, p.Y)
 	}
 	pop := ""
 	switch {

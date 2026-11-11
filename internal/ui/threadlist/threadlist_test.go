@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/dkouvdis/dk-email/internal/mail"
+	"github.com/dkouvdis/dk-email/internal/ui/theme"
 )
 
 var now = time.Date(2026, 11, 9, 15, 30, 0, 0, time.UTC)
@@ -83,7 +84,7 @@ func send(m Model, keys ...string) (Model, tea.Cmd) {
 }
 
 func TestView_ThreadRowFormat(t *testing.T) {
-	m := New(clock).SetSummaries(inbox(), false)
+	m := New(theme.Default(), clock).SetSummaries(inbox(), false)
 
 	got := lines(m, 70)
 
@@ -120,7 +121,7 @@ func TestView_ThreadRowFormat(t *testing.T) {
 
 func TestView_TruncatesToWidth(t *testing.T) {
 	long := sum(1, strings.Repeat("Sender", 10), strings.Repeat("Subject ", 20), now.Add(-time.Minute), "x")
-	m := New(clock).SetSummaries([]mail.Summary{long}, false)
+	m := New(theme.Default(), clock).SetSummaries([]mail.Summary{long}, false)
 
 	for _, w := range []int{24, 30, 45} {
 		row := lines(m, w)[0]
@@ -163,7 +164,7 @@ func TestFormatDate_UsesNowsLocation(t *testing.T) {
 }
 
 func TestView_SubjectFallback(t *testing.T) {
-	m := New(clock).SetSummaries([]mail.Summary{sum(1, "", "", now, "x")}, false)
+	m := New(theme.Default(), clock).SetSummaries([]mail.Summary{sum(1, "", "", now, "x")}, false)
 
 	row := lines(m, 70)[0]
 
@@ -173,7 +174,7 @@ func TestView_SubjectFallback(t *testing.T) {
 }
 
 func TestUpdate_NavigationClamps(t *testing.T) {
-	m := New(clock).SetSummaries(inbox(), false)
+	m := New(theme.Default(), clock).SetSummaries(inbox(), false)
 
 	steps := []struct {
 		key  string
@@ -190,7 +191,7 @@ func TestUpdate_NavigationClamps(t *testing.T) {
 }
 
 func TestUpdate_ExpandAndCollapse(t *testing.T) {
-	m := New(clock).SetSummaries(inbox(), false)
+	m := New(theme.Default(), clock).SetSummaries(inbox(), false)
 
 	m, _ = send(m, "space")
 	got := lines(m, 70)
@@ -231,8 +232,8 @@ func TestUpdate_ExpandAndCollapse(t *testing.T) {
 }
 
 func TestSelected(t *testing.T) {
-	m := New(clock).SetSummaries(inbox(), false)
-	if _, _, ok := New(clock).Selected(); ok {
+	m := New(theme.Default(), clock).SetSummaries(inbox(), false)
+	if _, _, ok := New(theme.Default(), clock).Selected(); ok {
 		t.Error("Selected() ok on an empty list")
 	}
 
@@ -248,7 +249,7 @@ func TestSelected(t *testing.T) {
 }
 
 func TestPaging_AsksForOlderAtTheEnd(t *testing.T) {
-	m := New(clock).SetSummaries(inbox(), true)
+	m := New(theme.Default(), clock).SetSummaries(inbox(), true)
 
 	m, cmd := send(m, "j")
 	if cmd != nil {
@@ -276,7 +277,7 @@ func TestPaging_MergesAcrossPageBoundaryWithoutMovingCursor(t *testing.T) {
 		sum(4, "Carol", "Lunch?", now.Add(-48*time.Hour), "l0"),
 		sum(3, "Erin", "Ancient", time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC), "a1"),
 	}
-	m := New(clock).SetSummaries(first, true)
+	m := New(theme.Default(), clock).SetSummaries(first, true)
 	m, _ = send(m, "G")
 
 	m = m.AddPage(page, false)
@@ -305,7 +306,7 @@ func TestPaging_MergesAcrossPageBoundaryWithoutMovingCursor(t *testing.T) {
 func TestPaging_ExpandedThreadStaysExpandedAfterMerge(t *testing.T) {
 	first := inbox()
 	first[3].References, first[3].InReplyTo = []string{"l0"}, "l0"
-	m := New(clock).SetSummaries(first, true)
+	m := New(theme.Default(), clock).SetSummaries(first, true)
 	m, _ = send(m, "j", "space") // expand Lunch
 
 	m = m.AddPage([]mail.Summary{sum(4, "Carol", "Lunch?", now.Add(-48*time.Hour), "l0")}, false)
@@ -316,7 +317,7 @@ func TestPaging_ExpandedThreadStaysExpandedAfterMerge(t *testing.T) {
 }
 
 func TestPaging_FailureAllowsRetry(t *testing.T) {
-	m := New(clock).SetSummaries(inbox(), true)
+	m := New(theme.Default(), clock).SetSummaries(inbox(), true)
 	m, _ = send(m, "G")
 
 	m = m.PageFailed()
@@ -330,7 +331,7 @@ func TestPaging_FailureAllowsRetry(t *testing.T) {
 }
 
 func TestPaging_DuplicatesAreDropped(t *testing.T) {
-	m := New(clock).SetSummaries(inbox(), true)
+	m := New(theme.Default(), clock).SetSummaries(inbox(), true)
 
 	m = m.AddPage(inbox()[:2], true)
 
@@ -340,7 +341,7 @@ func TestPaging_DuplicatesAreDropped(t *testing.T) {
 }
 
 func TestSetSummaries_ResetsCursorAndExpansion(t *testing.T) {
-	m := New(clock).SetSummaries(inbox(), false)
+	m := New(theme.Default(), clock).SetSummaries(inbox(), false)
 	m, _ = send(m, "space", "G")
 
 	m = m.SetSummaries(inbox(), false)
@@ -351,7 +352,7 @@ func TestSetSummaries_ResetsCursorAndExpansion(t *testing.T) {
 }
 
 func TestView_EmptyAndScrolling(t *testing.T) {
-	if v := ansi.Strip(New(clock).SetSummaries(nil, false).View(40, 5)); !strings.Contains(v, "No messages.") {
+	if v := ansi.Strip(New(theme.Default(), clock).SetSummaries(nil, false).View(40, 5)); !strings.Contains(v, "No messages.") {
 		t.Errorf("empty view = %q", v)
 	}
 
@@ -359,7 +360,7 @@ func TestView_EmptyAndScrolling(t *testing.T) {
 	for i := range 50 {
 		many = append(many, sum(mail.UID(i+1), "S", fmt.Sprintf("subject %02d", i), now.Add(-time.Duration(i)*time.Minute), fmt.Sprint(i)))
 	}
-	m := New(clock).SetSummaries(many, false).SetHeight(10)
+	m := New(theme.Default(), clock).SetSummaries(many, false).SetHeight(10)
 	m, _ = send(m, "G")
 
 	v := ansi.Strip(m.View(50, 10))
@@ -376,7 +377,7 @@ func TestView_EmptyAndScrolling(t *testing.T) {
 }
 
 func TestSetSeen_UpdatesRowsInPlace(t *testing.T) {
-	m := New(clock).SetSummaries(inbox(), false)
+	m := New(theme.Default(), clock).SetSummaries(inbox(), false)
 	m, _ = send(m, "space", "j")
 
 	m = m.SetSeen([]mail.UID{14}, true)
@@ -390,7 +391,7 @@ func TestSetSeen_UpdatesRowsInPlace(t *testing.T) {
 }
 
 func TestSetFlagged(t *testing.T) {
-	m := New(clock).SetSummaries(inbox(), false)
+	m := New(theme.Default(), clock).SetSummaries(inbox(), false)
 
 	m = m.SetFlagged([]mail.UID{12}, false).SetFlagged([]mail.UID{11}, true)
 
@@ -401,7 +402,7 @@ func TestSetFlagged(t *testing.T) {
 }
 
 func TestLookup(t *testing.T) {
-	m := New(clock).SetSummaries(inbox(), false)
+	m := New(theme.Default(), clock).SetSummaries(inbox(), false)
 
 	got := m.Lookup([]mail.UID{14, 99, 5})
 
@@ -411,7 +412,7 @@ func TestLookup(t *testing.T) {
 }
 
 func TestRemove_MovesCursorToNextThreadAndRestoreUndoes(t *testing.T) {
-	m := New(clock).SetSummaries(inbox(), true) // Plan (14,12,10), Lunch (11), Old news (5)
+	m := New(theme.Default(), clock).SetSummaries(inbox(), true) // Plan (14,12,10), Lunch (11), Old news (5)
 
 	m = m.Remove([]mail.UID{14, 12, 10})
 
@@ -439,7 +440,7 @@ func TestRemove_MovesCursorToNextThreadAndRestoreUndoes(t *testing.T) {
 }
 
 func TestRemove_MessageRowKeepsThread(t *testing.T) {
-	m := New(clock).SetSummaries(inbox(), false)
+	m := New(theme.Default(), clock).SetSummaries(inbox(), false)
 	m, _ = send(m, "space", "j", "j") // Bob's message (12)
 
 	m = m.Remove([]mail.UID{12})
@@ -454,7 +455,7 @@ func TestRemove_MessageRowKeepsThread(t *testing.T) {
 }
 
 func TestRemove_EverythingLeavesEmptyList(t *testing.T) {
-	m := New(clock).SetSummaries(inbox()[3:4], false)
+	m := New(theme.Default(), clock).SetSummaries(inbox()[3:4], false)
 
 	m = m.Remove([]mail.UID{11})
 
@@ -464,8 +465,8 @@ func TestRemove_EverythingLeavesEmptyList(t *testing.T) {
 }
 
 func TestMerge_AddsUpdatesAndDropsWithoutMovingCursor(t *testing.T) {
-	m := New(clock).SetSummaries(inbox(), true) // Plan (14,12,10), Lunch (11), Old news (5)
-	m, _ = send(m, "j", "space")                // Lunch expanded, cursor on it
+	m := New(theme.Default(), clock).SetSummaries(inbox(), true) // Plan (14,12,10), Lunch (11), Old news (5)
+	m, _ = send(m, "j", "space")                                 // Lunch expanded, cursor on it
 
 	fresh := inbox()
 	fresh = slices.DeleteFunc(fresh, func(s mail.Summary) bool { return s.UID == 12 }) // moved away elsewhere
@@ -490,14 +491,14 @@ func TestMerge_AddsUpdatesAndDropsWithoutMovingCursor(t *testing.T) {
 }
 
 func TestMerge_KeepsOlderPagesAndHandlesEmpty(t *testing.T) {
-	m := New(clock).SetSummaries(inbox(), true)
+	m := New(theme.Default(), clock).SetSummaries(inbox(), true)
 
 	m = m.Merge(inbox()[:2]) // a newest page covering only UIDs ≥ 12
 
 	if n := len(lines(m, 70)); n != 3 {
 		t.Errorf("older messages below the page were dropped: %d rows", n)
 	}
-	if got := New(clock).Merge(inbox()); len(lines(got, 70)) != 3 {
+	if got := New(theme.Default(), clock).Merge(inbox()); len(lines(got, 70)) != 3 {
 		t.Error("merging into an empty list should add everything")
 	}
 	if got := m.Merge(nil); len(lines(got, 70)) != 3 {
@@ -506,7 +507,7 @@ func TestMerge_KeepsOlderPagesAndHandlesEmpty(t *testing.T) {
 }
 
 func TestMerge_CursorMessageGoneMovesToNextThread(t *testing.T) {
-	m := New(clock).SetSummaries(inbox(), false)
+	m := New(theme.Default(), clock).SetSummaries(inbox(), false)
 	m, _ = send(m, "j") // Lunch
 
 	m = m.Merge(slices.DeleteFunc(inbox(), func(s mail.Summary) bool { return s.UID == 11 }))
@@ -516,18 +517,18 @@ func TestMerge_CursorMessageGoneMovesToNextThread(t *testing.T) {
 	}
 }
 
-func TestView_CursorRowIsPurpleNotReversedAndKeepsStarColour(t *testing.T) {
-	m := New(clock).SetSummaries(inbox(), false)
+func TestView_CursorRowIsAccentNotReversedAndKeepsStarColour(t *testing.T) {
+	m := New(theme.Default(), clock).SetSummaries(inbox(), false)
 
 	row := strings.Split(m.View(60, 10), "\n")[0]
 
-	if !strings.Contains(row, "48;5;63") || !strings.Contains(row, "38;5;231") {
-		t.Errorf("cursor row should be white on purple 63: %q", row)
+	if !strings.Contains(row, "30;45m") {
+		t.Errorf("cursor row should be on_accent (black) on accent (magenta): %q", row)
 	}
 	if strings.Contains(row, "\x1b[7m") || strings.Contains(row, ";7m") {
 		t.Errorf("cursor row should not use reverse video: %q", row)
 	}
-	if !strings.Contains(row, "38;5;220") || !strings.Contains(ansi.Strip(row), "*") {
+	if !strings.Contains(row, "33;45m") || !strings.Contains(ansi.Strip(row), "*") {
 		t.Errorf("cursor row should keep the yellow *: %q", row)
 	}
 }

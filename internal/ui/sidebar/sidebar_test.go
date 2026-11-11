@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/dkouvdis/dk-email/internal/mail"
+	"github.com/dkouvdis/dk-email/internal/ui/theme"
 )
 
 func press(k string) tea.KeyPressMsg {
@@ -48,7 +49,7 @@ func gmailFolders() []mail.Folder {
 func view(m Model) string { return ansi.Strip(m.View(22, 40)) }
 
 func TestSetFolders_OrdersByRoleThenName(t *testing.T) {
-	m := New([]string{"Personal"})
+	m := New(theme.Default(), []string{"Personal"})
 	m = m.SetFolders(0, gmailFolders(), nil)
 
 	var got []string
@@ -62,7 +63,7 @@ func TestSetFolders_OrdersByRoleThenName(t *testing.T) {
 }
 
 func TestView_ShowsAccountsFoldersAndUnreadCounts(t *testing.T) {
-	m := New([]string{"Personal", "Work"})
+	m := New(theme.Default(), []string{"Personal", "Work"})
 	m = m.SetFolders(0, gmailFolders(), nil)
 	m = m.SetFolders(1, []mail.Folder{{Name: "INBOX", Role: mail.RoleInbox, Unread: 1}}, nil)
 
@@ -97,7 +98,7 @@ func hasLine(lines []string, label, count string) bool {
 }
 
 func TestView_ConnectingAndFailedAccounts(t *testing.T) {
-	m := New([]string{"Personal", "Work"})
+	m := New(theme.Default(), []string{"Personal", "Work"})
 	m = m.SetFolders(1, nil, errors.New("login to account \"Work\" failed: bad credentials"))
 
 	v := view(m)
@@ -118,7 +119,7 @@ func TestView_ConnectingAndFailedAccounts(t *testing.T) {
 }
 
 func TestUpdate_CursorSkipsHeadersAndEnterSelects(t *testing.T) {
-	m := New([]string{"Personal", "Work"})
+	m := New(theme.Default(), []string{"Personal", "Work"})
 	m = m.SetFolders(0, []mail.Folder{{Name: "INBOX", Role: mail.RoleInbox}, {Name: "Receipts"}}, nil)
 	m = m.SetFolders(1, []mail.Folder{{Name: "INBOX", Role: mail.RoleInbox}}, nil)
 
@@ -152,7 +153,7 @@ func TestUpdate_CursorSkipsHeadersAndEnterSelects(t *testing.T) {
 }
 
 func TestUpdate_NoFoldersYet(t *testing.T) {
-	m := New([]string{"Personal"})
+	m := New(theme.Default(), []string{"Personal"})
 
 	m, cmd := m.Update(press("enter"))
 	if cmd != nil {
@@ -165,7 +166,7 @@ func TestUpdate_NoFoldersYet(t *testing.T) {
 }
 
 func TestSetOpen_MarksOpenFolderAndMovesCursor(t *testing.T) {
-	m := New([]string{"Personal"})
+	m := New(theme.Default(), []string{"Personal"})
 	m = m.SetFolders(0, gmailFolders(), nil)
 
 	m = m.SetOpen(0, "Receipts")
@@ -179,7 +180,7 @@ func TestSetOpen_MarksOpenFolderAndMovesCursor(t *testing.T) {
 }
 
 func TestSetFolders_KeepsCursorOnSameFolder(t *testing.T) {
-	m := New([]string{"Personal"})
+	m := New(theme.Default(), []string{"Personal"})
 	m = m.SetFolders(0, gmailFolders(), nil)
 	m = m.SetOpen(0, "Receipts")
 
@@ -195,7 +196,7 @@ func TestView_ScrollsToKeepCursorVisible(t *testing.T) {
 	for i := range 30 {
 		folders = append(folders, mail.Folder{Name: "f" + string(rune('a'+i%26)) + string(rune('a'+i/26))})
 	}
-	m := New([]string{"Personal"})
+	m := New(theme.Default(), []string{"Personal"})
 	m = m.SetFolders(0, folders, nil)
 
 	m, _ = m.Update(press("G"))
@@ -211,7 +212,7 @@ func TestView_ScrollsToKeepCursorVisible(t *testing.T) {
 }
 
 func TestSpinnerTicksOnlyWhileConnecting(t *testing.T) {
-	m := New([]string{"Personal"})
+	m := New(theme.Default(), []string{"Personal"})
 	tick := m.Tick()
 	if tick == nil {
 		t.Fatal("Tick() = nil while connecting")
@@ -228,7 +229,7 @@ func TestSpinnerTicksOnlyWhileConnecting(t *testing.T) {
 }
 
 func TestAdjustUnread(t *testing.T) {
-	m := New([]string{"Personal"}).SetFolders(0, gmailFolders(), nil)
+	m := New(theme.Default(), []string{"Personal"}).SetFolders(0, gmailFolders(), nil)
 
 	m = m.AdjustUnread(0, "INBOX", -2).AdjustUnread(0, "[Gmail]/Spam", -10).AdjustUnread(5, "INBOX", -1)
 
@@ -244,7 +245,7 @@ func TestAdjustUnread(t *testing.T) {
 }
 
 func TestAccounts(t *testing.T) {
-	m := New([]string{"Personal", "Work", "Empty"})
+	m := New(theme.Default(), []string{"Personal", "Work", "Empty"})
 	m = m.SetFolders(0, gmailFolders(), nil)
 	m = m.SetFolders(2, nil, nil)
 
@@ -263,7 +264,7 @@ func TestAccounts(t *testing.T) {
 }
 
 func TestAddAccount(t *testing.T) {
-	m := New([]string{"Personal"})
+	m := New(theme.Default(), []string{"Personal"})
 
 	m, i := m.AddAccount("Work", []mail.Folder{{Name: "INBOX", Role: mail.RoleInbox, Unread: 4}})
 
@@ -278,8 +279,8 @@ func TestAddAccount(t *testing.T) {
 	}
 }
 
-func TestView_CursorFolderIsPurpleNotReversed(t *testing.T) {
-	m := New([]string{"Personal"}).SetFolders(0, gmailFolders(), nil)
+func TestView_CursorFolderIsAccentNotReversed(t *testing.T) {
+	m := New(theme.Default(), []string{"Personal"}).SetFolders(0, gmailFolders(), nil)
 
 	var row string
 	for _, l := range strings.Split(m.View(22, 40), "\n") {
@@ -288,8 +289,8 @@ func TestView_CursorFolderIsPurpleNotReversed(t *testing.T) {
 		}
 	}
 
-	if !strings.Contains(row, "48;5;63") || !strings.Contains(row, "38;5;231") {
-		t.Errorf("cursor folder should be white on purple 63: %q", row)
+	if !strings.Contains(row, "30;45m") {
+		t.Errorf("cursor folder should be on_accent (black) on accent (magenta): %q", row)
 	}
 	if strings.Contains(row, "\x1b[7m") || strings.Contains(row, ";7m") {
 		t.Errorf("cursor folder should not use reverse video: %q", row)
@@ -297,7 +298,7 @@ func TestView_CursorFolderIsPurpleNotReversed(t *testing.T) {
 }
 
 func TestFilter_SlashFiltersFoldersAndEnterOpens(t *testing.T) {
-	m := New([]string{"Personal", "Work"})
+	m := New(theme.Default(), []string{"Personal", "Work"})
 	m = m.SetFolders(0, gmailFolders(), nil)
 	m = m.SetFolders(1, []mail.Folder{{Name: "INBOX", Role: mail.RoleInbox}, {Name: "Clients"}}, nil)
 
@@ -338,7 +339,7 @@ func TestFilter_SlashFiltersFoldersAndEnterOpens(t *testing.T) {
 }
 
 func TestFilter_TakesEveryKeyAndEscClears(t *testing.T) {
-	m := New([]string{"Personal"}).SetFolders(0, gmailFolders(), nil)
+	m := New(theme.Default(), []string{"Personal"}).SetFolders(0, gmailFolders(), nil)
 
 	m = typeKeys(m, "/jkzz")
 
@@ -355,7 +356,7 @@ func TestFilter_TakesEveryKeyAndEscClears(t *testing.T) {
 }
 
 func TestFilter_Paste(t *testing.T) {
-	m := New([]string{"Personal"}).SetFolders(0, gmailFolders(), nil)
+	m := New(theme.Default(), []string{"Personal"}).SetFolders(0, gmailFolders(), nil)
 
 	m = m.Paste(tea.PasteMsg{Content: "spam"})
 	if m.Filtering() {
@@ -377,7 +378,7 @@ func TestView_ScrollingUpShowsTheAccountName(t *testing.T) {
 		}
 		return out
 	}
-	m := New([]string{"Personal", "Work", "Proton"})
+	m := New(theme.Default(), []string{"Personal", "Work", "Proton"})
 	m = m.SetFolders(0, folders("a1", "a2", "a3", "a4", "a5"), nil)
 	m = m.SetFolders(1, folders("b1", "b2", "b3", "b4", "b5"), nil)
 	m = m.SetFolders(2, folders("c1", "c2", "c3", "c4", "c5"), nil)
@@ -446,7 +447,7 @@ func TestTree_DotDelimiterAndNoDelimiter(t *testing.T) {
 }
 
 func TestView_ShowsNestedFoldersIndentedAndSkipsParentsThatArentFolders(t *testing.T) {
-	m := New([]string{"Personal"}).SetFolders(0, nestedFolders(), nil)
+	m := New(theme.Default(), []string{"Personal"}).SetFolders(0, nestedFolders(), nil)
 
 	lines := strings.Split(view(m), "\n")
 	for _, want := range []string{"    Later", "    Starred", "  Work", "    Admin", "      Acme"} {
@@ -465,14 +466,14 @@ func TestView_ShowsNestedFoldersIndentedAndSkipsParentsThatArentFolders(t *testi
 }
 
 func TestFilter_ShowsMatchesWithTheirPath(t *testing.T) {
-	m := New([]string{"Personal"}).SetFolders(0, nestedFolders(), nil)
+	m := New(theme.Default(), []string{"Personal"}).SetFolders(0, nestedFolders(), nil)
 
 	m = typeKeys(m, "/acme")
 
 	if v := view(m); !strings.Contains(v, "Work/Clients/Acme") || strings.Contains(v, "  Work\n") {
 		t.Errorf("want the match with its path and no parents:\n%s", v)
 	}
-	m = typeKeys(New([]string{"Personal"}).SetFolders(0, nestedFolders(), nil), "/work")
+	m = typeKeys(New(theme.Default(), []string{"Personal"}).SetFolders(0, nestedFolders(), nil), "/work")
 	if v := view(m); !strings.Contains(v, "No folders match") {
 		t.Errorf("a parent that isn't a folder shouldn't match:\n%s", v)
 	}
@@ -483,7 +484,7 @@ func TestView_ScrollingUpMovesOneRowAtATime(t *testing.T) {
 	for i := range 15 {
 		fs = append(fs, mail.Folder{Name: fmt.Sprintf("f%02d", i)})
 	}
-	m := New([]string{"Personal"}).SetFolders(0, fs, nil).SetSize(22, 8)
+	m := New(theme.Default(), []string{"Personal"}).SetFolders(0, fs, nil).SetSize(22, 8)
 
 	m, _ = m.Update(press("G"))
 	prev := m.offset
@@ -500,7 +501,7 @@ func TestView_ScrollingUpMovesOneRowAtATime(t *testing.T) {
 }
 
 func TestClick_OpensTheFolderOnThatLineAndClearsAFilter(t *testing.T) {
-	m := New([]string{"Personal"}).SetFolders(0, gmailFolders(), nil).SetSize(22, 20)
+	m := New(theme.Default(), []string{"Personal"}).SetFolders(0, gmailFolders(), nil).SetSize(22, 20)
 
 	if _, cmd := m.Click(0); cmd != nil {
 		t.Error("clicking the account name should do nothing")

@@ -16,6 +16,7 @@ import (
 	"github.com/dkouvdis/dk-email/internal/config"
 	"github.com/dkouvdis/dk-email/internal/mail"
 	"github.com/dkouvdis/dk-email/internal/mail/mailtest"
+	"github.com/dkouvdis/dk-email/internal/ui/theme"
 	"github.com/dkouvdis/dk-email/internal/ui/threadlist"
 )
 
@@ -103,7 +104,7 @@ func settle(t *testing.T, m Model, cmd tea.Cmd) Model {
 func started(t *testing.T, f *fixture, w, h int) Model {
 	t.Helper()
 	m := newModel(f.connector())
-	m.list = threadlist.New(func() time.Time { return fixedNow })
+	m.list = threadlist.New(theme.Default(), func() time.Time { return fixedNow })
 	m = send(t, m, size(w, h))
 	return settle(t, m, m.Init())
 }

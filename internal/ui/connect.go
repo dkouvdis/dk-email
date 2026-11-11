@@ -73,13 +73,13 @@ func (m Model) openConnect() (Model, tea.Cmd) {
 		}
 	}
 	if m.connectFor >= 0 {
-		m.connectPop = popup.NewPasswordPrompt(m.accts[m.connectFor])
+		m.connectPop = popup.NewPasswordPrompt(m.theme, m.accts[m.connectFor])
 	} else {
 		names := make([]string, len(m.accts))
 		for i, a := range m.accts {
 			names[i] = a.Name
 		}
-		m.connectPop = popup.NewConnect(names)
+		m.connectPop = popup.NewConnect(m.theme, names)
 	}
 	m.connectPop.SetSize(m.panes.Popup.W, m.panes.Popup.H)
 	m.showConnect = true

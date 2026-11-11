@@ -35,7 +35,7 @@ func (m Model) openPicker() (Model, tea.Cmd) {
 		}
 		groups = append(groups, g)
 	}
-	m.picker = popup.NewPicker("Go to folder", groups)
+	m.picker = popup.NewPicker(m.theme, "Go to folder", groups)
 	m.picker.SetSize(m.panes.Popup.W, m.panes.Popup.H)
 	m.showPicker = true
 	m.log.Debug("popup opened", "popup", "picker")
@@ -75,7 +75,7 @@ func (m Model) openMovePicker(targets []mail.Summary) (Model, tea.Cmd) {
 		m.setStatus("No other folder to move to.")
 		return m, nil
 	}
-	m.picker = popup.NewPicker(fmt.Sprintf("Move %s to", plural(len(targets), "message")), []popup.Group[pick]{g})
+	m.picker = popup.NewPicker(m.theme, fmt.Sprintf("Move %s to", plural(len(targets), "message")), []popup.Group[pick]{g})
 	m.picker.SetSize(m.panes.Popup.W, m.panes.Popup.H)
 	m.showPicker = true
 	m.moveTargets = targets

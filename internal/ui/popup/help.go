@@ -8,7 +8,9 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+
 	"github.com/charmbracelet/x/ansi"
+	"github.com/dkouvdis/dk-email/internal/ui/theme"
 )
 
 // Section is a titled group of keys in the help popup.
@@ -60,18 +62,27 @@ const (
 	HelpClosed
 )
 
-func NewHelp(sections []Section) Help {
-	h := Help{st: helpStyles{
-		box:     lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("63")).Padding(0, 1),
+func newHelpStyles(th theme.Theme) helpStyles {
+	return helpStyles{
+		box:     frameBox(th),
 		title:   lipgloss.NewStyle().Bold(true),
-		badge:   lipgloss.NewStyle().Background(lipgloss.Color("63")).Foreground(lipgloss.Color("231")).Padding(0, 1),
-		section: lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("111")),
-		key:     lipgloss.NewStyle().Foreground(lipgloss.Color("183")),
+		badge:   th.Cursor.Padding(0, 1),
+		section: th.Unread.Bold(true),
+		key:     th.Key,
 		desc:    lipgloss.NewStyle(),
-		dim:     lipgloss.NewStyle().Foreground(lipgloss.Color("244")),
-		thumb:   lipgloss.NewStyle().Foreground(lipgloss.Color("63")),
-		alert:   lipgloss.NewStyle().Foreground(lipgloss.Color("203")),
-	}}
+		dim:     th.Muted,
+		thumb:   th.Accent,
+		alert:   th.Error,
+	}
+}
+
+// frameBox is the bordered box every popup is drawn in.
+func frameBox(th theme.Theme) lipgloss.Style {
+	return lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(th.AccentColor).Padding(0, 1)
+}
+
+func NewHelp(th theme.Theme, sections []Section) Help {
+	h := Help{st: newHelpStyles(th)}
 	h.scroll.up = key.NewBinding(key.WithKeys("k", "up"))
 	h.scroll.down = key.NewBinding(key.WithKeys("j", "down"))
 	h.scroll.pgUp = key.NewBinding(key.WithKeys("pgup", "ctrl+u"))

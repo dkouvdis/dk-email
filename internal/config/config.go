@@ -24,6 +24,7 @@ const (
 
 type Config struct {
 	UI       UI        `toml:"ui"`
+	Colors   Colors    `toml:"colors"`
 	Accounts []Account `toml:"account"`
 
 	// Path is the file the config was loaded from.
@@ -165,6 +166,7 @@ func (c *Config) validate() error {
 	if c.UI.RefreshInterval.Duration <= 0 {
 		errs = append(errs, fmt.Errorf("ui.refresh_interval must be positive, got %s", c.UI.RefreshInterval))
 	}
+	errs = append(errs, c.Colors.validate()...)
 
 	seen := make(map[string]bool, len(c.Accounts))
 	for i, a := range c.Accounts {

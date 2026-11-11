@@ -4,7 +4,9 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
+
 	"github.com/charmbracelet/x/ansi"
+	"github.com/dkouvdis/dk-email/internal/ui/theme"
 )
 
 // Overlay draws pop over base with its top-left corner at x, y.
@@ -25,8 +27,8 @@ func Center(w, h int, pop string) (x, y int) {
 
 // Frame puts content in a bordered box of exactly w × h cells, cutting it
 // to fit. It returns "" when the box has no room inside.
-func Frame(content string, w, h int) string {
-	box := NewHelp(nil).st.box
+func Frame(th theme.Theme, content string, w, h int) string {
+	box := frameBox(th)
 	innerW, innerH := w-box.GetHorizontalFrameSize(), h-box.GetVerticalFrameSize()
 	if innerW < 1 || innerH < 1 {
 		return ""
@@ -41,6 +43,6 @@ func Frame(content string, w, h int) string {
 
 // FrameInner is the content size inside a Frame of w × h.
 func FrameInner(w, h int) (int, int) {
-	box := NewHelp(nil).st.box
+	box := frameBox(theme.Theme{})
 	return max(w-box.GetHorizontalFrameSize(), 0), max(h-box.GetVerticalFrameSize(), 0)
 }

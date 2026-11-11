@@ -188,6 +188,12 @@ func TestLoad_ValidationErrors(t *testing.T) {
 		{"unknown layout", "[ui]\ndefault_layout = \"grid\"\n", `ui.default_layout must be "split" or "list"`},
 		{"non-positive refresh", "[ui]\nrefresh_interval = \"0s\"\n", "ui.refresh_interval must be positive"},
 		{"unparsable refresh", "[ui]\nrefresh_interval = \"soon\"\n", "invalid duration"},
+		{"colour number out of range", "[colors]\naccent = 256\n", "colors.accent must be an ANSI colour number 0-255"},
+		{"colour name", "[colors]\nstar = \"yellow\"\n", `colors.star must be an ANSI colour number 0-255 or a hex colour like "#ff00ff", got "yellow"`},
+		{"short hex", "[colors]\nerror = \"#ff\"\n", "colors.error must be"},
+		{"bad hex digit", "[colors]\nhint = \"#gg0000\"\n", "colors.hint must be"},
+		{"unknown colour role", "[colors]\nbackground = \"0\"\n", `unknown key "colors.background"`},
+		{"colour wrong type", "[colors]\nmuted = true\n", "colour must be a number or a string"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -202,6 +208,20 @@ func TestLoad_ValidationErrors(t *testing.T) {
 				t.Errorf("error = %q, want it to contain %q", err, tt.want)
 			}
 		})
+	}
+}
+
+func TestLoad_Colors(t *testing.T) {
+	path := writeConfig(t, "[colors]\naccent = 5\non_accent = \"15\"\nmuted = \"#888\"\nborder = \"#3c3c3c\"\n")
+
+	cfg, err := Load(path)
+
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	want := Colors{Accent: "5", OnAccent: "15", Muted: "#888", Border: "#3c3c3c"}
+	if cfg.Colors != want {
+		t.Errorf("Colors = %+v, want %+v", cfg.Colors, want)
 	}
 }
 

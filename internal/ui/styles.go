@@ -1,6 +1,10 @@
 package ui
 
-import "charm.land/lipgloss/v2"
+import (
+	"charm.land/lipgloss/v2"
+
+	"github.com/dkouvdis/dk-email/internal/ui/theme"
+)
 
 type styles struct {
 	pane, paneFocused lipgloss.Style
@@ -9,18 +13,18 @@ type styles struct {
 	hint              lipgloss.Style
 }
 
-func defaultStyles() styles {
+func newStyles(th theme.Theme) styles {
 	pane := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("240")).
+		BorderForeground(th.BorderColor).
 		Padding(0, 1)
 	return styles{
 		pane:        pane,
-		paneFocused: pane.BorderForeground(lipgloss.Color("63")),
+		paneFocused: pane.BorderForeground(th.AccentColor),
 		title:       lipgloss.NewStyle().Bold(true),
-		dim:         lipgloss.NewStyle().Foreground(lipgloss.Color("244")),
-		status:      lipgloss.NewStyle().Foreground(lipgloss.Color("244")),
-		statusErr:   lipgloss.NewStyle().Foreground(lipgloss.Color("203")),
-		hint:        lipgloss.NewStyle().Foreground(lipgloss.Color("110")),
+		dim:         th.Muted,
+		status:      th.Muted,
+		statusErr:   th.Error,
+		hint:        th.Hint,
 	}
 }
