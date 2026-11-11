@@ -20,7 +20,7 @@ A keyboard-driven terminal email client for **triaging several IMAP accounts** (
 
 | Mode | When | Panes |
 |---|---|---|
-| **Narrow** (default) | split mode, width ≥ 80 cols | folders sidebar (24 cols) │ thread list (the rest). `a` focuses the sidebar |
+| **Narrow** (default) | split mode, width ≥ 80 cols | folders sidebar (32 cols) │ thread list (the rest). `a` focuses the sidebar |
 | **List + popup** | toggled with `v`, or **forced automatically when width < 80 cols** | thread list at full width. The **account › folder** header sits at the top, and `a` opens the account/folder picker |
 
 There's no reading pane. In both layouts, `enter` opens the conversation in a centered popup (~90% × 90%), and `esc` closes it. Changed on 2026-11-10 at your request: the earlier three-pane wide layout and the list │ reader narrow layout were replaced by the two above, and `wide_breakpoint` and `list_width` were removed. Until the first folder opens, the thread list says "Connecting…".

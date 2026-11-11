@@ -1,50 +1,50 @@
-╭──────────────────────╮╭──────────────────────────────────────────────────────────────────────────────────────────────╮
-│ Personal             ││ Inbox · 2 unread                                                                             │
-│ ▶ Inbox            2 ││  ●    Bob                      Re: Plan (2)                                            13:30 │
-│   Sent Mail          ││  ●    Carol                    Lunch?                                                  Nov 8 │
-│   All Mail           ││                                                                                              │
-│   Trash              ││               ╭──────────────────────────────────────╮                                       │
-│   Receipts         1 ││               │ Keys                      esc close  │                                       │
-│                      ││               │ / press / to filter by key or descr… │                                       │
-│ Work                 ││               │                                      │                                       │
-│   Inbox            1 ││               │ Navigation                           │                                       │
-│   Archive            ││               │   k/↑         up                     │                                       │
-│                      ││               │   j/↓         down                   │                                       │
-│                      ││               │   g           top                    │                                       │
-│                      ││               │   G           bottom                 │                                       │
-│                      ││               │   h/←         left pane              │                                       │
-│                      ││               │   l/→         right pane             │                                       │
-│                      ││               │   tab         next pane              │                                       │
-│                      ││               │   shift+tab   previous pane          │                                       │
-│                      ││               │                                      │                                       │
-│                      ││               │ Threads                              │                                       │
-│                      ││               │   enter       open                   │                                       │
-│                      ││               │   space       expand                 │                                       │
-│                      ││               │   u           read/unread            │                                       │
-│                      ││               │   s           star                   │                                       │
-│                      ││               │   e           archive                │                                       │
-│                      ││               │   d           delete                 │                                       │
-│                      ││               │   m           move                   │                                       │
-│                      ││               │   r           refresh                │                                       │
-│                      ││               │                                      │                                       │
-│                      ││               │ Accounts & view                      │                                       │
-│                      ││               │   a           accounts               │                                       │
-│                      ││               │   /           filter folders         │                                       │
-│                      ││               │   A           connect account        │                                       │
-│                      ││               │   v           split/list             │                                       │
-│                      ││               │                                      │                                       │
-│                      ││               │ General                              │                                       │
-│                      ││               │   ?           help                   │                                       │
-│                      ││               │   esc         back                   │                                       │
-│                      ││               │   q           quit                   │                                       │
-│                      ││               │   ctrl+c      quit now               │                                       │
-│                      ││               │                                      │                                       │
-│                      ││               │ / filter · esc/q close               │                                       │
-│                      ││               ╰──────────────────────────────────────╯                                       │
-│                      ││                                                                                              │
-│                      ││                                                                                              │
-│                      ││                                                                                              │
-│                      ││                                                                                              │
-╰──────────────────────╯╰──────────────────────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────╮╭──────────────────────────────────────────────────────────────────────────────────────╮
+│ Personal                     ││ Inbox · 2 unread                                                                     │
+│ ▶ Inbox                    2 ││  ●    Bob                     Re: Plan (2)                                     13:30 │
+│   Sent Mail                  ││  ●    Carol                   Lunch?                                           Nov 8 │
+│   All Mail                   ││                                                                                      │
+│   Trash                      ││       ╭──────────────────────────────────────╮                                       │
+│   Receipts                 1 ││       │ Keys                      esc close  │                                       │
+│                              ││       │ / press / to filter by key or descr… │                                       │
+│ Work                         ││       │                                      │                                       │
+│   Inbox                    1 ││       │ Navigation                           │                                       │
+│   Archive                    ││       │   k/↑         up                     │                                       │
+│                              ││       │   j/↓         down                   │                                       │
+│                              ││       │   g           top                    │                                       │
+│                              ││       │   G           bottom                 │                                       │
+│                              ││       │   h/←         left pane              │                                       │
+│                              ││       │   l/→         right pane             │                                       │
+│                              ││       │   tab         next pane              │                                       │
+│                              ││       │   shift+tab   previous pane          │                                       │
+│                              ││       │                                      │                                       │
+│                              ││       │ Threads                              │                                       │
+│                              ││       │   enter       open                   │                                       │
+│                              ││       │   space       expand                 │                                       │
+│                              ││       │   u           read/unread            │                                       │
+│                              ││       │   s           star                   │                                       │
+│                              ││       │   e           archive                │                                       │
+│                              ││       │   d           delete                 │                                       │
+│                              ││       │   m           move                   │                                       │
+│                              ││       │   r           refresh                │                                       │
+│                              ││       │                                      │                                       │
+│                              ││       │ Accounts & view                      │                                       │
+│                              ││       │   a           accounts               │                                       │
+│                              ││       │   /           filter folders         │                                       │
+│                              ││       │   A           connect account        │                                       │
+│                              ││       │   v           split/list             │                                       │
+│                              ││       │                                      │                                       │
+│                              ││       │ General                              │                                       │
+│                              ││       │   ?           help                   │                                       │
+│                              ││       │   esc         back                   │                                       │
+│                              ││       │   q           quit                   │                                       │
+│                              ││       │   ctrl+c      quit now               │                                       │
+│                              ││       │                                      │                                       │
+│                              ││       │ / filter · esc/q close               │                                       │
+│                              ││       ╰──────────────────────────────────────╯                                       │
+│                              ││                                                                                      │
+│                              ││                                                                                      │
+│                              ││                                                                                      │
+│                              ││                                                                                      │
+╰──────────────────────────────╯╰──────────────────────────────────────────────────────────────────────────────────────╯
                                                                                                                   narrow
 Up: k/↑ | Down: j/↓ | Open: enter | Expand: space | Read/unread: u | Star: s | Archive: e | … | Help: ? | Close: q      

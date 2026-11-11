@@ -17,8 +17,8 @@ func TestLayout_WidthsPerModeAndBreakpoint(t *testing.T) {
 	}{
 		{60, ModeSplit, KindList, 0, 60},
 		{79, ModeSplit, KindList, 0, 79},
-		{80, ModeSplit, KindNarrow, 24, 56},
-		{200, ModeSplit, KindNarrow, 24, 176},
+		{80, ModeSplit, KindNarrow, 32, 48},
+		{200, ModeSplit, KindNarrow, 32, 168},
 
 		{60, ModeList, KindList, 0, 60},
 		{80, ModeList, KindList, 0, 80},

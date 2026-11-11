@@ -5,7 +5,7 @@ import "fmt"
 const (
 	// listForcedBelow is the width under which list + popup mode is forced.
 	listForcedBelow = 80
-	sidebarWidth    = 24
+	sidebarWidth    = 32
 	popupPercent    = 90
 	// Status line and hint bar.
 	footerRows = 2
