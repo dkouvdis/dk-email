@@ -71,7 +71,8 @@ Messages in the conversation are stacked oldest to newest. The latest (or first 
 | IMAP client | `github.com/emersion/go-imap/v2` (`imapclient`) | v2.0.0-beta.8 |
 | IMAP test server | `github.com/emersion/go-imap/v2/imapserver/imapmemserver` | same |
 | MIME parsing | `github.com/emersion/go-message` | v0.18.x |
-| HTML → text | `github.com/k3a/html2text` | v1.5.x |
+| HTML → markdown | `github.com/JohannesKaufmann/html-to-markdown/v2` + `golang.org/x/net/html` | v2.5.x |
+| Markdown → terminal | `charm.land/glamour/v2` (HTML-derived bodies only) | v2.0.x |
 | Keychain | `github.com/zalando/go-keyring` | v0.2.x |
 | Config | `github.com/BurntSushi/toml` | v1.6.x |
 | TUI tests | `github.com/charmbracelet/x/exp/teatest/v2` | pseudo-version |

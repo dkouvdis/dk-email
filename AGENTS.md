@@ -47,7 +47,7 @@ Data/control flow:
 Supporting modules:
 
 - `internal/thread`: pure threading logic (union-find over Message-ID / References with constrained subject fallback).
-- `internal/render`: MIME parsing + plain/HTML-to-text rendering + attachment extraction.
+- `internal/render`: MIME parsing + HTML-to-markdown rendering (email cruft stripped first; junk text/plain parts fall back to HTML) + Glamour styling of HTML-derived bodies (plain text is only wrapped) + attachment extraction.
 - `internal/secret`: password resolution from `password_cmd` or OS keychain.
 - `internal/config`: strict TOML load/validate/defaults and append-account persistence.
 

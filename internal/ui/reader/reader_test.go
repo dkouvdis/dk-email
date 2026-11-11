@@ -124,6 +124,47 @@ func TestSetMessage_ShowsHeadersBodyAndAttachments(t *testing.T) {
 	}
 }
 
+func TestSetMessage_StylesOnlyHTMLBodiesAsMarkdown(t *testing.T) {
+	m := open(conversation(), 2)
+	html := withBody(conversation().Messages[1], "## Hello\n\nSee **this** and [the site](https://example.com/a).")
+	html.BodyFromHTML = true
+
+	raw := m.SetMessage(2, html, nil).View(60, 200)
+	v := ansi.Strip(raw)
+	for _, want := range []string{"Hello", "See this and the site."} {
+		if !strings.Contains(v, want) {
+			t.Errorf("HTML body missing %q:\n%s", want, v)
+		}
+	}
+	if strings.Contains(v, "## ") || strings.Contains(v, "**") || strings.Contains(v, "https://") {
+		t.Errorf("markdown syntax or link URL left in HTML body:\n%s", v)
+	}
+	if !strings.Contains(raw, "\x1b]8;") || !strings.Contains(raw, ";https://example.com/a\a") {
+		t.Errorf("link is not a terminal hyperlink: %q", raw)
+	}
+
+	plain := withBody(conversation().Messages[1], "## not a heading, **literal**")
+	if v := view(m.SetMessage(2, plain, nil)); !strings.Contains(v, "## not a heading, **literal**") {
+		t.Errorf("plain body was restyled:\n%s", v)
+	}
+}
+
+func TestSetSize_RewrapsMarkdownBody(t *testing.T) {
+	msg := withBody(conversation().Messages[1], strings.Repeat("word ", 30))
+	msg.BodyFromHTML = true
+	m := open(conversation(), 2).SetMessage(2, msg, nil).SetSize(20, 200)
+
+	v := ansi.Strip(m.View(20, 200))
+	for l := range strings.SplitSeq(v, "\n") {
+		if ansi.StringWidth(l) > 20 {
+			t.Fatalf("line wider than 20 after resize: %q", l)
+		}
+	}
+	if !strings.Contains(v, "word word word") {
+		t.Errorf("body missing after resize:\n%s", v)
+	}
+}
+
 func TestSetMessage_ErrorAndUnknownUID(t *testing.T) {
 	m := open(conversation(), 0)
 

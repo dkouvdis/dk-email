@@ -11,8 +11,10 @@ import (
 	"unicode/utf8"
 
 	"github.com/charmbracelet/x/ansi"
+	"github.com/charmbracelet/x/exp/golden"
 
 	"github.com/dkouvdis/dk-email/internal/mail"
+	"github.com/dkouvdis/dk-email/internal/ui/theme"
 )
 
 func parseFile(t *testing.T, name string) mail.Message {
@@ -59,13 +61,13 @@ func TestParse_PlainWithHeaders(t *testing.T) {
 	}
 }
 
-func TestParse_HTMLOnlyIsConvertedToText(t *testing.T) {
+func TestParse_HTMLOnlyIsConvertedToMarkdown(t *testing.T) {
 	m := parseFile(t, "html-only.eml")
 
 	if !m.BodyFromHTML {
 		t.Error("BodyFromHTML = false")
 	}
-	for _, want := range []string{"Hello & welcome!", "the post <https://example.com/post>", "One", "Two"} {
+	for _, want := range []string{"Hello & welcome!", "Read [the post](https://example.com/post) today.", "- One\n- Two"} {
 		if !strings.Contains(m.Body, want) {
 			t.Errorf("Body missing %q:\n%s", want, m.Body)
 		}
@@ -82,6 +84,122 @@ func TestParse_AlternativePrefersPlain(t *testing.T) {
 
 	if m.Body != "Plain version wins." || m.BodyFromHTML {
 		t.Errorf("Body = %q (fromHTML %v)", m.Body, m.BodyFromHTML)
+	}
+}
+
+// Real-world emails (anonymised) whose text/plain parts are junk or that
+// are HTML-only. Update with go test ./internal/render -run Golden -update
+func TestParse_Golden(t *testing.T) {
+	for _, name := range []string{"account-password-reset", "shop-newsletter", "shop-shipping", "news-digest"} {
+		t.Run(name, func(t *testing.T) {
+			m := parseFile(t, name+".eml")
+			if !m.BodyFromHTML {
+				t.Error("BodyFromHTML = false, want the HTML part")
+			}
+			golden.RequireEqual(t, m.Body)
+		})
+	}
+}
+
+func TestPlainIsJunk(t *testing.T) {
+	tests := []struct {
+		name, plain string
+		want        bool
+	}{
+		{"real text", "Hi Bob,\n\nSee you at 5 <bob@example.com>.\nA & B", false},
+		{"one stray tag", "Use <br> for breaks.", false},
+		{"empty", " \n \n", true},
+		{"leaked tags", "Hello<br>\n<br> world <br>", true},
+		{"leaked entities", "&zwnj; &zwnj; &zwnj; hi", true},
+		{"zero-width padding", "Briefing " + strings.Repeat("\u200c ", 12) + "\nHi", true},
+		{"one zero-width char", "Hi\u200cthere", false},
+		{"template code", "%%=redirectTo(concat(\nHi", true},
+		{"mostly blank", strings.Repeat("\n", 30) + "Hi", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := plainIsJunk(tt.plain); got != tt.want {
+				t.Errorf("plainIsJunk(%q) = %v, want %v", tt.plain, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestHTMLToMarkdown_StripsEmailCruft(t *testing.T) {
+	src := `<html><head><title>T</title></head><body>
+<div style="display:none; max-height:0">Preheader&zwnj;&nbsp;&zwnj;</div>
+<span style="mso-hide: all !important">Outlook only</span>
+<img src="https://t.example/open.gif" width="1" height="1" alt="pixel">
+<!--[if mso]><p>Conditional</p><![endif]-->
+<table role="presentation"><tr><td><a href="https://example.com/"><img src="logo.png" alt=""></a></td></tr>
+<tr><td><h1>Big news</h1><p>Body <a href="javascript:alert(1)">bad</a> <a href="https://example.com/x">good</a></p></td></tr></table>
+<table><tr><th>Item</th><th>Price</th></tr><tr><td>Coffee</td><td>£9</td></tr></table>
+</body></html>`
+	got := htmlToMarkdown(src)
+	for _, bad := range []string{"Preheader", "Outlook only", "pixel", "Conditional", "javascript", "logo", "](https://example.com/)", "\u200c", "T\n"} {
+		if strings.Contains(got, bad) {
+			t.Errorf("output contains %q:\n%s", bad, got)
+		}
+	}
+	for _, want := range []string{"# Big news", "Body bad [good](https://example.com/x)", "| Item   | Price |", "| Coffee | £9    |"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("output missing %q:\n%s", want, got)
+		}
+	}
+}
+
+func TestMarkdown_StylesAndFitsWidth(t *testing.T) {
+	md := "# Order shipped\n\nShip To:\nTest Customer\nFlat 1\n\n[Track](https://example.com/" + strings.Repeat("x", 60) + ")"
+	out, err := Markdown(md, 30, theme.Default().Markdown)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plain := ansi.Strip(out)
+	if !strings.Contains(plain, "Order shipped") || strings.Contains(plain, "#") {
+		t.Errorf("heading not styled:\n%s", plain)
+	}
+	if !strings.Contains(plain, "Ship To:\nTest Customer\nFlat 1") {
+		t.Errorf("line breaks not kept:\n%s", plain)
+	}
+	for l := range strings.SplitSeq(plain, "\n") {
+		if ansi.StringWidth(l) > 30 {
+			t.Errorf("line wider than 30: %q", l)
+		}
+	}
+	if out == plain {
+		t.Error("no styling applied")
+	}
+}
+
+func TestMarkdown_LinksShowOnlyTextAsHyperlinks(t *testing.T) {
+	cases := []struct {
+		name, md, want string
+		width          int
+		urls           []string
+	}{
+		{"link", "See [the offer](https://example.com/a).", "See the offer.", 80, []string{"https://example.com/a"}},
+		{"bare URL", "Visit https://example.com/b now", "Visit https://example.com/b now", 80, []string{"https://example.com/b"}},
+		{"wrapped link text", "aaaa bbbb cccc [link text](https://example.com/c) dd", "aaaa bbbb cccc link\ntext dd", 22, []string{"https://example.com/c"}},
+		{"two links", "[one](https://example.com/1) or [two](https://example.com/2)", "one or two", 80, []string{"https://example.com/1", "https://example.com/2"}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			out, err := Markdown(c.md, c.width, theme.Default().Markdown)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if plain := ansi.Strip(out); plain != c.want {
+				t.Errorf("text = %q, want %q", plain, c.want)
+			}
+			for _, u := range c.urls {
+				if !strings.Contains(out, ";"+u+"\a") {
+					t.Errorf("no hyperlink to %s in %q", u, out)
+				}
+			}
+			if !strings.Contains(out, "4m") {
+				t.Errorf("links not underlined: %q", out)
+			}
+		})
 	}
 }
 

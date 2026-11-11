@@ -7,13 +7,13 @@ import (
 	"fmt"
 	"io"
 	"mime"
+	"regexp"
 	"strings"
 
 	"github.com/charmbracelet/x/ansi"
 	"github.com/emersion/go-message"
 	_ "github.com/emersion/go-message/charset" // registers charsets beyond UTF-8 and ASCII
 	gomail "github.com/emersion/go-message/mail"
-	"github.com/k3a/html2text"
 
 	"github.com/dkouvdis/dk-email/internal/mail"
 )
@@ -73,10 +73,10 @@ func Parse(r io.Reader) (mail.Message, error) {
 	})
 
 	switch {
-	case havePlain:
+	case havePlain && !(haveHTML && plainIsJunk(plain)):
 		msg.Body = plain
 	case haveHTML:
-		msg.Body = htmlToText(html)
+		msg.Body = htmlToMarkdown(html)
 		msg.BodyFromHTML = true
 	}
 	msg.Body = strings.TrimRight(Sanitize(msg.Body), " \n")
@@ -128,13 +128,35 @@ func attachmentName(name string) string {
 	return name
 }
 
-func htmlToText(html string) string {
-	return html2text.HTML2TextWithOptions(html,
-		html2text.WithUnixLineBreaks(),
-		html2text.WithLinksInnerText(),
-		html2text.WithListSupport(),
-		html2text.WithAllowedURLSchemes([]string{"http", "https", "mailto"}),
-	)
+var (
+	plainTags     = regexp.MustCompile(`(?i)</?(?:br|p|div|span|td|tr|table|a|img|font)\b[^>]*>`)
+	plainEntities = regexp.MustCompile(`&(?:[a-zA-Z]{2,8}|#[0-9]{2,6});`)
+	// Preheader padding: a run of zero-width characters, spaces between.
+	plainPadding = regexp.MustCompile(`(?:[\x{200b}-\x{200d}\x{2060}\x{feff}\x{034f}][ \x{a0}]*){10}`)
+)
+
+// plainIsJunk spots text/plain parts machine-generated from the HTML without
+// rendering it: leftover tags and entities, unexpanded template code,
+// preheader padding, or mostly blank lines. A real plain-text email trips
+// none of these.
+func plainIsJunk(s string) bool {
+	if strings.TrimSpace(s) == "" {
+		return true
+	}
+	if strings.Contains(s, "%%=") || strings.Contains(s, "%%[") || plainPadding.MatchString(s) {
+		return true
+	}
+	if len(plainTags.FindAllStringIndex(s, 3)) == 3 || len(plainEntities.FindAllStringIndex(s, 3)) == 3 {
+		return true
+	}
+	lines := strings.Split(s, "\n")
+	blank := 0
+	for _, l := range lines {
+		if strings.TrimSpace(l) == "" {
+			blank++
+		}
+	}
+	return blank >= 20 && blank*2 > len(lines)
 }
 
 // Wrap breaks text into lines of at most width cells, at spaces where it

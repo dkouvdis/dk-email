@@ -36,6 +36,11 @@ type body struct {
 	state loadState
 	msg   mail.Message
 	err   error
+
+	// lines caches the rendered body at width, as markdown rendering is
+	// too slow to repeat on every frame.
+	lines []string
+	width int
 }
 
 type keys struct{ up, down, pgUp, pgDown, top, bottom, expandAll key.Binding }
@@ -156,7 +161,7 @@ func (m Model) SetMessage(uid mail.UID, msg mail.Message, err error) Model {
 	if err != nil {
 		m.bodies[uid] = body{state: failed, err: err}
 	} else {
-		m.bodies[uid] = body{state: loaded, msg: msg}
+		m.bodies[uid] = m.renderBody(body{state: loaded, msg: msg}, m.width)
 	}
 	return m
 }
@@ -218,6 +223,14 @@ func (m Model) Remove(uids []mail.UID) Model {
 
 // SetSize records the pane's inner size, for wrapping and scrolling.
 func (m Model) SetSize(w, h int) Model {
+	if w != m.width {
+		m.bodies = maps.Clone(m.bodies)
+		for uid, b := range m.bodies {
+			if b.state == loaded {
+				m.bodies[uid] = m.renderBody(b, w)
+			}
+		}
+	}
 	m.width, m.height = w, h
 	m.offset = m.clamp(m.offset)
 	return m
@@ -343,11 +356,10 @@ func (m Model) expandedLines(s mail.Summary, width int) []string {
 	case failed:
 		return append(out, wrapStyled(m.st.err, "Couldn't load this message: "+b.err.Error(), width)...)
 	}
-	text := b.msg.Body
-	if text == "" {
-		text = "(no text)"
+	if b.width != width {
+		b = m.renderBody(b, width)
 	}
-	out = append(out, strings.Split(render.Wrap(text, width), "\n")...)
+	out = append(out, b.lines...)
 	if len(b.msg.Attachments) > 0 {
 		out = append(out, "", m.st.label.Render("Attachments:"))
 		for _, a := range b.msg.Attachments {
@@ -355,6 +367,26 @@ func (m Model) expandedLines(s mail.Summary, width int) []string {
 		}
 	}
 	return out
+}
+
+// renderBody styles bodies converted from HTML as markdown. Plain-text
+// bodies are only wrapped: their *, _ and # are the sender's, not markup.
+func (m Model) renderBody(b body, width int) body {
+	b.width, b.lines = width, nil
+	if width <= 0 {
+		return b
+	}
+	text := b.msg.Body
+	if text == "" {
+		text = "(no text)"
+	} else if b.msg.BodyFromHTML {
+		if styled, err := render.Markdown(text, width, m.theme.Markdown); err == nil {
+			b.lines = strings.Split(styled, "\n")
+			return b
+		}
+	}
+	b.lines = strings.Split(render.Wrap(text, width), "\n")
+	return b
 }
 
 // header renders "Label: value" with continuation lines aligned under the value.
