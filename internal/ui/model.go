@@ -381,7 +381,12 @@ func (m *Model) toggleMode() {
 func (m Model) View() tea.View {
 	v := tea.NewView(m.render())
 	v.AltScreen = true
-	v.MouseMode = tea.MouseModeCellMotion
+	// Popups ignore clicks, so release the mouse to the terminal while one is
+	// open: it can then open hyperlinks in the message (cmd/ctrl+click), and
+	// in the alt screen it turns the wheel into ↑/↓, which still scrolls.
+	if !m.popupOpen() {
+		v.MouseMode = tea.MouseModeCellMotion
+	}
 	return v
 }
 

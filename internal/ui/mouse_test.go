@@ -104,4 +104,13 @@ func TestMouse_Enabled(t *testing.T) {
 	if m.View().MouseMode != tea.MouseModeCellMotion {
 		t.Errorf("MouseMode = %v, want cell motion", m.View().MouseMode)
 	}
+
+	m = pressSettled(t, m, "l")
+	m = pressSettled(t, m, "enter")
+	if !m.readerPopup {
+		t.Fatal("reader popup not open")
+	}
+	if m.View().MouseMode != tea.MouseModeNone {
+		t.Errorf("MouseMode with a popup open = %v, want none so the terminal opens links", m.View().MouseMode)
+	}
 }

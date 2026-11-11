@@ -34,7 +34,8 @@ func (m Model) handleClick(ms tea.Mouse) (Model, tea.Cmd) {
 }
 
 // handleWheel scrolls like ↑/↓: in the open popup, else in the pane under
-// the pointer. It never opens anything.
+// the pointer. It never opens anything. While a popup is open the mouse is
+// released to the terminal (see View), so wheel events rarely arrive then.
 func (m Model) handleWheel(ms tea.Mouse) (Model, tea.Cmd) {
 	k := tea.KeyPressMsg{Code: tea.KeyDown}
 	switch ms.Button {
