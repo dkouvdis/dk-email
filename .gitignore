@@ -1,7 +1,9 @@
 # Build output
 /bin/
 /dist/
-/tmp/
+
+# Local scratch space (alternate configs, drafts, experiments)
+/.local/
 
 # Test and debug artifacts
 coverage.out
