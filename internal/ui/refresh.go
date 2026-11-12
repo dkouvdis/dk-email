@@ -40,6 +40,9 @@ type refreshState struct {
 	writes  int
 	dirty   bool
 	manual  bool
+	// rerun asks for another refresh once this one finishes, because
+	// something changed on the server after it started.
+	rerun bool
 }
 
 func tick(d time.Duration) tea.Cmd {
@@ -67,12 +70,29 @@ func (m Model) handleTick() (Model, tea.Cmd) {
 // startRefresh refreshes every connected account, unless a refresh is
 // already running.
 func (m Model) startRefresh(manual bool) (Model, tea.Cmd) {
+	return m.refreshAccounts(manual, -1)
+}
+
+// refreshAfterDraft brings account up to date after a draft was saved or
+// sent, which changes its Drafts folder. A refresh already running may have
+// read the folder before that, so it is followed by another one.
+func (m Model) refreshAfterDraft(account int) (Model, tea.Cmd) {
+	if m.refresh.pending > 0 {
+		m.refresh.rerun = true
+		return m, nil
+	}
+	return m.refreshAccounts(false, account)
+}
+
+// refreshAccounts refreshes the connected accounts, or only the account
+// numbered only when that isn't negative.
+func (m Model) refreshAccounts(manual bool, only int) (Model, tea.Cmd) {
 	if m.refresh.pending > 0 {
 		return m, nil
 	}
 	var cmds []tea.Cmd
 	for i, mb := range m.boxes {
-		if mb == nil {
+		if mb == nil || (only >= 0 && i != only) {
 			continue
 		}
 		folder := ""
@@ -88,7 +108,7 @@ func (m Model) startRefresh(manual bool) (Model, tea.Cmd) {
 	if manual {
 		m.setStatus("Refreshing…")
 	}
-	m.log.Debug("refresh", "accounts", len(cmds), "manual", manual)
+	m.log.Debug("refresh", "accounts", len(cmds), "manual", manual, "scoped", only >= 0)
 	return m, tea.Batch(cmds...)
 }
 
@@ -123,6 +143,12 @@ func (m Model) handleRefresh(msg refreshMsg) (Model, tea.Cmd) {
 		m.log.Debug("refresh done", "stale", stale)
 		if m.refresh.manual && m.status == "Refreshing…" {
 			m.setStatus("")
+		}
+		if m.refresh.rerun {
+			var more tea.Cmd
+			m.refresh.rerun = false
+			m, more = m.startRefresh(false)
+			cmd = tea.Batch(cmd, more)
 		}
 	}
 	return m, cmd

@@ -352,6 +352,84 @@ func (s *Sender) Send(ctx context.Context, d mail.Draft) error {
 	return nil
 }
 
+// DraftSender is a Sender that is also a mail.Drafter: it records saved
+// drafts and serves the ones registered with AddDraft. Use a plain Sender
+// for an account that can't save drafts.
+type DraftSender struct {
+	Sender
+	saved     []mail.Draft
+	saveCalls int
+	saveErrs  []error
+	stored    map[mail.MessageRef]mail.Draft
+}
+
+var (
+	_ mail.Sender  = (*DraftSender)(nil)
+	_ mail.Drafter = (*DraftSender)(nil)
+)
+
+// FailSaveWith scripts SaveDraft errors by call number like Sender.FailWith.
+func (s *DraftSender) FailSaveWith(errs ...error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.saveErrs = slices.Clone(errs)
+}
+
+// Saved returns a copy of every draft passed to SaveDraft, in order,
+// including ones that were answered with an error.
+func (s *DraftSender) Saved() []mail.Draft {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]mail.Draft, len(s.saved))
+	for i, d := range s.saved {
+		out[i] = cloneDraft(d)
+	}
+	return out
+}
+
+// SaveDraft records d, then returns ctx.Err() if ctx is done, else the
+// scripted error for this call.
+func (s *DraftSender) SaveDraft(ctx context.Context, d mail.Draft) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.saved = append(s.saved, cloneDraft(d))
+	n := s.saveCalls
+	s.saveCalls++
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if n < len(s.saveErrs) {
+		return s.saveErrs[n]
+	}
+	return nil
+}
+
+// AddDraft makes OpenDraft(ref) return d with DraftOf set to ref.
+func (s *DraftSender) AddDraft(ref mail.MessageRef, d mail.Draft) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.stored == nil {
+		s.stored = map[mail.MessageRef]mail.Draft{}
+	}
+	s.stored[ref] = cloneDraft(d)
+}
+
+// OpenDraft returns the draft registered for ref, or an error if there is none.
+func (s *DraftSender) OpenDraft(ctx context.Context, ref mail.MessageRef) (mail.Draft, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return mail.Draft{}, err
+	}
+	d, ok := s.stored[ref]
+	if !ok {
+		return mail.Draft{}, fmt.Errorf("mailtest: no draft %v", ref)
+	}
+	d = cloneDraft(d)
+	d.DraftOf = &ref
+	return d, nil
+}
+
 func cloneDraft(d mail.Draft) mail.Draft {
 	d.To = slices.Clone(d.To)
 	d.Cc = slices.Clone(d.Cc)
@@ -364,6 +442,10 @@ func cloneDraft(d mail.Draft) mail.Draft {
 	if d.ForwardOf != nil {
 		ref := *d.ForwardOf
 		d.ForwardOf = &ref
+	}
+	if d.DraftOf != nil {
+		ref := *d.DraftOf
+		d.DraftOf = &ref
 	}
 	return d
 }

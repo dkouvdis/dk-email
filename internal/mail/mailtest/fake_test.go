@@ -465,3 +465,30 @@ func TestSender_IsSafeForConcurrentUse(t *testing.T) {
 		t.Errorf("recorded %d drafts, want 20", n)
 	}
 }
+
+func TestDraftSender_RecordsSavesAndServesStoredDrafts(t *testing.T) {
+	errA := errors.New("a")
+	s := &DraftSender{}
+	s.FailSaveWith(nil, errA)
+	ref := mail.MessageRef{Folder: "Drafts", UID: 7}
+	s.AddDraft(ref, mail.Draft{Subject: "Hi"})
+
+	if err := s.SaveDraft(ctx, mail.Draft{Subject: "one"}); err != nil {
+		t.Errorf("first save = %v", err)
+	}
+	if err := s.SaveDraft(ctx, mail.Draft{Subject: "two", DraftOf: &ref}); err != errA {
+		t.Errorf("second save = %v, want the scripted error", err)
+	}
+	got := s.Saved()
+	if len(got) != 2 || got[1].Subject != "two" || got[1].DraftOf == nil || *got[1].DraftOf != ref || len(s.Sent()) != 0 {
+		t.Errorf("saved = %+v", got)
+	}
+
+	d, err := s.OpenDraft(ctx, ref)
+	if err != nil || d.Subject != "Hi" || d.DraftOf == nil || *d.DraftOf != ref {
+		t.Errorf("OpenDraft = %+v, %v", d, err)
+	}
+	if _, err := s.OpenDraft(ctx, mail.MessageRef{Folder: "Drafts", UID: 8}); err == nil {
+		t.Error("OpenDraft of an unknown draft succeeded")
+	}
+}

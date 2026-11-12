@@ -19,6 +19,8 @@ import (
 const (
 	statusFinishDraft = "Finish or discard the draft first"
 	statusSending     = "Sending…"
+	statusSaving      = "Saving…"
+	statusSaved       = "Draft saved"
 	statusDiscarded   = "Draft discarded"
 )
 
@@ -49,6 +51,23 @@ type sentMsg struct {
 	took    time.Duration
 }
 
+// draftSavedMsg reports the outcome of saving a draft to the Drafts folder.
+type draftSavedMsg struct {
+	account int
+	draft   mail.Draft
+	err     error
+	took    time.Duration
+}
+
+// drafter is account's way of saving drafts, if it has one.
+func (m Model) drafter(account int) (mail.Drafter, bool) {
+	if account < 0 || account >= len(m.senders) {
+		return nil, false
+	}
+	d, ok := m.senders[account].(mail.Drafter)
+	return d, ok
+}
+
 // draftAccount is the account a new draft would be sent from. When none can
 // start, it sets the status that says why, or leaves it alone if there is
 // nothing to say.
@@ -56,6 +75,9 @@ func (m *Model) draftAccount() (int, bool) {
 	switch {
 	case m.sending:
 		m.setStatus(statusSending)
+		return 0, false
+	case m.saving:
+		m.setStatus(statusSaving)
 		return 0, false
 	case m.draft != nil:
 		m.setStatus(statusFinishDraft)
@@ -101,7 +123,8 @@ func (m Model) startDraft(account int, base mail.Draft, kind composeKind) (Model
 	}
 	pop := popup.NewCompose(m.theme, title, popup.ComposeValues(fields), focus)
 	pop.SetSize(m.panes.Popup.W, m.panes.Popup.H)
-	pop.EnableSave(false)
+	_, canSave := m.drafter(account)
+	pop.EnableSave(canSave)
 	m.draft = &draftState{account: account, base: base, pop: pop}
 	m.log.Debug("popup opened", "popup", "compose", "action", kind.String())
 	return m, nil
@@ -122,6 +145,8 @@ func (m Model) updateComposer(msg tea.Msg) (Model, tea.Cmd) {
 	switch res {
 	case popup.ComposeSend:
 		return m.startSend()
+	case popup.ComposeSave:
+		return m.startSave()
 	case popup.ComposeClose:
 		m.closeDraft()
 	case popup.ComposeDiscard:
@@ -153,6 +178,63 @@ func (m Model) startSend() (Model, tea.Cmd) {
 	return m, sendDraft(sender, d.account, draft)
 }
 
+// startSave parses the composer's fields, which may lack recipients, and
+// saves them to Drafts in the background, leaving the composer open and
+// locked meanwhile. A parse error is shown in the composer, which stays
+// editable.
+func (m Model) startSave() (Model, tea.Cmd) {
+	d := m.draft
+	drafter, ok := m.drafter(d.account)
+	if !ok {
+		d.pop.SetError("Saving drafts isn't set up for this account")
+		return m, nil
+	}
+	draft, err := compose.Fields(d.pop.Values()).DraftForSave(d.base)
+	if err != nil {
+		d.pop.SetError(err.Error())
+		return m, nil
+	}
+	d.pop.SetBusy(statusSaving)
+	m.saving = true
+	m.status, m.statusErr = statusSaving, false
+	m.log.Debug("draft save started", "account", m.accts[d.account].Name, "recipients", len(recipients(draft)), "replaces", draft.DraftOf != nil)
+	return m, saveDraft(drafter, d.account, draft)
+}
+
+// saveDraft runs in a tea.Cmd. The transport enforces its own timeout.
+func saveDraft(dr mail.Drafter, account int, d mail.Draft) tea.Cmd {
+	return func() tea.Msg {
+		start := time.Now()
+		err := dr.SaveDraft(context.Background(), d)
+		return draftSavedMsg{account: account, draft: d, err: err, took: time.Since(start)}
+	}
+}
+
+func (m Model) handleDraftSaved(msg draftSavedMsg) (tea.Model, tea.Cmd) {
+	m.saving = false
+	if msg.account >= 0 && msg.account < len(m.accts) {
+		m.log.Debug("draft save finished", "account", m.accts[msg.account].Name, "ok", msg.err == nil, "recipients", len(recipients(msg.draft)), "took", msg.took.Round(time.Millisecond))
+	}
+	switch {
+	case msg.err == nil:
+		m.closeDraft()
+		m.status, m.statusErr = statusSaved, false
+	case errors.Is(msg.err, mail.ErrDraftSaved):
+		// Saved, so there's nothing to retry.
+		m.closeDraft()
+		m.status, m.statusErr = capitalize(msg.err.Error()), true
+	case !m.composing():
+		m.setError(msg.err)
+		return m, nil
+	default:
+		m.draft.pop.SetBusy("")
+		m.draft.pop.SetError("Save failed: " + msg.err.Error())
+		m.status, m.statusErr = "", false
+		return m, nil
+	}
+	return m.refreshAfterDraft(msg.account)
+}
+
 // sendDraft runs in a tea.Cmd. The transport enforces its own timeout.
 func sendDraft(s mail.Sender, account int, d mail.Draft) tea.Cmd {
 	return func() tea.Msg {
@@ -177,10 +259,16 @@ func (m Model) handleSent(msg sentMsg) (tea.Model, tea.Cmd) {
 		m.status, m.statusErr = capitalize(msg.err.Error()), true
 	case !m.composing():
 		m.setError(msg.err)
+		return m, nil
 	default:
 		m.draft.pop.SetBusy("")
 		m.draft.pop.SetError("Send failed: " + msg.err.Error())
 		m.status, m.statusErr = "", false
+		return m, nil
+	}
+	if msg.draft.DraftOf != nil {
+		// The saved copy this replaced is gone from Drafts.
+		return m.refreshAfterDraft(msg.account)
 	}
 	return m, nil
 }

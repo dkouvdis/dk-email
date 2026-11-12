@@ -97,9 +97,11 @@ type Model struct {
 	status      string
 	statusErr   bool
 	// draft is the message being composed, nil when there is none; sending
-	// is set while it is being delivered. The composer popup edits draft.
+	// is set while it is being delivered and saving while it is being saved
+	// to Drafts. The composer popup edits draft.
 	draft   *draftState
 	sending bool
+	saving  bool
 }
 
 // New builds the root model. Init connects every account with connect. log
@@ -208,6 +210,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleConnected(msg)
 	case sentMsg:
 		return m.handleSent(msg)
+	case draftSavedMsg:
+		return m.handleDraftSaved(msg)
 	case replyFetchedMsg:
 		return m.handleReplyFetched(msg)
 	default:

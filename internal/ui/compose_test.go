@@ -17,14 +17,33 @@ import (
 
 // composeFixture is a started model where Personal can send through the
 // returned sender and Work can't.
-func composeFixture(t *testing.T) (Model, *mailtest.Sender) {
+func composeFixture(t *testing.T) (Model, *mailtest.DraftSender) {
 	t.Helper()
-	s := &mailtest.Sender{}
+	s := &mailtest.DraftSender{}
+	m, _ := composeFixtureWith(t, s)
+	return m, s
+}
+
+// composeFixtureWith is composeFixture with Personal's sender s, which may
+// lack saving. It also returns the mailboxes.
+func composeFixtureWith(t *testing.T, s mail.Sender) (Model, *fixture) {
+	t.Helper()
 	f := newFixture()
 	f.personalSender = s
 	m := started(t, f, 160, 30)
 	m.accts[0].Email, m.accts[0].FromName = "me@example.com", "Me Myself"
-	return m, s
+	return m, f
+}
+
+// folderCalls counts the Folders calls mb has served.
+func folderCalls(mb *mailtest.Fake) int {
+	n := 0
+	for _, c := range mb.Calls() {
+		if c.Method == mailtest.MethodFolders {
+			n++
+		}
+	}
+	return n
 }
 
 // keyCmd presses k and returns the model and the command it produced.
@@ -284,7 +303,9 @@ func TestCompose_EscOnAnUntouchedComposerClosesAtOnce(t *testing.T) {
 }
 
 func TestCompose_EscAfterTypingAsksThenDiscardOrKeepEditing(t *testing.T) {
-	m, s := composeFixture(t)
+	// Saving is off for a sender without a Drafter.
+	m, f := composeFixtureWith(t, &mailtest.Sender{})
+	s := f.personalSender.(*mailtest.Sender)
 	m = written(t, m, "alice@example.com", "Lunch", "Shall we?")
 
 	m, _ = keyCmd(t, m, "esc")
@@ -293,6 +314,13 @@ func TestCompose_EscAfterTypingAsksThenDiscardOrKeepEditing(t *testing.T) {
 	}
 	if view := plain(m); !strings.Contains(view, "Discard draft?  d discard · e keep editing") || strings.Contains(view, " s save") {
 		t.Errorf("prompt should offer only d and e:\n%s", view)
+	}
+
+	for _, k := range []string{"s", "esc"} {
+		var cmd tea.Cmd
+		if m, cmd = keyCmd(t, m, k); cmd != nil || !m.composing() || !m.draft.pop.Prompting() || m.saving {
+			t.Fatalf("%q in a prompt without saving: cmd %v, composing %v, prompting %v", k, cmd != nil, m.composing(), m.draft.pop.Prompting())
+		}
 	}
 
 	m, _ = keyCmd(t, m, "e")
@@ -436,5 +464,241 @@ func TestCompose_SentStatusFormatting(t *testing.T) {
 				t.Errorf("sentStatus = %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+// saveFromPrompt types a draft with no recipient but a Bcc, opens the close
+// prompt and presses k, returning the model and the save command.
+func saveFromPrompt(t *testing.T, m Model, k string) (Model, tea.Cmd) {
+	t.Helper()
+	m, _ = keyCmd(t, m, "c")
+	m = send(t, m, press("tab"), press("tab"))
+	m = typed(t, m, "Hidden <hidden@example.com>")
+	m = send(t, m, press("tab"))
+	m = typed(t, m, "Lunch")
+	m = send(t, m, press("tab"))
+	m = typed(t, m, "Shall we?")
+	m, _ = keyCmd(t, m, "esc")
+	if !m.draft.pop.Prompting() {
+		t.Fatal("esc after typing should ask")
+	}
+	return keyCmd(t, m, k)
+}
+
+func TestCompose_PromptOffersSaveWhenTheSenderCanDraft(t *testing.T) {
+	m, _ := composeFixture(t)
+	m = written(t, m, "alice@example.com", "Lunch", "Shall we?")
+
+	m, _ = keyCmd(t, m, "esc")
+
+	if view := plain(m); !strings.Contains(view, "Save draft?  s save · d discard · e keep editing") {
+		t.Errorf("prompt should offer saving:\n%s", view)
+	}
+}
+
+func TestCompose_SaveKeySavesWithoutRecipientsAndClosesWithRefresh(t *testing.T) {
+	m, f := composeFixtureWith(t, &mailtest.DraftSender{})
+	s := f.personalSender.(*mailtest.DraftSender)
+	personal, work := folderCalls(f.personal), folderCalls(f.work)
+
+	m, cmd := saveFromPrompt(t, m, "s")
+
+	if cmd == nil || !m.saving || !m.composing() || m.status != "Saving…" || m.draft.pop.Prompting() {
+		t.Fatalf("cmd %v, saving %v, composing %v, status %q, prompting %v", cmd != nil, m.saving, m.composing(), m.status, m.draft.pop.Prompting())
+	}
+	if view := plain(m); !strings.Contains(view, "Saving…") {
+		t.Errorf("composer should say Saving…:\n%s", view)
+	}
+	next, refresh := m.Update(cmd())
+	m = next.(Model)
+
+	saved := s.Saved()
+	if len(saved) != 1 || len(s.Sent()) != 0 {
+		t.Fatalf("saved %d, sent %d; want one save and no send", len(saved), len(s.Sent()))
+	}
+	d := saved[0]
+	if len(d.To) != 0 || len(d.Bcc) != 1 || d.Bcc[0].Email != "hidden@example.com" || d.Subject != "Lunch" || d.Body != "Shall we?" ||
+		d.From != (mail.Address{Name: "Me Myself", Email: "me@example.com"}) {
+		t.Errorf("draft = %+v", d)
+	}
+	if m.composing() || m.saving || m.status != "Draft saved" || m.statusErr {
+		t.Errorf("composing %v, saving %v, status %q (err %v)", m.composing(), m.saving, m.status, m.statusErr)
+	}
+	if refresh == nil {
+		t.Fatal("no refresh after saving")
+	}
+	m = settle(t, m, refresh)
+	if folderCalls(f.personal) != personal+1 || folderCalls(f.work) != work {
+		t.Errorf("Folders calls: personal %d→%d, work %d→%d; want only Personal refreshed once", personal, folderCalls(f.personal), work, folderCalls(f.work))
+	}
+	if m.refresh.pending != 0 {
+		t.Errorf("refresh pending = %d after settling", m.refresh.pending)
+	}
+}
+
+func TestCompose_SecondEscSavesLikeS(t *testing.T) {
+	m, f := composeFixtureWith(t, &mailtest.DraftSender{})
+	s := f.personalSender.(*mailtest.DraftSender)
+
+	m, cmd := saveFromPrompt(t, m, "esc")
+	if cmd == nil || !m.saving || m.status != "Saving…" {
+		t.Fatalf("cmd %v, saving %v, status %q", cmd != nil, m.saving, m.status)
+	}
+	m = send(t, m, cmd())
+
+	if len(s.Saved()) != 1 || m.composing() || m.status != "Draft saved" {
+		t.Errorf("saved %d, composing %v, status %q", len(s.Saved()), m.composing(), m.status)
+	}
+}
+
+func TestCompose_SaveParseErrorKeepsEditing(t *testing.T) {
+	m, s := composeFixture(t)
+	m = written(t, m, "not an address", "Hi", "body")
+	m, _ = keyCmd(t, m, "esc")
+
+	m, cmd := keyCmd(t, m, "s")
+
+	if cmd != nil || m.saving || !m.composing() || len(s.Saved()) != 0 {
+		t.Fatalf("cmd %v, saving %v, composing %v, saved %d", cmd != nil, m.saving, m.composing(), len(s.Saved()))
+	}
+	if view := plain(m); !strings.Contains(view, "To: invalid address list") {
+		t.Errorf("composer should show the parse error:\n%s", view)
+	}
+}
+
+func TestCompose_SaveFailureKeepsTheComposerAndRetrySaves(t *testing.T) {
+	m, s := composeFixture(t)
+	s.FailSaveWith(errors.New("imap: connection reset"))
+
+	m, cmd := saveFromPrompt(t, m, "s")
+	m = send(t, m, cmd())
+
+	if m.saving || !m.composing() || len(s.Saved()) != 1 {
+		t.Fatalf("saving %v, composing %v, saved %d", m.saving, m.composing(), len(s.Saved()))
+	}
+	if view := plain(m); !strings.Contains(view, "Save failed: imap: connection reset") || !strings.Contains(view, "Lunch") {
+		t.Errorf("composer should show the error and the draft:\n%s", view)
+	}
+	m = typed(t, m, "!") // editing resumes
+	m, _ = keyCmd(t, m, "esc")
+	m, cmd = keyCmd(t, m, "s")
+	m = send(t, m, cmd())
+
+	got := s.Saved()
+	if len(got) != 2 || got[1].Body != "Shall we?!" || m.composing() || m.status != "Draft saved" {
+		t.Errorf("saved %+v, composing %v, status %q", got, m.composing(), m.status)
+	}
+}
+
+func TestCompose_SaveFailureThenDiscard(t *testing.T) {
+	m, s := composeFixture(t)
+	s.FailSaveWith(errors.New("imap: down"))
+
+	m, cmd := saveFromPrompt(t, m, "s")
+	m = send(t, m, cmd())
+	m, _ = keyCmd(t, m, "esc")
+	m, _ = keyCmd(t, m, "d")
+
+	if m.composing() || m.status != "Draft discarded" {
+		t.Errorf("composing %v, status %q", m.composing(), m.status)
+	}
+}
+
+func TestCompose_DraftSavedWithFollowUpFailureClosesWithAWarning(t *testing.T) {
+	m, f := composeFixtureWith(t, &mailtest.DraftSender{})
+	s := f.personalSender.(*mailtest.DraftSender)
+	s.FailSaveWith(fmt.Errorf("draft saved, but removing the old copy failed: gone: %w", mail.ErrDraftSaved))
+	before := folderCalls(f.personal)
+
+	m, cmd := saveFromPrompt(t, m, "s")
+	next, refresh := m.Update(cmd())
+	m = next.(Model)
+
+	if m.composing() || m.saving || !m.statusErr || !strings.HasPrefix(m.status, "Draft saved, but removing the old copy failed") {
+		t.Errorf("composing %v, saving %v, status %q (err %v)", m.composing(), m.saving, m.status, m.statusErr)
+	}
+	settle(t, m, refresh)
+	if folderCalls(f.personal) != before+1 {
+		t.Error("the saved copy should still be refreshed")
+	}
+}
+
+func TestCompose_SaveResultWithNoDraftOnlyShowsTheError(t *testing.T) {
+	m, _ := composeFixture(t)
+
+	m = send(t, m, draftSavedMsg{err: errors.New("imap: down")})
+
+	if m.composing() || !m.statusErr || m.status != "imap: down" {
+		t.Errorf("composing %v, status %q (err %v)", m.composing(), m.status, m.statusErr)
+	}
+}
+
+func TestCompose_BusySavingIgnoresKeysButCtrlCQuits(t *testing.T) {
+	m, s := composeFixture(t)
+	m, _ = saveFromPrompt(t, m, "s")
+	before := m.draft.pop.Values()
+
+	for _, k := range []string{"y", "esc", "s", "d", "tab", "q", "c", "ctrl+s"} {
+		var cmd tea.Cmd
+		m, cmd = keyCmd(t, m, k)
+		if cmd != nil || !m.composing() || m.draft.pop.Values() != before {
+			t.Fatalf("%q while saving: cmd %v, composing %v", k, cmd != nil, m.composing())
+		}
+	}
+	if _, cmd := m.Update(press("ctrl+c")); cmd == nil {
+		t.Error("ctrl+c should still quit while saving")
+	}
+	if len(s.Saved()) != 0 || len(s.Sent()) != 0 {
+		t.Error("keys while busy saved or sent something")
+	}
+}
+
+func TestCompose_SendingAReopenedDraftRefreshesItsAccount(t *testing.T) {
+	m, f := composeFixtureWith(t, &mailtest.DraftSender{})
+	m = written(t, m, "alice@example.com", "Lunch", "Shall we?")
+	ref := mail.MessageRef{Folder: "Drafts", UID: 4}
+	m.draft.base.DraftOf = &ref
+	before := folderCalls(f.personal)
+
+	m, cmd := keyCmd(t, m, "ctrl+s")
+	next, refresh := m.Update(cmd())
+	m = next.(Model)
+	settle(t, m, refresh)
+
+	if folderCalls(f.personal) != before+1 {
+		t.Errorf("Folders calls %d→%d, want one refresh", before, folderCalls(f.personal))
+	}
+}
+
+func TestCompose_SendingAFreshDraftDoesNotRefresh(t *testing.T) {
+	m, _ := composeFixture(t)
+	m = written(t, m, "alice@example.com", "Lunch", "Shall we?")
+
+	m, cmd := keyCmd(t, m, "ctrl+s")
+	_, refresh := m.Update(cmd())
+
+	if refresh != nil {
+		t.Error("a send that touched no draft started a refresh")
+	}
+}
+
+func TestCompose_SaveDuringARefreshQueuesAnotherOne(t *testing.T) {
+	m, f := composeFixtureWith(t, &mailtest.DraftSender{})
+	m, tickCmd := m.startRefresh(false)
+	if m.refresh.pending == 0 || tickCmd == nil {
+		t.Fatal("setup: no refresh in flight")
+	}
+	m, cmd := saveFromPrompt(t, m, "s")
+	next, refresh := m.Update(cmd())
+	m = next.(Model)
+	if refresh != nil || !m.refresh.rerun {
+		t.Fatalf("refresh %v, rerun %v; want the save to queue a rerun", refresh != nil, m.refresh.rerun)
+	}
+	before := folderCalls(f.personal)
+
+	m = settle(t, m, tickCmd)
+
+	if folderCalls(f.personal) != before+2 || m.refresh.pending != 0 || m.refresh.rerun {
+		t.Errorf("Folders calls %d→%d, pending %d, rerun %v; want the in-flight refresh then a rerun", before, folderCalls(f.personal), m.refresh.pending, m.refresh.rerun)
 	}
 }

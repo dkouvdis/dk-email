@@ -92,9 +92,9 @@ Every task also meets the standing bar before it counts as done:
 
 ### D3: Save from the composer
 
-- [ ] In the prompt, `s` and a second `esc` save to Drafts and close; "Saving…" shows meanwhile, then "Draft saved" in the status bar.
-- [ ] A failed save keeps the composer open with the error in the footer; `ErrDraftSaved` closes it with a status warning.
-- [ ] If the Drafts folder is on screen, its list and counts refresh.
+- [x] In the prompt, `s` and a second `esc` save to Drafts and close; "Saving…" shows meanwhile, then "Draft saved" in the status bar.
+- [x] A failed save keeps the composer open with the error in the footer; `ErrDraftSaved` closes it with a status warning.
+- [x] If the Drafts folder is on screen, its list and counts refresh.
 
 ### D4: Reopen drafts
 
