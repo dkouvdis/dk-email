@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -21,6 +22,7 @@ import (
 type fakeOnboarding struct {
 	dialErr, addErr error
 	box             *mailtest.Fake
+	sender          mail.Sender
 	dialed          []string // passwords Dial was given
 	added           []config.Account
 	addedPasswords  []string
@@ -36,12 +38,12 @@ func newOnboarding() *fakeOnboarding {
 
 func (f *fakeOnboarding) onboarding() Onboarding {
 	return Onboarding{
-		Dial: func(_ context.Context, _ config.Account, password string) (mail.Mailbox, error) {
+		Dial: func(_ context.Context, _ config.Account, password string) (Conn, error) {
 			f.dialed = append(f.dialed, password)
 			if f.dialErr != nil {
-				return nil, f.dialErr
+				return Conn{}, f.dialErr
 			}
-			return f.box, nil
+			return Conn{Mailbox: f.box, Sender: f.sender}, nil
 		},
 		AddAccount: func(acct config.Account, password string) error {
 			if f.addErr != nil {
@@ -137,6 +139,27 @@ func TestConnect_SuccessSavesAndLoadsTheAccount(t *testing.T) {
 	if !strings.Contains(logs.String(), "connect test") {
 		t.Errorf("connect test not logged:\n%s", logs.String())
 	}
+}
+
+func TestConnect_NewAccountGetsItsSender(t *testing.T) {
+	o := newOnboarding()
+	o.sender = &mailtest.Sender{}
+	m := firstRun(t, o, nil)
+	m = fillGmailKeychain(t, m, "Gmail", "pw")
+	next, cmd := m.Update(press("enter"))
+	m = settle(t, next.(Model), cmd)
+
+	if len(m.senders) != len(m.boxes) || m.senders[0] != o.sender {
+		t.Fatalf("senders = %v, want the new account's sender", m.senders)
+	}
+	m.editorCmd = func(path string) *exec.Cmd { return exec.Command("true", path) }
+	t.Setenv("TMPDIR", t.TempDir())
+	next, cmd = m.Update(press("c"))
+	m = next.(Model)
+	if cmd == nil || m.draft == nil {
+		t.Errorf("c on the new account: cmd %v, draft %v, status %q", cmd != nil, m.draft, m.status)
+	}
+	_ = m.Close()
 }
 
 func TestConnect_FailedTestSavesNothing(t *testing.T) {

@@ -57,8 +57,10 @@ type Model struct {
 	connect Connector
 	// boxes holds each account's mailbox once connected, by account index.
 	boxes []mail.Mailbox
-	side  sidebar.Model
-	open  openFolder
+	// senders is parallel to boxes; nil means sending isn't set up.
+	senders []mail.Sender
+	side    sidebar.Model
+	open    openFolder
 	// every schedules the next refresh tick; tests replace it.
 	every   func(time.Duration) tea.Cmd
 	refresh refreshState
@@ -99,6 +101,12 @@ type Model struct {
 	// it. editorPath is the draft file waiting for the editor to return.
 	editorCmd  func(path string) *exec.Cmd
 	editorPath string
+	// draft is the message being composed, nil when there is none; sending
+	// is set while it is being delivered. The confirm popup shows draft.
+	draft       *draftState
+	sending     bool
+	showConfirm bool
+	confirmPop  popup.Confirm
 }
 
 // New builds the root model. Init connects every account with connect. log
@@ -122,6 +130,7 @@ func New(cfg config.Config, connect Connector, log *slog.Logger) Model {
 		accts:         slices.Clone(cfg.Accounts),
 		connect:       connect,
 		boxes:         make([]mail.Mailbox, len(cfg.Accounts)),
+		senders:       make([]mail.Sender, len(cfg.Accounts)),
 		side:          sidebar.New(th, names),
 		open:          openFolder{account: -1},
 		every:         tick,
@@ -205,6 +214,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleConnected(msg)
 	case editorDoneMsg:
 		return m.handleEditorDone(msg)
+	case sentMsg:
+		return m.handleSent(msg)
 	}
 	return m, nil
 }
@@ -223,6 +234,7 @@ func (m *Model) relayout() {
 	m.helpPop.SetSize(m.panes.Popup.W, m.panes.Popup.H)
 	m.picker.SetSize(m.panes.Popup.W, m.panes.Popup.H)
 	m.connectPop.SetSize(m.panes.Popup.W, m.panes.Popup.H)
+	m.confirmPop.SetSize(m.panes.Popup.W, m.panes.Popup.H)
 	frame := m.styles.pane.GetVerticalFrameSize()
 	m.side = m.side.SetSize(max(m.panes.Sidebar.W-m.styles.pane.GetHorizontalFrameSize(), 0), max(m.panes.Sidebar.H-frame, 0))
 	m.list = m.list.SetHeight(max(m.panes.List.H-frame-listHeaderRows, 0))
@@ -243,6 +255,11 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if key.Matches(msg, m.keys.ForceQuit) {
 		m.log.Debug("quit")
 		return m, tea.Quit
+	}
+	// The confirm popup takes every key: only y, e and d do anything, so a
+	// draft is never dropped by accident.
+	if m.showConfirm {
+		return m.handleConfirmKey(msg)
 	}
 	// The connect form takes every key, so q can be typed into it.
 	if m.showConnect {
@@ -272,6 +289,13 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if m.closeTopPopup() {
 			return m, nil
 		}
+		if m.sending || m.draft != nil {
+			m.status, m.statusErr = statusFinishDraft, false
+			if m.sending {
+				m.status = statusSending
+			}
+			return m, nil
+		}
 		m.log.Debug("quit")
 		return m, tea.Quit
 	}
@@ -294,7 +318,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, m.keys.Picker):
 			return m.openPicker()
 		case key.Matches(msg, m.keys.Compose):
-			return m.startEditor(placeholderTemplate)
+			return m.startCompose()
 		case m.isTriageKey(msg):
 			return m.triage(msg)
 		}
@@ -324,7 +348,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, m.keys.Connect):
 		return m.openConnect()
 	case key.Matches(msg, m.keys.Compose) && m.open.account >= 0:
-		return m.startEditor(placeholderTemplate)
+		return m.startCompose()
 	case m.focus == PaneSidebar:
 		var cmd tea.Cmd
 		m.side, cmd = m.side.Update(msg)
@@ -435,6 +459,9 @@ func (m Model) render() string {
 		pop = m.picker.View()
 	case m.showConnect:
 		pop = m.connectPop.View()
+	}
+	if m.showConfirm {
+		pop = m.confirmPop.View()
 	}
 	x, y := popup.Center(m.width, m.height-footerRows, pop)
 	screen = popup.Overlay(screen, pop, x, y)

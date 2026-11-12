@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+
+	"github.com/dkouvdis/dk-email/internal/mail/mailtest"
 )
 
 // editorModel is a started model whose editor command is a stub that is
@@ -13,7 +15,9 @@ import (
 func editorModel(t *testing.T) Model {
 	t.Helper()
 	t.Setenv("TMPDIR", t.TempDir())
-	m := started(t, newFixture(), 160, 30)
+	f := newFixture()
+	f.personalSender = &mailtest.Sender{}
+	m := started(t, f, 160, 30)
 	m.editorCmd = func(path string) *exec.Cmd { return exec.Command("true", path) }
 	return m
 }
@@ -128,17 +132,6 @@ func TestEditor_CloseRemovesPendingFile(t *testing.T) {
 	}
 	if err := m.Close(); err != nil {
 		t.Errorf("second Close() error = %v; a removed file is fine", err)
-	}
-}
-
-func TestEditor_DoneDiscardsTheDraft(t *testing.T) {
-	m := editorModel(t)
-	m.editorPath = "/gone/draft.eml"
-
-	m = send(t, m, editorDoneMsg{text: "To: a@b.c\n\nhi", orig: placeholderTemplate})
-
-	if m.status != "Draft discarded" || m.statusErr || m.editorPath != "" {
-		t.Errorf("status %q (err %v), pending %q; want Draft discarded and nothing pending", m.status, m.statusErr, m.editorPath)
 	}
 }
 

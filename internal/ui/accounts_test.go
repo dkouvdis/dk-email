@@ -24,6 +24,8 @@ import (
 type fixture struct {
 	personal, work *mailtest.Fake
 	errs           map[string]error
+	// Senders are nil unless a test sets them before connecting.
+	personalSender, workSender mail.Sender
 }
 
 func newFixture() *fixture {
@@ -57,14 +59,14 @@ func msg(from, subject string, at time.Time, seen bool, id string, refs ...strin
 }
 
 func (f *fixture) connector() Connector {
-	return func(ctx context.Context, acct config.Account) (mail.Mailbox, error) {
+	return func(ctx context.Context, acct config.Account) (Conn, error) {
 		if err := f.errs[acct.Name]; err != nil {
-			return nil, err
+			return Conn{}, err
 		}
 		if acct.Name == "Work" {
-			return f.work, nil
+			return Conn{Mailbox: f.work, Sender: f.workSender}, nil
 		}
-		return f.personal, nil
+		return Conn{Mailbox: f.personal, Sender: f.personalSender}, nil
 	}
 }
 
@@ -299,7 +301,7 @@ func TestStatus_ErrorStaysUntilKeyPress(t *testing.T) {
 
 func TestAccounts_LoadingStatus(t *testing.T) {
 	m := send(t, newModel(newFixture().connector()), size(160, 30))
-	next, cmd := m.Update(accountMsg{index: 0, mb: newFixture().personal, folders: []mail.Folder{{Name: "INBOX", Role: mail.RoleInbox}}})
+	next, cmd := m.Update(accountMsg{index: 0, conn: Conn{Mailbox: newFixture().personal}, folders: []mail.Folder{{Name: "INBOX", Role: mail.RoleInbox}}})
 	m = next.(Model)
 
 	if cmd == nil || m.status != "Loading Inbox…" || !strings.Contains(plain(m), "Loading…") {
@@ -308,7 +310,7 @@ func TestAccounts_LoadingStatus(t *testing.T) {
 }
 
 func TestAccounts_NilMailboxIsAnError(t *testing.T) {
-	connect := func(context.Context, config.Account) (mail.Mailbox, error) { return nil, nil }
+	connect := func(context.Context, config.Account) (Conn, error) { return Conn{}, nil }
 	m := send(t, newModel(connect), size(160, 30))
 
 	m = settle(t, m, m.Init())

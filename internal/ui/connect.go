@@ -22,7 +22,7 @@ var ErrNeedsPassword = errors.New("needs password")
 type Onboarding struct {
 	// Dial logs in. A non-empty password is used as is; otherwise the
 	// account's password_cmd (or keychain entry) supplies it.
-	Dial func(ctx context.Context, acct config.Account, password string) (mail.Mailbox, error)
+	Dial func(ctx context.Context, acct config.Account, password string) (Conn, error)
 	// AddAccount saves a new account: password, if any, to the keychain,
 	// then the account to config.toml.
 	AddAccount func(acct config.Account, password string) error
@@ -41,7 +41,7 @@ type connectedMsg struct {
 	gen     int
 	index   int
 	acct    config.Account
-	mb      mail.Mailbox
+	conn    Conn
 	folders []mail.Folder
 	err     error
 	took    time.Duration
@@ -113,23 +113,23 @@ func testAndSave(o Onboarding, gen, index int, req popup.ConnectRequest) tea.Cmd
 		start := time.Now()
 		res := connectedMsg{gen: gen, index: index, acct: req.Account}
 		fail := func(err error) tea.Msg {
-			if res.mb != nil {
-				_ = res.mb.Close()
-				res.mb = nil
+			if res.conn.Mailbox != nil {
+				_ = res.conn.Mailbox.Close()
+				res.conn = Conn{}
 			}
 			res.err, res.took = err, time.Since(start)
 			return res
 		}
 
-		mb, err := o.Dial(ctx, req.Account, req.Password)
-		if err == nil && mb == nil {
+		conn, err := o.Dial(ctx, req.Account, req.Password)
+		if err == nil && conn.Mailbox == nil {
 			err = errors.New("connector returned no mailbox")
 		}
 		if err != nil {
 			return fail(err)
 		}
-		res.mb = mb
-		if res.folders, err = mb.Folders(ctx); err != nil {
+		res.conn = conn
+		if res.folders, err = conn.Mailbox.Folders(ctx); err != nil {
 			return fail(fmt.Errorf("list folders: %w", err))
 		}
 		if index >= 0 {
@@ -147,8 +147,8 @@ func testAndSave(o Onboarding, gen, index int, req popup.ConnectRequest) tea.Cmd
 
 func (m Model) handleConnected(msg connectedMsg) (Model, tea.Cmd) {
 	if msg.gen != m.connectGen || !m.showConnect {
-		if msg.mb != nil {
-			_ = msg.mb.Close()
+		if msg.conn.Mailbox != nil {
+			_ = msg.conn.Mailbox.Close()
 		}
 		return m, nil
 	}
@@ -165,6 +165,7 @@ func (m Model) handleConnected(msg connectedMsg) (Model, tea.Cmd) {
 	if index < 0 {
 		m.accts = append(m.accts, msg.acct.WithDefaults())
 		m.boxes = append(m.boxes, nil)
+		m.senders = append(m.senders, nil)
 		m.side, index = m.side.AddAccount(msg.acct.Name, nil)
 	} else {
 		delete(m.needsPassword, index)
@@ -172,7 +173,7 @@ func (m Model) handleConnected(msg connectedMsg) (Model, tea.Cmd) {
 			_ = old.Close()
 		}
 	}
-	m, cmd := m.handleAccount(accountMsg{index: index, mb: msg.mb, folders: msg.folders, took: msg.took})
+	m, cmd := m.handleAccount(accountMsg{index: index, conn: msg.conn, folders: msg.folders, took: msg.took})
 	done := fmt.Sprintf("Connected %s.", m.accts[index].Name)
 	if m.open.account == index && m.open.loading {
 		m.open.notice = done // shown once its Inbox has loaded

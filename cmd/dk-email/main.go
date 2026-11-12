@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -15,7 +16,9 @@ import (
 	"github.com/dkouvdis/dk-email/internal/config"
 	"github.com/dkouvdis/dk-email/internal/mail"
 	"github.com/dkouvdis/dk-email/internal/mail/imap"
+	"github.com/dkouvdis/dk-email/internal/mail/smtp"
 	"github.com/dkouvdis/dk-email/internal/secret"
+	"github.com/dkouvdis/dk-email/internal/send"
 	"github.com/dkouvdis/dk-email/internal/ui"
 )
 
@@ -77,33 +80,56 @@ type passwordResolver interface {
 	Resolve(ctx context.Context, acct config.Account) (string, error)
 }
 
-// newConnector resolves each account's password, then logs in over IMAP.
-// The debug log times both phases, never recording the password.
+// newConnector resolves each account's password once, then logs in over IMAP
+// and, if the account has an smtp_host, sets up sending with the same
+// password. The debug log times both phases, never recording the password.
 func newConnector(pw passwordResolver, log *slog.Logger) ui.Connector {
-	return func(ctx context.Context, acct config.Account) (mail.Mailbox, error) {
+	return func(ctx context.Context, acct config.Account) (ui.Conn, error) {
 		start := time.Now()
 		password, err := pw.Resolve(ctx, acct)
 		log.Debug("password resolved", "account", acct.Name, "ok", err == nil, "took", time.Since(start).Round(time.Millisecond))
 		if errors.Is(err, secret.ErrNoPassword) {
-			return nil, fmt.Errorf("%w: %w", ui.ErrNeedsPassword, err)
+			return ui.Conn{}, fmt.Errorf("%w: %w", ui.ErrNeedsPassword, err)
 		}
 		if err != nil {
-			return nil, err
+			return ui.Conn{}, err
 		}
 		return dial(ctx, acct, password, log)
 	}
 }
 
-// dial logs in over IMAP. It returns a nil interface, never a typed nil,
-// on failure.
-func dial(ctx context.Context, acct config.Account, password string, log *slog.Logger) (mail.Mailbox, error) {
-	start := time.Now()
+// imapConn is what dial needs from an IMAP login: the mailbox for the UI and
+// the store the sender saves copies and marks answers through.
+type imapConn interface {
+	mail.Mailbox
+	send.Store
+}
+
+// dialIMAP logs in over IMAP; tests replace it to avoid the network. On
+// failure it returns a nil interface, never a typed nil.
+var dialIMAP = func(ctx context.Context, acct config.Account, password string) (imapConn, error) {
 	c, err := imap.Dial(ctx, acct, password)
-	log.Debug("imap login", "account", acct.Name, "ok", err == nil, "took", time.Since(start).Round(time.Millisecond))
 	if err != nil {
 		return nil, err
 	}
 	return c, nil
+}
+
+// dial logs in over IMAP and, iff the account has an smtp_host, builds its
+// sender around the same connection and password. It returns a zero Conn on
+// failure.
+func dial(ctx context.Context, acct config.Account, password string, log *slog.Logger) (ui.Conn, error) {
+	start := time.Now()
+	c, err := dialIMAP(ctx, acct, password)
+	log.Debug("imap login", "account", acct.Name, "ok", err == nil, "took", time.Since(start).Round(time.Millisecond))
+	if err != nil {
+		return ui.Conn{}, err
+	}
+	conn := ui.Conn{Mailbox: c}
+	if strings.TrimSpace(acct.SMTPHost) != "" {
+		conn.Sender = send.New(acct, smtp.New(acct, password), c, log)
+	}
+	return conn, nil
 }
 
 // newOnboarding lets the connect popup test and save accounts. A new
@@ -111,12 +137,12 @@ func dial(ctx context.Context, acct config.Account, password string, log *slog.L
 // configPath, so a saved account always has its password.
 func newOnboarding(configPath string, pw passwordResolver, store func(account, password string) error, log *slog.Logger) ui.Onboarding {
 	return ui.Onboarding{
-		Dial: func(ctx context.Context, acct config.Account, password string) (mail.Mailbox, error) {
+		Dial: func(ctx context.Context, acct config.Account, password string) (ui.Conn, error) {
 			acct = acct.WithDefaults()
 			if password == "" {
 				var err error
 				if password, err = pw.Resolve(ctx, acct); err != nil {
-					return nil, err
+					return ui.Conn{}, err
 				}
 			}
 			return dial(ctx, acct, password, log)

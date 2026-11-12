@@ -21,13 +21,21 @@ const (
 	pageSize         = 200
 )
 
-// Connector opens an account's mailbox. It may block on password_cmd and
-// login, so it always runs inside a tea.Cmd.
-type Connector func(ctx context.Context, acct config.Account) (mail.Mailbox, error)
+// Conn is what connecting an account yields. Sender is nil when sending
+// isn't set up for the account (no smtp_host).
+type Conn struct {
+	Mailbox mail.Mailbox
+	Sender  mail.Sender
+}
+
+// Connector opens an account's mailbox and, if sending is set up, its
+// sender. It may block on password_cmd and login, so it always runs inside
+// a tea.Cmd.
+type Connector func(ctx context.Context, acct config.Account) (Conn, error)
 
 type accountMsg struct {
 	index   int
-	mb      mail.Mailbox
+	conn    Conn
 	folders []mail.Folder
 	err     error
 	took    time.Duration
@@ -59,15 +67,15 @@ func connectAccount(connect Connector, index int, acct config.Account) tea.Cmd {
 		defer cancel()
 		start := time.Now()
 
-		mb, err := connect(ctx, acct)
-		if err == nil && mb == nil {
+		conn, err := connect(ctx, acct)
+		if err == nil && conn.Mailbox == nil {
 			err = errors.New("connector returned no mailbox")
 		}
 		if err != nil {
 			return accountMsg{index: index, err: err, took: time.Since(start)}
 		}
-		folders, err := mb.Folders(ctx)
-		return accountMsg{index: index, mb: mb, folders: folders, err: err, took: time.Since(start)}
+		folders, err := conn.Mailbox.Folders(ctx)
+		return accountMsg{index: index, conn: conn, folders: folders, err: err, took: time.Since(start)}
 	}
 }
 
@@ -85,8 +93,9 @@ func (m Model) handleAccount(msg accountMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 	name := m.accts[msg.index].Name
-	if msg.mb != nil {
-		m.boxes[msg.index] = msg.mb
+	if msg.conn.Mailbox != nil {
+		m.boxes[msg.index] = msg.conn.Mailbox
+		m.senders[msg.index] = msg.conn.Sender
 	}
 	m.side = m.side.SetFolders(msg.index, msg.folders, msg.err)
 	m.log.Debug("account connected", "account", name, "ok", msg.err == nil, "folders", len(msg.folders), "took", msg.took.Round(time.Millisecond))

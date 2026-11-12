@@ -9,9 +9,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-// placeholderTemplate is what c opens until compose.Format builds the real one.
-const placeholderTemplate = "To: \nCc: \nBcc: \nSubject: \n\n"
-
 // editorDoneMsg reports the editor having exited: text is the file as the
 // user left it, orig the template it started from.
 type editorDoneMsg struct {
@@ -93,18 +90,6 @@ func (m Model) startEditor(text string) (Model, tea.Cmd) {
 	return m, tea.ExecProcess(cmd, func(runErr error) tea.Msg {
 		return finishEditor(path, text, runErr)
 	})
-}
-
-// handleEditorDone is where the edited draft arrives. Sending isn't wired
-// up yet, so every draft is discarded.
-func (m Model) handleEditorDone(msg editorDoneMsg) (tea.Model, tea.Cmd) {
-	m.editorPath = ""
-	if msg.err != nil {
-		m.setError(msg.err)
-		return m, nil
-	}
-	m.status, m.statusErr = "Draft discarded", false
-	return m, nil
 }
 
 // removeEditorFile deletes a draft file the editor never handed back.

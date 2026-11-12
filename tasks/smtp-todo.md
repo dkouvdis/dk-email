@@ -238,13 +238,13 @@ Also rebind refresh from `r` to `ctrl+r`, and add `r`/`R`/`f`/`c` to `KeyMap`, u
 
 **Acceptance criteria:**
 
-- [ ] `Update`-level tests with `mailtest.Sender` and a stub editor cover: an unchanged file is discarded, `y` sends the parsed draft, `e` reopens the editor with the current text, `d` discards, `esc` keeps the popup, a failure then retry sends exactly once more, `ErrAfterDelivery` shows the warning and offers no retry, `q` is blocked while sending, and the not-configured message appears.
-- [ ] `cmd/dk-email` connector tests: no `smtp_host` gives a nil Sender, and with one, password resolution happens once.
+- [x] `Update`-level tests with `mailtest.Sender` and a stub editor cover: an unchanged file is discarded, `y` sends the parsed draft, `e` reopens the editor with the current text, `d` discards, `esc` keeps the popup, a failure then retry sends exactly once more, `ErrAfterDelivery` shows the warning and offers no retry, `q` is blocked while sending, and the not-configured message appears.
+- [x] `cmd/dk-email` connector tests: no `smtp_host` gives a nil Sender, and with one, password resolution happens once.
 - [ ] Manual: `c` → write → `y` delivers to yourself from Gmail (one copy in Sent) and from a non-Gmail account (an APPENDed copy in Sent).
 
 **Verification:**
 
-- [ ] `go test -race ./internal/ui/... ./cmd/dk-email/...` passes.
+- [x] `go test -race ./internal/ui/... ./cmd/dk-email/...` passes.
 - [ ] Manual check above.
 
 **Dependencies:** S1, S4, S7

@@ -12,6 +12,8 @@ import (
 	"testing"
 
 	"github.com/dkouvdis/dk-email/internal/config"
+	"github.com/dkouvdis/dk-email/internal/mail"
+	"github.com/dkouvdis/dk-email/internal/mail/mailtest"
 	"github.com/dkouvdis/dk-email/internal/secret"
 	"github.com/dkouvdis/dk-email/internal/ui"
 )
@@ -30,10 +32,10 @@ func TestNewConnector_PasswordErrorSkipsLogin(t *testing.T) {
 	log := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	want := errors.New("op read failed")
 
-	mb, err := newConnector(stubResolver{err: want}, log)(context.Background(), config.Account{Name: "Personal"})
+	conn, err := newConnector(stubResolver{err: want}, log)(context.Background(), config.Account{Name: "Personal"})
 
-	if !errors.Is(err, want) || mb != nil {
-		t.Fatalf("connect = %v, %v; want nil, %v", mb, err, want)
+	if !errors.Is(err, want) || conn != (ui.Conn{}) {
+		t.Fatalf("connect = %v, %v; want a zero Conn, %v", conn, err, want)
 	}
 	if !strings.Contains(buf.String(), "password resolved") || strings.Contains(buf.String(), "imap login") {
 		t.Errorf("log = %q, want a password step and no login step", buf.String())
@@ -53,10 +55,10 @@ func TestNewConnector_LoginErrorReturnsNilMailboxAndNeverLogsPassword(t *testing
 	const password = "hunter2-secret"
 	acct := config.Account{Name: "Personal", Username: "me", IMAPHost: "127.0.0.1", IMAPPort: addr.Port, TLS: config.TLSImplicit}
 
-	mb, err := newConnector(stubResolver{password: password}, log)(context.Background(), acct)
+	conn, err := newConnector(stubResolver{password: password}, log)(context.Background(), acct)
 
-	if err == nil || mb != nil {
-		t.Fatalf("connect = %#v, %v; want a nil mailbox and an error", mb, err)
+	if err == nil || conn != (ui.Conn{}) {
+		t.Fatalf("connect = %#v, %v; want a zero Conn and an error", conn, err)
 	}
 	if !strings.Contains(buf.String(), "imap login") || !strings.Contains(buf.String(), "ok=false") {
 		t.Errorf("log = %q, want a failed login step", buf.String())
@@ -138,8 +140,94 @@ func TestOnboarding_DialResolvesWhenNoPasswordGiven(t *testing.T) {
 	ln, _ := net.Listen("tcp", "127.0.0.1:0")
 	port := ln.Addr().(*net.TCPAddr).Port
 	ln.Close()
-	mb, err := o.Dial(context.Background(), config.Account{Name: "Work", Email: "me@x", IMAPHost: "127.0.0.1", IMAPPort: port}, "typed")
-	if err == nil || errors.Is(err, want) || mb != nil {
-		t.Errorf("Dial() = %v, %v; want a connection error and a nil mailbox", mb, err)
+	conn, err := o.Dial(context.Background(), config.Account{Name: "Work", Email: "me@x", IMAPHost: "127.0.0.1", IMAPPort: port}, "typed")
+	if err == nil || errors.Is(err, want) || conn != (ui.Conn{}) {
+		t.Errorf("Dial() = %v, %v; want a connection error and a zero Conn", conn, err)
+	}
+}
+
+// countingResolver counts how often the password is resolved.
+type countingResolver struct {
+	password string
+	calls    int
+}
+
+func (c *countingResolver) Resolve(context.Context, config.Account) (string, error) {
+	c.calls++
+	return c.password, nil
+}
+
+// fakeIMAP is an imapConn that never touches the network.
+type fakeIMAP struct{ *mailtest.Fake }
+
+func (fakeIMAP) Raw(context.Context, string, mail.UID) ([]byte, error) { return nil, nil }
+func (fakeIMAP) Append(context.Context, string, []byte, ...mail.Flag) error {
+	return nil
+}
+func (fakeIMAP) SentFolder(context.Context) (string, bool, error) { return "", false, nil }
+func (fakeIMAP) SetFlag(context.Context, string, []mail.UID, mail.Flag, bool) error {
+	return nil
+}
+
+// stubDial replaces dialIMAP and records the passwords it was given.
+func stubDial(t *testing.T) *[]string {
+	t.Helper()
+	var passwords []string
+	old := dialIMAP
+	dialIMAP = func(_ context.Context, _ config.Account, password string) (imapConn, error) {
+		passwords = append(passwords, password)
+		return fakeIMAP{mailtest.New()}, nil
+	}
+	t.Cleanup(func() { dialIMAP = old })
+	return &passwords
+}
+
+func TestNewConnector_NoSMTPHostMeansNoSender(t *testing.T) {
+	stubDial(t)
+	pw := &countingResolver{password: "pw"}
+
+	for _, host := range []string{"", "  "} {
+		conn, err := newConnector(pw, slog.New(slog.DiscardHandler))(context.Background(), config.Account{Name: "Work", SMTPHost: host})
+
+		if err != nil || conn.Mailbox == nil {
+			t.Fatalf("connect = %v, %v; want a mailbox", conn, err)
+		}
+		if conn.Sender != nil {
+			t.Errorf("smtp_host %q: Sender = %v, want a nil interface", host, conn.Sender)
+		}
+	}
+}
+
+func TestNewConnector_SMTPHostBuildsSenderFromOnePasswordResolution(t *testing.T) {
+	passwords := stubDial(t)
+	pw := &countingResolver{password: "hunter2-secret"}
+	var buf bytes.Buffer
+	log := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	acct := config.Account{Name: "Personal", Email: "me@example.com", SMTPHost: "smtp.example.com"}.WithDefaults()
+
+	conn, err := newConnector(pw, log)(context.Background(), acct)
+
+	if err != nil || conn.Mailbox == nil || conn.Sender == nil {
+		t.Fatalf("connect = %+v, %v; want a mailbox and a sender", conn, err)
+	}
+	if pw.calls != 1 || len(*passwords) != 1 || (*passwords)[0] != "hunter2-secret" {
+		t.Errorf("password resolved %d times, dialed with %v; want once", pw.calls, *passwords)
+	}
+	if strings.Contains(buf.String(), "hunter2-secret") {
+		t.Error("password leaked into the log")
+	}
+}
+
+func TestOnboarding_DialBuildsSenderOnlyWithSMTPHost(t *testing.T) {
+	stubDial(t)
+	o := newOnboarding("", stubResolver{}, nil, slog.New(slog.DiscardHandler))
+
+	plain, err := o.Dial(context.Background(), config.Account{Name: "A", Email: "a@x.com"}, "typed")
+	if err != nil || plain.Mailbox == nil || plain.Sender != nil {
+		t.Errorf("without smtp_host: %+v, %v; want a mailbox and no sender", plain, err)
+	}
+	full, err := o.Dial(context.Background(), config.Account{Name: "B", Email: "b@x.com", SMTPHost: "smtp.x.com"}, "typed")
+	if err != nil || full.Mailbox == nil || full.Sender == nil {
+		t.Errorf("with smtp_host: %+v, %v; want a mailbox and a sender", full, err)
 	}
 }
