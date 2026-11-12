@@ -67,7 +67,7 @@ The full details are in [smtp-todo.md](smtp-todo.md).
 
 ### Phase 4: Onboarding, docs, release
 - [x] S11: Connect popup SMTP fields + SMTP login test
-- [ ] S12: Docs: README, SPEC.md, AGENTS.md and the Copilot mirror
+- [x] S12: Docs: README, SPEC.md, AGENTS.md and the Copilot mirror
 - [ ] S13: Live verification and `v0.2.0-beta.1` (tag on your approval)
 
 ### Checkpoint 4: v0.2.0

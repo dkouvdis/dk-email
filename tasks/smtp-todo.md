@@ -372,13 +372,13 @@ Also rebind refresh from `r` to `ctrl+r`, and add `r`/`R`/`f`/`c` to `KeyMap`, u
 
 **Acceptance criteria:**
 
-- [ ] The README key table and config example match the code: every `KeyMap` binding is listed, and every new config key is shown.
-- [ ] AGENTS.md and copilot-instructions.md stay identical in body.
-- [ ] No doc still says refresh is `r`.
+- [x] The README key table and config example match the code: every `KeyMap` binding is listed, and every new config key is shown.
+- [x] AGENTS.md and copilot-instructions.md stay identical in body.
+- [x] No doc still says refresh is `r`.
 
 **Verification:**
 
-- [ ] `grep -rn '\`r\`.*refresh' README.md SPEC.md AGENTS.md .github/` returns nothing.
+- [x] `grep -rn '\`r\`.*refresh' README.md SPEC.md AGENTS.md .github/` returns nothing.
 
 **Dependencies:** S8–S11
 
