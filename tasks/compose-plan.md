@@ -48,7 +48,7 @@ The earlier idea of embedding `$EDITOR` in a PTY is dropped. Because dk-email ho
 - New `Fields{To, Cc, Bcc, Subject, Body string}`.
   - `FieldsOf(mail.Draft) Fields`.
   - `(Fields).Draft(base mail.Draft) (mail.Draft, error)`: reuses `parseAddresses`, and errors name the field ("To: …").
-- `FromMessage(...)` rebuilds a `mail.Draft` from a saved draft: addresses, subject, the text/plain body, In-Reply-To and References.
+- `FromRaw(raw)` rebuilds a `mail.Draft` from a saved draft's raw bytes: addresses (Bcc included, which `mail.Message` doesn't carry), subject, the text/plain body, In-Reply-To and References.
 - `Build` gains a draft mode that writes the Bcc header. Sending still never writes it.
 - `editorfile.go` (`Format` / `Parse`) is deleted once unused.
 
@@ -56,7 +56,7 @@ The earlier idea of embedding `$EDITOR` in a PTY is dropped. Because dk-email ho
 
 - New `FlagDraft`.
 - `Draft` gains `DraftOf *MessageRef`, the saved draft this one replaces.
-- A new `Drafter` interface with `SaveDraft(ctx, d) error`, which `send.Sender` implements.
+- A new `Drafter` interface with `SaveDraft(ctx, d) error` and `OpenDraft(ctx, ref) (Draft, error)`, which `send.Sender` implements.
 
 **`internal/mail/imap`**
 
@@ -97,7 +97,7 @@ The earlier idea of embedding `$EDITOR` in a PTY is dropped. Because dk-email ho
 - Send, save and discard follow the results above.
 - `sentMsg` and the new `draftSavedMsg` update the composer or close it.
 - Window resizes call `SetSize` on the composer.
-- Opening a draft: on a Drafts-role folder, `enter` fetches the message (reusing `fetchReply`-style loading), then calls `compose.FromMessage` and opens the composer with `DraftOf` set.
+- Opening a draft: on a Drafts-role folder, `enter` calls `mail.Drafter.OpenDraft` (raw fetch + `compose.FromRaw`, with `DraftOf` set and `ForwardOf` when it has attachments) in a loading `tea.Cmd`, then opens the composer.
 - After a draft is saved or deleted, the Drafts folder's summaries and counts are refreshed if it's the folder on screen, plus the sidebar count.
 - Deleted:
   - `editor.go`, the `editorPath` / `editorCmd` seam and `editorDoneMsg`;
@@ -165,7 +165,7 @@ The earlier idea of embedding `$EDITOR` in a PTY is dropped. Because dk-email ho
   - `SaveDraft`, with attachments and replacing `DraftOf`.
   - `Send` deletes `DraftOf` after delivery.
   - Add `ErrDraftSaved` and the `ErrAfterDelivery` path.
-  - `compose.FromMessage`.
+  - `compose.FromRaw` and `Sender.OpenDraft`.
 - **D3 – Save from the composer.** The prompt's **s** and second-`esc` options (both save and close; a failed save keeps the composer open), "Saving…", "Draft saved", and errors in the footer. The Drafts folder is refreshed when it's on screen.
 - **D4 – Reopen drafts.**
   - `enter` in a Drafts-role folder opens the composer.

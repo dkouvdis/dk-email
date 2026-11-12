@@ -26,10 +26,10 @@ Every task also meets the standing bar before it counts as done:
 
 **Acceptance criteria:**
 
-- [ ] `compose.Fields{To, Cc, Bcc, Subject, Body string}`, `FieldsOf(mail.Draft) Fields` and `(Fields).Draft(base mail.Draft) (mail.Draft, error)` exist.
-- [ ] `Draft` keeps `base`'s From, threading headers, `ReplyTo` and `ForwardOf`, and replaces only addresses, subject and body.
-- [ ] Address errors name the field, e.g. `To: …`. A draft with no recipient at all is an error. Subject newlines are flattened.
-- [ ] `FieldsOf` then `Draft` round-trips names with commas and quotes.
+- [x] `compose.Fields{To, Cc, Bcc, Subject, Body string}`, `FieldsOf(mail.Draft) Fields` and `(Fields).Draft(base mail.Draft) (mail.Draft, error)` exist.
+- [x] `Draft` keeps `base`'s From, threading headers, `ReplyTo` and `ForwardOf`, and replaces only addresses, subject and body.
+- [x] Address errors name the field, e.g. `To: …`. A draft with no recipient at all is an error. Subject newlines are flattened.
+- [x] `FieldsOf` then `Draft` round-trips names with commas and quotes.
 
 **Verification:** `go test -race ./internal/compose`
 
@@ -39,12 +39,12 @@ Every task also meets the standing bar before it counts as done:
 
 **Acceptance criteria:**
 
-- [ ] `FrameTitled(th, title, content, w, h)` draws the title in the top border, truncated with `…`, at exactly w × h.
-- [ ] `Compose` has To, Cc, Bcc and Subject inputs and a body textarea (`MaxHeight = 0`, `CharLimit = 0`). `tab` / `shift+tab` cycle focus. The initial focus is set by the caller.
-- [ ] `ctrl+s` returns a send result. `esc` returns at once when nothing changed; otherwise it opens the prompt. In the prompt, `d` discards, `e` goes back to editing, other keys are ignored. Saving (`s`, second `esc`) is off until D3 turns it on.
-- [ ] `SetError` shows a footer line; `SetBusy` shows "Sending…" / "Saving…" and ignores keys except `ctrl+c` (which the model handles).
-- [ ] `SetSize` resizes every input; the body fills the rest of the frame above the footer.
-- [ ] A benchmark types into a 5,000-line body; the result is reported at Checkpoint 1.
+- [x] `FrameTitled(th, title, content, w, h)` draws the title in the top border, truncated with `…`, at exactly w × h.
+- [x] `Compose` has To, Cc, Bcc and Subject inputs and a body textarea (`MaxHeight = 0`, `CharLimit = 0`). `tab` / `shift+tab` cycle focus. The initial focus is set by the caller.
+- [x] `ctrl+s` returns a send result. `esc` returns at once when nothing changed; otherwise it opens the prompt. In the prompt, `d` discards, `e` goes back to editing, other keys are ignored. Saving (`s`, second `esc`) is off until D3 turns it on.
+- [x] `SetError` shows a footer line; `SetBusy` shows "Sending…" / "Saving…" and ignores keys except `ctrl+c` (which the model handles).
+- [x] `SetSize` resizes every input; the body fills the rest of the frame above the footer.
+- [x] A benchmark types into a 5,000-line body; the result is reported at Checkpoint 1. (66–70 ms per keystroke on a 5,000-line body, M4 Pro.)
 
 **Verification:** `go test -race ./internal/ui/popup`
 
@@ -77,18 +77,18 @@ Every task also meets the standing bar before it counts as done:
 
 ### D1: mail and IMAP
 
-- [ ] `mail.FlagDraft`; `Append` sets `\Draft`.
-- [ ] `imap.Client.DraftsFolder(ctx)` mirrors `SentFolder`.
-- [ ] `imap.Client.Delete(ctx, folder, uids)` sets `\Deleted` and runs UID EXPUNGE; without UIDPLUS it returns an error and never runs a plain EXPUNGE.
-- [ ] Tested against the in-process IMAP server.
+- [x] `mail.FlagDraft`; `Append` sets `\Draft`.
+- [x] `imap.Client.DraftsFolder(ctx)` mirrors `SentFolder`.
+- [x] `imap.Client.Delete(ctx, folder, uids)` sets `\Deleted` and runs UID EXPUNGE; without UIDPLUS it returns an error and never runs a plain EXPUNGE.
+- [x] Tested against the in-process IMAP server.
 
 ### D2: compose and send
 
-- [ ] `mail.Draft.DraftOf *MessageRef`; `mail.Drafter` interface with `SaveDraft(ctx, d) error`.
+- [ ] `mail.Draft.DraftOf *MessageRef`; `mail.Drafter` interface with `SaveDraft(ctx, d) error` and `OpenDraft(ctx, ref) (Draft, error)`.
 - [ ] `compose.Build` has a draft mode that writes Bcc; sending never does.
 - [ ] `send.Sender.SaveDraft` appends to Drafts with `\Draft` and `\Seen`, includes forwarded attachments, then deletes `DraftOf`. A failed delete returns an error wrapping `ErrDraftSaved`.
 - [ ] `Send` deletes `DraftOf` after delivery; failure wraps `ErrAfterDelivery`.
-- [ ] `compose.FromMessage` rebuilds a draft (addresses, subject, text body, In-Reply-To, References).
+- [ ] `compose.FromRaw` rebuilds a draft from the saved raw message (addresses incl. Bcc, subject, text body, In-Reply-To, References); `OpenDraft` sets `DraftOf`, and `ForwardOf` when the draft has attachments.
 
 ### D3: Save from the composer
 
