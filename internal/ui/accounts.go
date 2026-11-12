@@ -178,9 +178,10 @@ func (m Model) handleSummaries(msg summariesMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-// Close closes every connected mailbox. Call it after the program exits.
+// Close removes a draft file still waiting for the editor and closes every
+// connected mailbox. Call it after the program exits.
 func (m Model) Close() error {
-	var errs []error
+	errs := []error{m.removeEditorFile()}
 	for _, mb := range m.boxes {
 		if mb != nil {
 			errs = append(errs, mb.Close())

@@ -15,6 +15,8 @@ type KeyMap struct {
 	ToggleRead, Star       key.Binding
 	Archive, Delete, Move  key.Binding
 	Refresh                key.Binding
+	Reply, ReplyAll        key.Binding
+	Forward, Compose       key.Binding
 	Picker, Filter         key.Binding
 	Connect                key.Binding
 	ToggleView, Help, Back key.Binding
@@ -41,7 +43,11 @@ func DefaultKeyMap() KeyMap {
 		Archive:    b([]string{"e"}, "e", "archive"),
 		Delete:     b([]string{"d"}, "d", "delete"),
 		Move:       b([]string{"m"}, "m", "move"),
-		Refresh:    b([]string{"r"}, "r", "refresh"),
+		Refresh:    b([]string{"ctrl+r"}, "ctrl+r", "refresh"),
+		Reply:      b([]string{"r"}, "r", "reply"),
+		ReplyAll:   b([]string{"R"}, "R", "reply all"),
+		Forward:    b([]string{"f"}, "f", "forward"),
+		Compose:    b([]string{"c"}, "c", "new message"),
 		Picker:     b([]string{"a"}, "a", "accounts"),
 		Filter:     b([]string{"/"}, "/", "filter folders"),
 		Connect:    b([]string{"A"}, "A", "connect account"),
@@ -58,6 +64,7 @@ func (k KeyMap) HelpSections() []popup.Section {
 	return []popup.Section{
 		{Title: "Navigation", Keys: []key.Binding{k.Up, k.Down, k.Top, k.Bottom, k.Left, k.Right, k.NextPane, k.PrevPane}},
 		{Title: "Threads", Keys: []key.Binding{k.Open, k.Expand, k.ToggleRead, k.Star, k.Archive, k.Delete, k.Move, k.Refresh}},
+		{Title: "Compose", Keys: []key.Binding{k.Compose}},
 		{Title: "Accounts & view", Keys: []key.Binding{k.Picker, k.Filter, k.Connect, k.ToggleView}},
 		{Title: "General", Keys: []key.Binding{k.Help, k.Back, k.Quit, k.ForceQuit}},
 	}
@@ -68,7 +75,7 @@ func (k KeyMap) HelpSections() []popup.Section {
 // the end. ? and q are added by the bar itself so they're never cut off.
 func (k KeyMap) hints(focus Pane, reading bool, kind Kind) []key.Binding {
 	if reading {
-		return []key.Binding{k.Up, k.Down, k.Back, k.Expand, k.ToggleRead, k.Star, k.Archive, k.Delete, k.Move}
+		return []key.Binding{k.Up, k.Down, k.Back, k.Expand, k.ToggleRead, k.Star, k.Archive, k.Delete, k.Move, k.Compose}
 	}
 	keys := []key.Binding{k.Up, k.Down, k.Open}
 	if kind == KindList {
@@ -76,7 +83,7 @@ func (k KeyMap) hints(focus Pane, reading bool, kind Kind) []key.Binding {
 	}
 	switch focus {
 	case PaneList:
-		keys = append(keys, k.Expand, k.ToggleRead, k.Star, k.Archive, k.Delete, k.Move)
+		keys = append(keys, k.Expand, k.ToggleRead, k.Star, k.Archive, k.Delete, k.Move, k.Compose)
 	case PaneSidebar:
 		keys = append(keys, key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "filter")))
 	}

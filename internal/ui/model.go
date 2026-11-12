@@ -5,6 +5,7 @@ package ui
 import (
 	"fmt"
 	"log/slog"
+	"os/exec"
 	"slices"
 	"strings"
 	"time"
@@ -94,6 +95,10 @@ type Model struct {
 	moveTargets []mail.Summary
 	status      string
 	statusErr   bool
+	// editorCmd builds the command that edits a draft file; tests replace
+	// it. editorPath is the draft file waiting for the editor to return.
+	editorCmd  func(path string) *exec.Cmd
+	editorPath string
 }
 
 // New builds the root model. Init connects every account with connect. log
@@ -120,6 +125,7 @@ func New(cfg config.Config, connect Connector, log *slog.Logger) Model {
 		side:          sidebar.New(th, names),
 		open:          openFolder{account: -1},
 		every:         tick,
+		editorCmd:     shellEditorCmd,
 		needsPassword: map[int]bool{},
 		connectFor:    -1,
 		list:          threadlist.New(th, time.Now),
@@ -197,6 +203,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleRefresh(msg)
 	case connectedMsg:
 		return m.handleConnected(msg)
+	case editorDoneMsg:
+		return m.handleEditorDone(msg)
 	}
 	return m, nil
 }
@@ -285,6 +293,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case key.Matches(msg, m.keys.Picker):
 			return m.openPicker()
+		case key.Matches(msg, m.keys.Compose):
+			return m.startEditor(placeholderTemplate)
 		case m.isTriageKey(msg):
 			return m.triage(msg)
 		}
@@ -313,6 +323,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.startRefresh(true)
 	case key.Matches(msg, m.keys.Connect):
 		return m.openConnect()
+	case key.Matches(msg, m.keys.Compose) && m.open.account >= 0:
+		return m.startEditor(placeholderTemplate)
 	case m.focus == PaneSidebar:
 		var cmd tea.Cmd
 		m.side, cmd = m.side.Update(msg)

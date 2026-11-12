@@ -12,7 +12,7 @@
 │                              ││       │   l/→         right pane           ┃ │                                       │
 │                              ││       │   tab         next pane            ┃ │                                       │
 │                              ││       │   shift+tab   previous pane        ┃ │                                       │
-│                              ││       │                                    ┃ │                                       │
+│                              ││       │                                      │                                       │
 │                              ││       │ Threads                              │                                       │
 │                              ││       │   enter       open                   │                                       │
 │                              ││       │   space       expand                 │                                       │

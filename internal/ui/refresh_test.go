@@ -48,18 +48,21 @@ func TestRefresh_TickMergesNewMailAndKeepsCursor(t *testing.T) {
 	}
 }
 
-func TestRefresh_RKeyRefreshesNowWithStatus(t *testing.T) {
+func TestRefresh_CtrlRRefreshesNowWithStatus(t *testing.T) {
 	f := newFixture()
 	m := started(t, f, 160, 30)
 	f.personal.AddMessage("INBOX", msg("Zed", "Brand new", fixedNow, false, "z1"))
 
-	next, cmd := m.Update(press("r"))
+	if _, cmd := m.Update(press("r")); cmd != nil {
+		t.Error("r started a refresh; it only refreshes on ctrl+r")
+	}
+	next, cmd := m.Update(press("ctrl+r"))
 	m = next.(Model)
 	if m.status != "Refreshing…" || cmd == nil {
 		t.Fatalf("status %q, cmd %v; want a refresh under way", m.status, cmd != nil)
 	}
-	if _, again := m.Update(press("r")); again != nil {
-		t.Error("a second r started an overlapping refresh")
+	if _, again := m.Update(press("ctrl+r")); again != nil {
+		t.Error("a second ctrl+r started an overlapping refresh")
 	}
 	scheduled := 0
 	m.every = func(time.Duration) tea.Cmd { scheduled++; return nil }

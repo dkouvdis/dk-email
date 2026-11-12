@@ -36,6 +36,8 @@ func press(k string) tea.KeyPressMsg {
 		return tea.KeyPressMsg{Code: tea.KeyRight}
 	case "ctrl+c":
 		return tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl}
+	case "ctrl+r":
+		return tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl}
 	case "enter":
 		return tea.KeyPressMsg{Code: tea.KeyEnter}
 	case "space":
