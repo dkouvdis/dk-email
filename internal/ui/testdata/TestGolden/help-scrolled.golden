@@ -1,19 +1,21 @@
 ╭──────────────────────────────╮╭──────────────────────────────────────────────────────────────────────────────────────╮
 │ Personal                     ││ Inbo╭──────────────────────────────────────────╮                                     │
-│ ▶ Inbox                    2 ││  ●  │ Keys                          esc close  │                               13:30 │
+│ ▶ Inbox                    2 ││  ●  │ Keys                                     │                               13:30 │
 │   Sent Mail                  ││  ●  │ / press / to filter by key or descripti… │                               Nov 8 │
 │   All Mail                   ││     │                                          │                                     │
-│   Trash                      ││     │   ctrl+s      send                       │                                     │
-│   Receipts                 1 ││     │   tab         next field                 │                                     │
-│                              ││     │   shift+tab   previous field             │                                     │
-│ Work                         ││     │   enter       next field (in a header)   │                                     │
-│   Inbox                    1 ││     │   esc         close, or save / discard   │                                     │
-│   Archive                    ││     │   ctrl+c      quit now                   │                                     │
+│   Trash                      ││     │                                          │                                     │
+│   Receipts                 1 ││     │ Composer                                 │                                     │
+│                              ││     │   ctrl+s      send                       │                                     │
+│ Work                         ││     │   tab         next field                 │                                     │
+│   Inbox                    1 ││     │   shift+tab   previous field             │                                     │
+│   Archive                    ││     │   enter       next field (in a header)   │                                     │
+│                              ││     │   esc         close, or save / discard   │                                     │
+│                              ││     │   ctrl+c      quit now                   │                                     │
 │                              ││     │                                          │                                     │
 │                              ││     │ Accounts & view                          │                                     │
 │                              ││     │   a           accounts                   │                                     │
 │                              ││     │   /           filter folders             │                                     │
-│                              ││     │   A           connect account            │                                     │
+│                              ││     │   A           connect account          ┃ │                                     │
 │                              ││     │   v           split/list               ┃ │                                     │
 │                              ││     │                                        ┃ │                                     │
 │                              ││     │ General                                ┃ │                                     │
@@ -21,10 +23,8 @@
 │                              ││     │   esc         back                     ┃ │                                     │
 │                              ││     │   q           quit                     ┃ │                                     │
 │                              ││     │   ctrl+c      quit now                 ┃ │                                     │
-│                              ││     │                                          │                                     │
-│                              ││     │ / filter · j/k/pgup/pgdn scroll · esc/q… │                                     │
 │                              ││     ╰──────────────────────────────────────────╯                                     │
 │                              ││                                                                                      │
 ╰──────────────────────────────╯╰──────────────────────────────────────────────────────────────────────────────────────╯
                                                                                                                   narrow
-Up: k/↑ | Down: j/↓ | Open: enter | Expand: space | Read/unread: u | Star: s | Archive: e | … | Help: ? | Close: q      
+Up: k/↑ | Down: j/↓ | Page: pgup/pgdn | Top/bottom: g/G | Filter: / | Close: esc/q/?                                    

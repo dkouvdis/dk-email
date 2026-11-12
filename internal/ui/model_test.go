@@ -14,6 +14,8 @@ import (
 	"github.com/charmbracelet/x/exp/teatest/v2"
 
 	"github.com/dkouvdis/dk-email/internal/config"
+	"github.com/dkouvdis/dk-email/internal/mail/mailtest"
+	"github.com/dkouvdis/dk-email/internal/ui/popup"
 )
 
 func testConfig() config.Config {
@@ -230,8 +232,11 @@ func TestModel_HintBarAlwaysFitsAndEndsWithHelpAndQuit(t *testing.T) {
 
 func TestModel_HelpPopup(t *testing.T) {
 	m := send(t, New(testConfig(), nil, nil), size(120, 30), press("?"))
-	if !m.showHelp || !strings.Contains(plain(m), "esc close") {
+	if !m.showHelp || !strings.Contains(plain(m), "press / to filter by key") {
 		t.Fatal("? didn't open the help popup")
+	}
+	if h := strings.TrimSpace(ansi.Strip(m.renderHints())); !strings.HasSuffix(h, "Filter: / | Close: esc/q/?") || strings.Contains(h, "Quit") {
+		t.Errorf("hint bar = %q, want the help popup's own keys", h)
 	}
 
 	m = send(t, m, press("tab"), press("v"))
@@ -250,7 +255,7 @@ func TestModel_HelpPopup(t *testing.T) {
 
 	for _, k := range []string{"esc", "?"} {
 		m = send(t, m, press("?"), press(k))
-		if m.showHelp || strings.Contains(plain(m), "esc close") {
+		if m.showHelp || strings.Contains(plain(m), "press / to filter by key") {
 			t.Errorf("%s didn't close the help popup", k)
 		}
 	}
@@ -277,8 +282,9 @@ func TestModel_Quit(t *testing.T) {
 	if quits(cmd) || next.(Model).showHelp {
 		t.Error("q with the help popup open should close it, not quit")
 	}
-	if !strings.Contains(ansi.Strip(withHelp.renderHints()), "Close: q") {
-		t.Errorf("hint bar = %q, want Close: q while a popup is open", ansi.Strip(withHelp.renderHints()))
+	reading := pressSettled(t, started(t, newFixture(), 70, 24), "enter")
+	if !reading.readerPopup || !strings.HasSuffix(strings.TrimRight(ansi.Strip(reading.renderHints()), " "), "Help: ? | Close: q") {
+		t.Errorf("reader hint bar = %q, want it to end with Help: ? | Close: q", ansi.Strip(reading.renderHints()))
 	}
 	if _, cmd := withHelp.Update(press("ctrl+c")); !quits(cmd) {
 		t.Error("ctrl+c with a popup open didn't quit")
@@ -412,5 +418,162 @@ func TestModel_HelpFilter(t *testing.T) {
 	}
 	if _, cmd := m.Update(press("ctrl+c")); cmd == nil {
 		t.Error("ctrl+c should still quit with help open")
+	}
+}
+
+// sgrPrefix is the escape a style writes before its text.
+func sgrPrefix(s lipgloss.Style) string {
+	pre, _, _ := strings.Cut(s.Render("x"), "x")
+	return pre
+}
+
+// popupRows is the screen rows a popup covers.
+func popupRows(m Model) (top, bottom int) {
+	var view string
+	switch {
+	case m.showConnect:
+		view = m.connectPop.View()
+	case m.showHelp:
+		view = m.helpPop.View()
+	case m.showPicker:
+		view = m.picker.View()
+	default:
+		p := m.panes.Popup
+		return p.Y, p.Y + p.H
+	}
+	_, y := popup.Center(m.width, m.height-footerRows, view)
+	return y, y + lipgloss.Height(view)
+}
+
+// With a popup open, the panes behind it are drawn in the muted style only:
+// no selected row and no focused border colour. Without one nothing changes.
+func TestModel_PopupDimsTheBackdrop(t *testing.T) {
+	tests := []struct {
+		name  string
+		key   string
+		width int // the picker is only used in list mode
+		// ownSelection popups draw a selected row or button of their own.
+		ownSelection bool
+	}{
+		{"none", "", 160, false},
+		{"reader", "enter", 160, false},
+		{"help", "?", 160, false},
+		{"picker", "a", 70, true},
+		{"composer", "c", 160, false},
+		{"connect", "A", 160, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := newFixture()
+			f.personalSender = &mailtest.DraftSender{} // the composer needs a sender
+			m := started(t, f, tt.width, 30)
+			m.accts[0].Email = "me@example.com"
+			m = m.WithOnboarding(newOnboarding().onboarding())
+			if tt.key != "" {
+				m = pressSettled(t, m, tt.key)
+			}
+			selected := sgrPrefix(m.theme.Cursor)
+			accent := sgrPrefix(lipgloss.NewStyle().Foreground(m.theme.AccentColor))
+			screen := m.render()
+			lines := strings.Split(screen, "\n")
+
+			if tt.key == "" {
+				if m.popupOpen() || m.showConnect {
+					t.Fatal("a popup is open")
+				}
+				if !strings.Contains(screen, selected) || !strings.Contains(lines[0], accent) {
+					t.Error("without a popup the selected row and the focused border should be drawn as before")
+				}
+				return
+			}
+			if !m.popupOpen() && !m.showConnect {
+				t.Fatal("the popup didn't open")
+			}
+
+			top, bottom := popupRows(m)
+			for i, l := range lines[:m.height-footerRows] {
+				if i >= top && i < bottom {
+					continue
+				}
+				if strings.Contains(l, selected) || strings.Contains(l, accent) {
+					t.Errorf("row %d, outside the popup, still has selection or focus colour: %q", i, l)
+				}
+			}
+			if !tt.ownSelection && strings.Contains(screen, selected) {
+				t.Error("a selected row is still highlighted behind the popup")
+			}
+		})
+	}
+}
+
+func TestModel_DimmedKeepsTextAndWidth(t *testing.T) {
+	m := started(t, newFixture(), 160, 30)
+	block := lipgloss.JoinHorizontal(lipgloss.Top, m.renderPane(PaneSidebar, m.panes.Sidebar, m.side.View), m.renderPane(PaneList, m.panes.List, m.listView))
+
+	got := m.dimmed(block)
+
+	if ansi.Strip(got) != ansi.Strip(block) {
+		t.Error("dimming changed the text")
+	}
+	if strings.Contains(got, sgrPrefix(m.theme.Cursor)) {
+		t.Error("dimmed block still has the selection colour")
+	}
+	for i, l := range strings.Split(got, "\n") {
+		if lipgloss.Width(l) != m.width {
+			t.Errorf("line %d is %d wide, want %d", i, lipgloss.Width(l), m.width)
+		}
+	}
+}
+
+// The top-most popup's own keys fill the hint bar, with no Help/Quit tail,
+// and the shared fitting still cuts them with … at narrow widths.
+func TestModel_HintBarShowsThePopupKeys(t *testing.T) {
+	f := newFixture()
+	f.personalSender = &mailtest.DraftSender{}
+	base := started(t, f, 160, 30)
+	base.accts[0].Email = "me@example.com"
+	base = base.WithOnboarding(newOnboarding().onboarding())
+
+	// Each composer needs its own draft, which the models would share.
+	composing := pressSettled(t, base, "c")
+	prompting := send(t, pressSettled(t, base, "c"), press("x"), press("esc"))
+	busy := pressSettled(t, base, "c")
+	busy.draft.pop.SetBusy("Sending…")
+	filtering := pressSettled(t, pressSettled(t, base, "?"), "/")
+
+	tests := []struct {
+		name string
+		m    Model
+		want string
+	}{
+		{"composer", composing, "Send: ctrl+s | Next field: tab | Previous field: shift+tab | Close: esc"},
+		{"composer prompt", prompting, "Save: s | Discard: d | Keep editing: e | Save & close: esc"},
+		{"composer busy", busy, "Quit now: ctrl+c"},
+		{"help", pressSettled(t, base, "?"), "Up: k/↑ | Down: j/↓ | Page: pgup/pgdn | Top/bottom: g/G | Filter: / | Close: esc/q/?"},
+		{"help filter", filtering, "Keep: enter | Clear: esc"},
+		{"picker", send(t, base, size(70, 30), press("a")), "Filter: / | Move: j/k | Open: enter | Close: esc/q"},
+		{"connect", pressSettled(t, base, "A"), "Next: tab | Choose: ←→ | Test & save: enter | Cancel: esc"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := strings.TrimRight(ansi.Strip(tt.m.renderHints()), " "); got != tt.want {
+				t.Errorf("hint bar = %q, want %q", got, tt.want)
+			}
+			for w := minWidth; w <= 120; w++ {
+				m := send(t, tt.m, size(w, 30))
+				bar := m.renderHints()
+				if got := lipgloss.Width(bar); got != w {
+					t.Fatalf("width %d: hint bar is %d wide", w, got)
+				}
+				text := strings.TrimRight(ansi.Strip(bar), " ")
+				if strings.Contains(text, "Help: ?") || strings.Contains(text, "Quit: q") {
+					t.Fatalf("width %d: %q has the pane tail", w, text)
+				}
+				full := w >= ansi.StringWidth(tt.want)
+				if full != (text == tt.want) || !full && !strings.HasSuffix(text, "…") {
+					t.Fatalf("width %d: hint bar %q, want %q or a cut ending in …", w, text, tt.want)
+				}
+			}
+		})
 	}
 }

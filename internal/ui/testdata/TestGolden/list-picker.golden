@@ -1,24 +1,24 @@
 ╭────────────────────────────────────────────────────────────────────╮
 │ Personal › Inbox · 2 unread                                        │
-│  ●    Bo╭────────────────────────────────────────────────╮   13:30 │
-│  ●    Ca│ Go to folder                        esc close  │   Nov 8 │
-│         │ / press / to filter folders                    │         │
-│         │                                                │         │
-│         │ Personal                                       │         │
-│         │ ▶ Inbox                                      2 │         │
-│         │ ▸ Sent Mail                                    │         │
-│         │   All Mail                                     │         │
-│         │   Trash                                        │         │
-│         │   Receipts                                   1 │         │
-│         │                                                │         │
-│         │ Work                                           │         │
-│         │   Inbox                                      1 │         │
-│         │   Archive                                      │         │
-│         │                                                │         │
-│         │ / filter · j/k move · enter open · esc/q close │         │
-│         ╰────────────────────────────────────────────────╯         │
+│  ●    Bob                Re: Plan (2)                        13:30 │
+│  ●    Carol  ╭──────────────────────────────────────╮        Nov 8 │
+│              │ Go to folder                         │              │
+│              │ / press / to filter folders          │              │
+│              │                                      │              │
+│              │ Personal                             │              │
+│              │ ▶ Inbox                            2 │              │
+│              │ ▸ Sent Mail                          │              │
+│              │   All Mail                           │              │
+│              │   Trash                              │              │
+│              │   Receipts                         1 │              │
+│              │                                      │              │
+│              │ Work                                 │              │
+│              │   Inbox                            1 │              │
+│              │   Archive                            │              │
+│              ╰──────────────────────────────────────╯              │
+│                                                                    │
 │                                                                    │
 │                                                                    │
 ╰────────────────────────────────────────────────────────────────────╯
                                                          list (forced)
-Up: k/↑ | Down: j/↓ | Open: enter | … | Help: ? | Close: q            
+Filter: / | Move: j/k | Open: enter | Close: esc/q                    

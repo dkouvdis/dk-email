@@ -2,7 +2,7 @@
 │ Personal                     ││ Inbox · 2 unread                                                                     │
 │ ▶ Inbox                    2 ││  ●    Bob                     Re: Plan (2)                                     13:30 │
 │   Sent Mail                  ││  ●  ╭──────────────────────────────────────────╮                               Nov 8 │
-│   All Mail                   ││     │ Keys                          esc close  │                                     │
+│   All Mail                   ││     │ Keys                                     │                                     │
 │   Trash                      ││     │ / press / to filter by key or descripti… │                                     │
 │   Receipts                 1 ││     │                                          │                                     │
 │                              ││     │ Navigation                             ┃ │                                     │
@@ -38,17 +38,17 @@
 │                              ││     │   shift+tab   previous field           ┃ │                                     │
 │                              ││     │   enter       next field (in a header) ┃ │                                     │
 │                              ││     │   esc         close, or save / discard ┃ │                                     │
-│                              ││     │   ctrl+c      quit now                   │                                     │
-│                              ││     │                                          │                                     │
-│                              ││     │ Accounts & view                          │                                     │
+│                              ││     │   ctrl+c      quit now                 ┃ │                                     │
+│                              ││     │                                        ┃ │                                     │
+│                              ││     │ Accounts & view                        ┃ │                                     │
 │                              ││     │   a           accounts                   │                                     │
 │                              ││     │   /           filter folders             │                                     │
 │                              ││     │   A           connect account            │                                     │
+│                              ││     │   v           split/list                 │                                     │
 │                              ││     │                                          │                                     │
-│                              ││     │ / filter · j/k/pgup/pgdn scroll · esc/q… │                                     │
 │                              ││     ╰──────────────────────────────────────────╯                                     │
 │                              ││                                                                                      │
 │                              ││                                                                                      │
 ╰──────────────────────────────╯╰──────────────────────────────────────────────────────────────────────────────────────╯
                                                                                                                   narrow
-Up: k/↑ | Down: j/↓ | Open: enter | Expand: space | Read/unread: u | Star: s | Archive: e | … | Help: ? | Close: q      
+Up: k/↑ | Down: j/↓ | Page: pgup/pgdn | Top/bottom: g/G | Filter: / | Close: esc/q/?                                    

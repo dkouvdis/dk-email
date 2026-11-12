@@ -427,11 +427,7 @@ func (c Connect) View() string {
 	if c.passwordOnly {
 		title = "Password for " + c.account.Name
 	}
-	badge := c.st.badge.Render("esc close")
-	t := c.st.title.Render(title)
-	header := t + strings.Repeat(" ", max(innerW-lipgloss.Width(t)-lipgloss.Width(badge), 1)) + badge
-
-	lines := []string{ansi.Truncate(header, innerW, ""), ""}
+	lines := []string{ansi.Truncate(c.st.title.Render(title), innerW, ""), ""}
 	if c.passwordOnly {
 		lines = append(lines, c.readOnly("Email", c.account.Email, innerW), c.readOnly("Server", fmt.Sprintf("%s:%d", c.account.IMAPHost, c.account.WithDefaults().IMAPPort), innerW), "")
 	} else {
@@ -472,19 +468,27 @@ func (c Connect) View() string {
 			lines = append(lines, c.st.alert.Render(strings.TrimRight(l, " ")))
 		}
 	}
-	footer := "tab next · ←→ choose · enter test & save · esc cancel"
-	if c.passwordOnly {
-		footer = "enter test & save · esc cancel"
-	}
-	lines = append(lines, "", c.st.dim.Render(ansi.Truncate(footer, innerW, "…")))
 
 	if room := c.maxH - 2; len(lines) > room {
-		lines = append(lines[:room-1], lines[len(lines)-1])
+		lines = lines[:room]
 	}
 	for i, l := range lines {
 		lines[i] = ansi.Truncate(l, innerW, "")
 	}
 	return c.st.box.Width(innerW + helpChromeCols).Render(strings.Join(lines, "\n"))
+}
+
+// Hints are the keys that currently work, for the hint bar.
+func (c Connect) Hints() []key.Binding {
+	b := func(k, desc string) key.Binding { return key.NewBinding(key.WithKeys(k), key.WithHelp(k, desc)) }
+	cancel := b("esc", "cancel")
+	switch {
+	case c.busy:
+		return []key.Binding{cancel}
+	case c.passwordOnly:
+		return []key.Binding{b("enter", "test & save"), cancel}
+	}
+	return []key.Binding{b("tab", "next"), b("←→", "choose"), b("enter", "test & save"), cancel}
 }
 
 func (c Connect) label(f int, text string) string {

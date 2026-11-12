@@ -233,6 +233,31 @@ func TestConnect_PasswordOnlyMode(t *testing.T) {
 	}
 }
 
+func TestConnect_HintsAreNotInThePopup(t *testing.T) {
+	c := newConnect()
+	if got := hintText(c.Hints()); got != "Next: tab | Choose: ←→ | Test & save: enter | Cancel: esc" {
+		t.Errorf("hints = %q", got)
+	}
+	v := ansi.Strip(c.View())
+	for _, bad := range []string{"esc close", "esc cancel", "tab next", "enter test"} {
+		if strings.Contains(v, bad) {
+			t.Errorf("view has key text %q; the hint bar shows the keys:\n%s", bad, v)
+		}
+	}
+	if !strings.Contains(v, "[ Test & save ]") {
+		t.Errorf("view lacks the button:\n%s", v)
+	}
+
+	acct := config.Account{Name: "Personal", Email: "me@gmail.com", IMAPHost: "imap.gmail.com", TLS: config.TLSImplicit}
+	if got := hintText(NewPasswordPrompt(theme.Default(), acct).Hints()); got != "Test & save: enter | Cancel: esc" {
+		t.Errorf("password prompt hints = %q", got)
+	}
+	c.SetBusy(true)
+	if got := hintText(c.Hints()); got != "Cancel: esc" {
+		t.Errorf("busy hints = %q", got)
+	}
+}
+
 func TestConnect_FitsTheScreen(t *testing.T) {
 	c := newConnect()
 	if w := lipgloss.Width(c.View()); w > 70 {

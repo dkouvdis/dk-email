@@ -4,8 +4,9 @@
 │                              ││                                                                                                          │
 │                              ││                                                                                                          │
 │                              ││                                                                                                          │
+│                              ││                                                                                                          │
 │                              ││      ╭────────────────────────────────────────────────────────────╮                                      │
-│                              ││      │ Connect account                                 esc close  │                                      │
+│                              ││      │ Connect account                                            │                                      │
 │                              ││      │                                                            │                                      │
 │                              ││      │ Name       Gmail                                           │                                      │
 │                              ││      │ Email      me@gmail.com                                    │                                      │
@@ -21,9 +22,8 @@
 │                              ││      │ SMTP TLS   ● implicit   ○ starttls                         │                                      │
 │                              ││      │                                                            │                                      │
 │                              ││      │ [ Test & save ]                                            │                                      │
-│                              ││      │                                                            │                                      │
-│                              ││      │ tab next · ←→ choose · enter test & save · esc cancel      │                                      │
 │                              ││      ╰────────────────────────────────────────────────────────────╯                                      │
+│                              ││                                                                                                          │
 │                              ││                                                                                                          │
 │                              ││                                                                                                          │
 │                              ││                                                                                                          │
@@ -31,4 +31,4 @@
 │                              ││                                                                                                          │
 ╰──────────────────────────────╯╰──────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 No accounts yet: press A to add one.                                                                                                  narrow
-Up: k/↑ | Down: j/↓ | Open: enter | Expand: space | Read/unread: u | Star: s | Archive: e | Delete: d | Move: m | … | Help: ? | Quit: q     
+Next: tab | Choose: ←→ | Test & save: enter | Cancel: esc                                                                                   

@@ -302,22 +302,19 @@ func (p Picker[T]) itemRow(it Item[T], cursor bool, width int) string {
 	return marker + indent + label + gap + p.st.key.Render(count)
 }
 
-const (
-	pickerFooter       = "/ filter · j/k move · enter open · esc/q close"
-	pickerFilterFooter = "↑/↓ move · enter open · esc clear"
-)
-
-func (p Picker[T]) footer() string {
+// Hints are the keys that currently work, for the hint bar.
+func (p Picker[T]) Hints() []key.Binding {
+	b := func(k, desc string) key.Binding { return key.NewBinding(key.WithKeys(k), key.WithHelp(k, desc)) }
 	if p.filter.Focused() {
-		return pickerFilterFooter
+		return []key.Binding{b("↑/↓", "move"), b("enter", "open"), b("esc", "clear")}
 	}
-	return pickerFooter
+	return []key.Binding{b("/", "filter"), b("j/k", "move"), b("enter", "open"), b("esc/q", "close")}
 }
 
-// contentW is the inner width the items need, before capping. It fits
-// both footers, so the box keeps its width while filtering.
+// contentW is the inner width the items need, before capping. The width
+// is the same while filtering, so the box doesn't jump.
 func (p Picker[T]) contentW() int {
-	w := max(ansi.StringWidth(pickerFooter), ansi.StringWidth(pickerFilterFooter), minHelpInner)
+	w := minHelpInner
 	for _, g := range p.groups {
 		w = max(w, ansi.StringWidth(g.Name), 2+ansi.StringWidth(g.Note))
 		for _, it := range g.Items {
@@ -374,9 +371,7 @@ func (p Picker[T]) View() string {
 	if vh < 1 || innerW < 20 {
 		return ""
 	}
-	badge := p.st.badge.Render("esc close")
-	title := p.st.title.Render(p.title)
-	header := title + strings.Repeat(" ", max(innerW-lipgloss.Width(title)-lipgloss.Width(badge), 1)) + badge
+	header := p.st.title.Render(p.title)
 
 	f := p.filter
 	f.SetWidth(max(innerW-ansi.StringWidth(f.Prompt)-1, 1))
@@ -394,6 +389,5 @@ func (p Picker[T]) View() string {
 		}
 		content = append(content, line)
 	}
-	content = append(content, "", p.st.dim.Render(ansi.Truncate(p.footer(), innerW, "…")))
 	return p.st.box.Width(innerW + helpChromeCols).Render(strings.Join(content, "\n"))
 }

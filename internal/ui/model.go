@@ -8,8 +8,6 @@ import (
 	"slices"
 	"strings"
 	"time"
-	"unicode"
-	"unicode/utf8"
 
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/spinner"
@@ -453,8 +451,12 @@ func (m Model) render() string {
 		cols = append(cols, m.renderPane(PaneSidebar, p.Sidebar, m.side.View))
 	}
 	cols = append(cols, m.renderPane(PaneList, p.List, m.listView))
+	panes := lipgloss.JoinHorizontal(lipgloss.Top, cols...)
+	if m.popupOpen() || m.showConnect {
+		panes = m.dimmed(panes)
+	}
 	screen := lipgloss.JoinVertical(lipgloss.Left,
-		lipgloss.JoinHorizontal(lipgloss.Top, cols...),
+		panes,
 		m.renderStatus(),
 		m.renderHints(),
 	)
@@ -480,6 +482,16 @@ func (m Model) render() string {
 	x, y := popup.Center(m.width, m.height-footerRows, pop)
 	screen = popup.Overlay(screen, pop, x, y)
 	return screen
+}
+
+// dimmed redraws block in the muted style only, so nothing behind a popup
+// (the selected row, the focused border) competes with it.
+func (m Model) dimmed(block string) string {
+	lines := strings.Split(ansi.Strip(block), "\n")
+	for i, l := range lines {
+		lines[i] = m.styles.dim.Render(l)
+	}
+	return strings.Join(lines, "\n")
 }
 
 // renderPane draws a bordered pane whose content is rendered for its inner size.
@@ -550,45 +562,63 @@ func (m Model) renderStatus() string {
 	return left + strings.Repeat(" ", gap) + right
 }
 
-// renderHints fits as many of the focused pane's keys as the width allows,
-// lazygit style ("Archive: e | Delete: d"), marks a cut with …, and always
-// ends with Help: ? | Quit: q.
+// renderHints is the hint bar. The top-most popup shows its own keys, since
+// ?, q and the like may type text or mean something else there; the reader
+// popup and the panes also end with Help: ? | Quit: q (Close: q in a popup).
 func (m Model) renderHints() string {
-	if m.composing() {
-		line := ansi.Truncate("ctrl+s send · tab next field · esc close", m.width, "")
-		return m.styles.hint.Render(line + strings.Repeat(" ", max(m.width-ansi.StringWidth(line), 0)))
-	}
-	const sep = " | "
-	item := func(b key.Binding) string {
-		d := b.Help().Desc
-		r, n := utf8.DecodeRuneInString(d)
-		return string(unicode.ToUpper(r)) + d[n:] + ": " + b.Help().Key
+	switch {
+	case m.showConnect:
+		return m.fitHints(m.connectPop.Hints(), nil)
+	case m.showHelp:
+		return m.fitHints(m.helpPop.Hints(), nil)
+	case m.showPicker:
+		return m.fitHints(m.picker.Hints(), nil)
+	case m.composing():
+		return m.fitHints(m.draft.pop.Hints(), nil)
 	}
 	quit := m.keys.Quit
 	if m.popupOpen() {
 		quit = key.NewBinding(key.WithKeys("q"), key.WithHelp("q", "close"))
 	}
-	tail := item(m.keys.Help) + sep + item(quit)
-	room := m.width - ansi.StringWidth(tail)
+	return m.fitHints(m.keys.hints(m.focus, m.readerPopup, m.panes.Kind), []key.Binding{m.keys.Help, quit})
+}
+
+// fitHints fits as many hints as the width allows, lazygit style
+// ("Archive: e | Delete: d"), marks a cut with …, and always keeps tail.
+func (m Model) fitHints(hints, tail []key.Binding) string {
+	sepW := ansi.StringWidth(popup.HintSep)
+	tailText := popup.HintLine(tail)
+	room, trail := m.width, 0
+	if len(tail) > 0 {
+		room -= ansi.StringWidth(tailText)
+		trail = sepW
+	}
 
 	var head []string
 	used := 0
-	hints := m.keys.hints(m.focus, m.readerPopup, m.panes.Kind)
 	for i, b := range hints {
-		w := ansi.StringWidth(item(b) + sep)
-		// Unless this is the last key, leave space for a "… | " marker.
+		last := i == len(hints)-1
+		item := popup.HintItem(b)
+		w := ansi.StringWidth(item)
+		if !last || len(tail) > 0 {
+			w += sepW
+		}
+		// Unless this is the last key, leave space for a "…" marker.
 		reserve := 0
-		if i < len(hints)-1 {
-			reserve = ansi.StringWidth("…" + sep)
+		if !last {
+			reserve = ansi.StringWidth("…") + trail
 		}
 		if used+w+reserve > room {
 			head = append(head, "…")
 			break
 		}
-		head = append(head, item(b))
+		head = append(head, item)
 		used += w
 	}
-	line := ansi.Truncate(strings.Join(append(head, tail), sep), m.width, "")
+	if len(tail) > 0 {
+		head = append(head, tailText)
+	}
+	line := ansi.Truncate(strings.Join(head, popup.HintSep), m.width, "")
 	return m.styles.hint.Render(line + strings.Repeat(" ", max(m.width-ansi.StringWidth(line), 0)))
 }
 

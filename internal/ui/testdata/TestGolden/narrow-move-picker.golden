@@ -2,23 +2,23 @@
 │ Personal                     ││ Inbox · 2 unread                                                                                         │
 │ ▶ Inbox                    2 ││  ●    Bob                      Re: Plan (2)                                                        13:30 │
 │   Sent Mail                  ││  ●    Carol                    Lunch?                                                              Nov 8 │
-│   All Mail                   ││            ╭────────────────────────────────────────────────╮                                            │
-│   Trash                      ││            │ Move 2 messages to                  esc close  │                                            │
-│   Receipts                 1 ││            │ / press / to filter folders                    │                                            │
-│                              ││            │                                                │                                            │
-│ Work                         ││            │ Personal                                       │                                            │
-│   Inbox                    1 ││            │   Inbox                                        │                                            │
-│   Archive                    ││            │ ▸ Sent Mail                                    │                                            │
-│                              ││            │   All Mail                                     │                                            │
-│                              ││            │   Trash                                        │                                            │
-│                              ││            │   Receipts                                   1 │                                            │
-│                              ││            │                                                │                                            │
-│                              ││            │ / filter · j/k move · enter open · esc/q close │                                            │
-│                              ││            ╰────────────────────────────────────────────────╯                                            │
+│   All Mail                   ││                                                                                                          │
+│   Trash                      ││                 ╭──────────────────────────────────────╮                                                 │
+│   Receipts                 1 ││                 │ Move 2 messages to                   │                                                 │
+│                              ││                 │ / press / to filter folders          │                                                 │
+│ Work                         ││                 │                                      │                                                 │
+│   Inbox                    1 ││                 │ Personal                             │                                                 │
+│   Archive                    ││                 │   Inbox                              │                                                 │
+│                              ││                 │ ▸ Sent Mail                          │                                                 │
+│                              ││                 │   All Mail                           │                                                 │
+│                              ││                 │   Trash                              │                                                 │
+│                              ││                 │   Receipts                         1 │                                                 │
+│                              ││                 ╰──────────────────────────────────────╯                                                 │
+│                              ││                                                                                                          │
 │                              ││                                                                                                          │
 │                              ││                                                                                                          │
 │                              ││                                                                                                          │
 │                              ││                                                                                                          │
 ╰──────────────────────────────╯╰──────────────────────────────────────────────────────────────────────────────────────────────────────────╯
                                                                                                                                       narrow
-Up: k/↑ | Down: j/↓ | Open: enter | Expand: space | Read/unread: u | Star: s | Archive: e | Delete: d | Move: m | … | Help: ? | Close: q    
+Filter: / | Move: j/k | Open: enter | Close: esc/q                                                                                          

@@ -116,7 +116,7 @@ func TestPicker_View(t *testing.T) {
 	view := p.View()
 	plain := ansi.Strip(view)
 
-	for _, want := range []string{"Go to folder", "esc close", "Personal", "Broken", "login failed", "Work", "▸ Inbox", "▶ Receipts", "enter open"} {
+	for _, want := range []string{"Go to folder", "Personal", "Broken", "login failed", "Work", "▸ Inbox", "▶ Receipts"} {
 		if !strings.Contains(plain, want) {
 			t.Errorf("view missing %q:\n%s", want, plain)
 		}
@@ -127,6 +127,21 @@ func TestPicker_View(t *testing.T) {
 	}
 	if w := lipgloss.Width(view); w > 60 {
 		t.Errorf("width = %d, want a compact popup", w)
+	}
+	if strings.Contains(plain, "esc close") || strings.Contains(plain, "enter open") || strings.Contains(plain, "esc/q") {
+		t.Errorf("view has key text; the hint bar shows the keys:\n%s", plain)
+	}
+}
+
+func TestPicker_Hints(t *testing.T) {
+	p := NewPicker(theme.Default(), "Go to folder", groups())
+	p.SetSize(80, 30)
+	if got := hintText(p.Hints()); got != "Filter: / | Move: j/k | Open: enter | Close: esc/q" {
+		t.Errorf("hints = %q", got)
+	}
+	p = typeKeys(p, "/")
+	if got := hintText(p.Hints()); got != "Move: ↑/↓ | Open: enter | Clear: esc" {
+		t.Errorf("hints while filtering = %q", got)
 	}
 }
 

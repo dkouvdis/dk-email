@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/textarea"
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
@@ -277,21 +278,41 @@ func (c Compose) View() string {
 	return FrameTitled(c.th, c.title, strings.Join(body, "\n"), c.w, c.h)
 }
 
+// footer is the last row: the close prompt, an error or the busy label. The
+// keys themselves are in the hint bar (see Hints); with nothing to say the
+// row stays blank so the body doesn't move.
 func (c Compose) footer(w int) string {
 	var s string
 	switch {
-	case c.prompting && c.canSave:
-		s = c.th.Cursor.Padding(0, 1).Render("Save draft?  s save · d discard · e keep editing · esc save & close")
 	case c.prompting:
-		s = c.th.Cursor.Padding(0, 1).Render("Discard draft?  d discard · e keep editing")
+		s = c.th.Cursor.Padding(0, 1).Render(c.promptQuestion() + "  " + HintLine(c.Hints()))
 	case c.err != "":
 		s = c.th.Error.Render(oneLine(c.err))
 	case c.busy != "":
 		s = c.th.Muted.Render(c.busy)
-	default:
-		s = c.th.Muted.Render("ctrl+s send · tab next field · esc close")
 	}
 	return ansi.Truncate(s, w, "…")
+}
+
+func (c Compose) promptQuestion() string {
+	if c.canSave {
+		return "Save draft?"
+	}
+	return "Discard draft?"
+}
+
+// Hints are the keys that currently work, for the hint bar.
+func (c Compose) Hints() []key.Binding {
+	h := func(k, desc string) key.Binding { return key.NewBinding(key.WithKeys(k), key.WithHelp(k, desc)) }
+	switch {
+	case c.busy != "":
+		return []key.Binding{h("ctrl+c", "quit now")}
+	case c.prompting && c.canSave:
+		return []key.Binding{h("s", "save"), h("d", "discard"), h("e", "keep editing"), h("esc", "save & close")}
+	case c.prompting:
+		return []key.Binding{h("d", "discard"), h("e", "keep editing")}
+	}
+	return []key.Binding{h("ctrl+s", "send"), h("tab", "next field"), h("shift+tab", "previous field"), h("esc", "close")}
 }
 
 func oneLine(s string) string {

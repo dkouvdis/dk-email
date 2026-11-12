@@ -114,8 +114,11 @@ func TestCompose_HintsRowShowsComposerKeys(t *testing.T) {
 	m, _ := composeFixture(t)
 	m, _ = keyCmd(t, m, "c")
 
-	if h := strings.TrimSpace(ansi.Strip(m.renderHints())); h != "ctrl+s send · tab next field · esc close" {
+	if h := strings.TrimSpace(ansi.Strip(m.renderHints())); h != "Send: ctrl+s | Next field: tab | Previous field: shift+tab | Close: esc" {
 		t.Errorf("hints = %q", h)
+	}
+	if view := plain(m); strings.Contains(view, "ctrl+s send") || strings.Count(view, "ctrl+s") != 1 {
+		t.Errorf("the keys should appear only in the hint bar:\n%s", view)
 	}
 }
 
@@ -312,8 +315,11 @@ func TestCompose_EscAfterTypingAsksThenDiscardOrKeepEditing(t *testing.T) {
 	if !m.composing() || !m.draft.pop.Prompting() {
 		t.Fatal("esc after typing should ask")
 	}
-	if view := plain(m); !strings.Contains(view, "Discard draft?  d discard · e keep editing") || strings.Contains(view, " s save") {
+	if view := plain(m); !strings.Contains(view, "Discard draft?  Discard: d | Keep editing: e") || strings.Contains(view, "Save: s") {
 		t.Errorf("prompt should offer only d and e:\n%s", view)
+	}
+	if h := strings.TrimSpace(ansi.Strip(m.renderHints())); h != "Discard: d | Keep editing: e" {
+		t.Errorf("hints = %q, want only d and e", h)
 	}
 
 	for _, k := range []string{"s", "esc"} {
@@ -491,8 +497,11 @@ func TestCompose_PromptOffersSaveWhenTheSenderCanDraft(t *testing.T) {
 
 	m, _ = keyCmd(t, m, "esc")
 
-	if view := plain(m); !strings.Contains(view, "Save draft?  s save · d discard · e keep editing") {
+	if view := plain(m); !strings.Contains(view, "Save draft?  Save: s | Discard: d | Keep editing: e | Save & close: esc") {
 		t.Errorf("prompt should offer saving:\n%s", view)
+	}
+	if h := strings.TrimSpace(ansi.Strip(m.renderHints())); h != "Save: s | Discard: d | Keep editing: e | Save & close: esc" {
+		t.Errorf("hints = %q", h)
 	}
 }
 

@@ -25,7 +25,7 @@ A keyboard-driven terminal email client for **triaging several IMAP accounts** (
 
 There's no reading pane. In both layouts, `enter` opens the conversation in a centered popup (~90% × 90%), and `esc` closes it. Changed on 2026-11-10 at your request: the earlier three-pane wide layout and the list │ reader narrow layout were replaced by the two above, and `wide_breakpoint` and `list_width` were removed. Until the first folder opens, the thread list says "Connecting…".
 
-Every mode includes a bottom **hint bar** showing the keys for the focused pane, plus a status line for errors and progress (e.g. "Archiving…"). The hint bar is written lazygit style, description first and then the key (`Archive: e | Delete: d | … | Help: ? | Quit: q`), all in a soft blue (256-colour 110) so it reads easily on a dark background.
+Every mode includes a bottom **hint bar** showing the keys for the focused pane, plus a status line for errors and progress (e.g. "Archiving…"). The hint bar is written lazygit style, description first and then the key (`Archive: e | Delete: d | … | Help: ? | Quit: q`), all in a soft blue (256-colour 110) so it reads easily on a dark background. Every popup shows its keys in this same bar, in the same format, and nowhere else: the popup with focus replaces the pane keys (the reader keeps `Help: ? | Close: q`, the others show only their own keys, since `?` and `q` may be text there). While a popup is open, the panes behind it are drawn dimmed, with no selected row or focused border.
 
 ### Folder tree
 
@@ -232,7 +232,7 @@ Actions on a **collapsed thread** apply to every message in it. On an expanded r
 | `ctrl+c` | quit, even while composing |
 
 - Replies start in the body above the quote. New messages and forwards start in To. The body is sent exactly as typed, soft-wrapped on screen only, with tabs becoming 4 spaces. A forward's attachments are still sent, but aren't listed.
-- A parse or send error shows in the composer's footer, and `ctrl+s` retries. If the message was delivered but a follow-up (Sent copy, `\Answered`, removing the draft) failed, the composer closes with the error in the status bar and the message is never resent.
+- A parse or send error shows in the composer's footer row (the keys themselves are in the hint bar), and `ctrl+s` retries. If the message was delivered but a follow-up (Sent copy, `\Answered`, removing the draft) failed, the composer closes with the error in the status bar and the message is never resent.
 - **Drafts:** saving stores the message in the account's Drafts-role folder flagged `\Draft` and `\Seen`. It needs no recipients, and keeps Bcc, threading headers and forwarded attachments. `enter` (or a click to open) on a message in the Drafts folder reopens it in the composer. Saving again replaces the old copy, and sending removes it. Removing one message needs the IMAP UIDPLUS extension; without it the old copy is kept and the status says so. A resumed reply still threads, but doesn't mark the original `\Answered`.
 
 The **`?` help popup** is sized to its content, groups keys into sections (including Compose and Composer), and scrolls with `j`/`k`, `↑`/`↓`, `pgup`/`pgdn` and `g`/`G`. Inside it, `/` filters the keys by key or description.

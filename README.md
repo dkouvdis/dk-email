@@ -229,7 +229,7 @@ save_sent    = false               # optional, save a copy to Sent; default: fal
 | `esc` | close at once if nothing changed, otherwise ask what to do |
 | `ctrl+c` | quit, even while composing |
 
-- If you press `esc` after changing something, the footer asks: `s` saves to Drafts, `d` discards, `e` keeps editing, and `esc` saves and closes. A draft is only discarded on purpose. If the account can't save drafts, only `d` and `e` are offered.
+- If you press `esc` after changing something, the popup's last row asks (`Save draft?`) and the hint bar lists the answers: `s` saves to Drafts, `d` discards, `e` keeps editing, and `esc` saves and closes. A draft is only discarded on purpose. If the account can't save drafts, only `d` and `e` are offered.
 - Sending happens in the background (`Sending…`). A bad address or a failed send shows in the composer's footer, with your text intact, and `ctrl+s` retries. `q` types a `q` while you compose, so it never quits by accident.
 - If the message was delivered but saving the Sent copy, marking the original answered or removing the draft failed, the composer closes and the status bar says so. dk-email never retries then, so nothing is sent twice.
 
@@ -274,6 +274,7 @@ The connect-account popup has optional **SMTP host**, **SMTP port** and **SMTP T
 - `r`, `R` and `f` work on the thread list and in the reader. `c` works anywhere a folder is open. In the Drafts folder, `enter` reopens a draft in the composer. See [Sending mail](#sending-mail).
 - `enter` opens the conversation in a popup, and `esc` closes it. In the reader, `pgup`/`pgdn` (or `ctrl+u`/`ctrl+d`) scroll by a page, and `space` expands or collapses every message.
 - **Mouse:** clicking a folder opens it. Clicking a thread selects it, and clicking it again opens it. The scroll wheel moves the selection (or scrolls the open popup) but never opens anything. Links in a message are underlined; cmd+click (ctrl+click on Linux) opens them while the reader popup is open, in terminals that support hyperlinks. To select text in the terminal, hold shift (or option on macOS) while dragging.
+- Every popup lists its keys in the bottom hint bar (`Close: esc`, `Send: ctrl+s`, …), not inside the popup, and the panes behind an open popup are dimmed.
 - In the `?` help popup, `/` filters keys by key or description.
 - In the folders sidebar and the folder pickers (`a` in list mode, `m` to move), `/` filters folders by name. While typing, every key goes to the filter: `↑`/`↓` move between matches, `enter` opens the highlighted folder, and `esc` clears the filter.
 - In the connect popup, `tab`/`↓` and `shift+tab`/`↑` move between fields, and `←`/`→` or `space` change a choice. `enter` submits and `esc` cancels.

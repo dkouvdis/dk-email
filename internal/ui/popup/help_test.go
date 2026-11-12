@@ -57,31 +57,40 @@ func TestHelp_SizesToContentWhenItFits(t *testing.T) {
 	if w := lipgloss.Width(view); w > 60 {
 		t.Errorf("width = %d, want a compact popup (≤ 60) when there's room", w)
 	}
-	// 17 content lines + border, header, filter, blank, blank, footer.
-	if got := lipgloss.Height(view); got != 17+7 {
-		t.Errorf("height = %d, want %d", got, 17+7)
+	// 17 content lines + border, header, filter, blank.
+	if got := lipgloss.Height(view); got != 17+5 {
+		t.Errorf("height = %d, want %d", got, 17+5)
 	}
-	for _, want := range []string{"Keys", "esc close", "/ press / to filter", "one", "three", "c3", "third group", "/ filter · esc/q close"} {
+	for _, want := range []string{"Keys", "/ press / to filter", "one", "three", "c3", "third group"} {
 		if !strings.Contains(plain, want) {
 			t.Errorf("view missing %q:\n%s", want, plain)
 		}
 	}
-	if strings.Contains(plain, "scroll") || strings.Contains(plain, "┃") {
+	if strings.Contains(plain, "┃") {
 		t.Errorf("view shows scrolling though everything fits:\n%s", plain)
+	}
+	if strings.Contains(plain, "esc close") || strings.Contains(plain, "esc/q") || strings.Contains(plain, "filter ·") {
+		t.Errorf("view has key text; the hint bar shows the keys:\n%s", plain)
+	}
+	if got := hintText(h.Hints()); got != "Filter: / | Close: esc/q/?" {
+		t.Errorf("hints = %q", got)
 	}
 }
 
 func TestHelp_ClampsToMaxSizeAndScrolls(t *testing.T) {
 	h := NewHelp(theme.Default(), sections())
-	h.SetSize(50, 12) // 5 rows of content
+	h.SetSize(50, 10) // 5 rows of content
 	view := h.View()
 
-	if w, ht := lipgloss.Width(view), lipgloss.Height(view); w > 50 || ht != 12 {
-		t.Fatalf("size = %dx%d, want at most 50 wide and exactly 12 high", w, ht)
+	if w, ht := lipgloss.Width(view), lipgloss.Height(view); w > 50 || ht != 10 {
+		t.Fatalf("size = %dx%d, want at most 50 wide and exactly 10 high", w, ht)
 	}
 	plain := ansi.Strip(view)
-	if !strings.Contains(plain, "j/k/pgup/pgdn scroll") || !strings.Contains(plain, "┃") {
-		t.Errorf("overflowing view lacks scroll hint or scrollbar:\n%s", plain)
+	if !strings.Contains(plain, "┃") {
+		t.Errorf("overflowing view lacks a scrollbar:\n%s", plain)
+	}
+	if got := hintText(h.Hints()); got != "Up: k/↑ | Down: j/↓ | Page: pgup/pgdn | Top/bottom: g/G | Filter: / | Close: esc/q/?" {
+		t.Errorf("hints = %q", got)
 	}
 	if strings.Contains(plain, "c3") {
 		t.Error("last key visible before scrolling")
@@ -110,14 +119,14 @@ func TestHelp_ClampsToMaxSizeAndScrolls(t *testing.T) {
 
 func TestHelp_ResetAndResizeKeepOffsetValid(t *testing.T) {
 	h := NewHelp(theme.Default(), sections())
-	h.SetSize(50, 12)
+	h.SetSize(50, 10)
 	h, _ = h.Update(keyMsg("G"))
 
 	h.SetSize(50, 100)
 	if h.offset != 0 {
 		t.Errorf("offset = %d after growing to fit everything, want 0", h.offset)
 	}
-	h.SetSize(50, 12)
+	h.SetSize(50, 10)
 	h, _ = h.Update(keyMsg("G"))
 	h.Reset()
 	if h.offset != 0 {
@@ -127,7 +136,7 @@ func TestHelp_ResetAndResizeKeepOffsetValid(t *testing.T) {
 
 func TestHelp_TooSmallRendersNothing(t *testing.T) {
 	h := NewHelp(theme.Default(), sections())
-	for _, s := range [][2]int{{0, 0}, {20, 30}, {50, 7}} {
+	for _, s := range [][2]int{{0, 0}, {20, 30}, {50, 5}} {
 		h.SetSize(s[0], s[1])
 		if v := h.View(); v != "" {
 			t.Errorf("SetSize(%d, %d): view = %q, want empty", s[0], s[1], v)
@@ -144,8 +153,8 @@ func TestHelp_LongDescriptionsAreTruncatedNotWrapped(t *testing.T) {
 	if w := lipgloss.Width(view); w != 40 {
 		t.Errorf("width = %d, want clamped to 40", w)
 	}
-	if ht := lipgloss.Height(view); ht != 2+7 {
-		t.Errorf("height = %d, want %d (no wrapping)", ht, 2+7)
+	if ht := lipgloss.Height(view); ht != 2+5 {
+		t.Errorf("height = %d, want %d (no wrapping)", ht, 2+5)
 	}
 }
 
@@ -174,8 +183,8 @@ func TestHelp_FilterNarrowsAndHidesEmptySections(t *testing.T) {
 	if strings.Contains(plain, "one") || strings.Contains(plain, "three") || !strings.Contains(plain, "two") {
 		t.Errorf("sections without matches should be hidden:\n%s", plain)
 	}
-	if !strings.Contains(plain, "enter keep · esc clear") {
-		t.Errorf("footer doesn't explain the filter keys:\n%s", plain)
+	if got := hintText(h.Hints()); got != "Keep: enter | Clear: esc" {
+		t.Errorf("hints while filtering = %q", got)
 	}
 	if got := lipgloss.Height(h.View()); got != size {
 		t.Errorf("height changed from %d to %d while filtering", size, got)
@@ -280,3 +289,5 @@ func TestHelp_PasteIntoFilter(t *testing.T) {
 		t.Errorf("pasted filter not applied:\n%s", plain)
 	}
 }
+
+func hintText(bs []key.Binding) string { return ansi.Strip(HintLine(bs)) }

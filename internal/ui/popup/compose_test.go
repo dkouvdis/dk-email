@@ -179,15 +179,38 @@ func TestCompose_Prompt(t *testing.T) {
 }
 
 func TestCompose_PromptFooter(t *testing.T) {
-	for save, want := range map[bool]string{true: "Save draft?", false: "Discard draft?"} {
+	for save, want := range map[bool]string{
+		true:  "Save draft?  Save: s | Discard: d | Keep editing: e | Save & close: esc",
+		false: "Discard draft?  Discard: d | Keep editing: e",
+	} {
 		c := dirty(save)
 		if v := ansi.Strip(c.View()); !strings.Contains(v, want) {
 			t.Errorf("save=%v: view lacks %q:\n%s", save, want, v)
 		}
 	}
 	c, _ := press(dirty(true), "e")
-	if v := ansi.Strip(c.View()); !strings.Contains(v, "ctrl+s send") {
-		t.Errorf("hints should return after keep editing:\n%s", v)
+	if v := ansi.Strip(c.View()); strings.Contains(v, "draft?") || strings.Contains(v, "ctrl+s") {
+		t.Errorf("after keep editing the footer should be blank:\n%s", v)
+	}
+}
+
+func TestCompose_Hints(t *testing.T) {
+	normal := newTestCompose(ComposeValues{}, ComposeTo)
+	busy := normal
+	busy.SetBusy("Sending…")
+	noSave := dirty(false)
+	for name, tc := range map[string]struct {
+		c    Compose
+		want string
+	}{
+		"normal":    {normal, "Send: ctrl+s | Next field: tab | Previous field: shift+tab | Close: esc"},
+		"prompting": {dirty(true), "Save: s | Discard: d | Keep editing: e | Save & close: esc"},
+		"no save":   {noSave, "Discard: d | Keep editing: e"},
+		"busy":      {busy, "Quit now: ctrl+c"},
+	} {
+		if got := hintText(tc.c.Hints()); got != tc.want {
+			t.Errorf("%s: hints = %q, want %q", name, got, tc.want)
+		}
 	}
 }
 
@@ -238,16 +261,20 @@ func TestCompose_Paste(t *testing.T) {
 
 func TestCompose_Error(t *testing.T) {
 	c := newTestCompose(ComposeValues{}, ComposeTo)
-	if v := ansi.Strip(c.View()); !strings.Contains(v, "ctrl+s send · tab next field · esc close") {
-		t.Errorf("hints missing:\n%s", v)
+	footer := func() string {
+		lines := strings.Split(ansi.Strip(c.View()), "\n")
+		return strings.Trim(lines[len(lines)-2], "│ ")
+	}
+	if got := footer(); got != "" {
+		t.Errorf("footer = %q, want it blank (the keys are in the hint bar)", got)
 	}
 	c.SetError("no recipients")
-	if v := ansi.Strip(c.View()); !strings.Contains(v, "no recipients") || strings.Contains(v, "ctrl+s send") {
-		t.Errorf("error should replace hints:\n%s", v)
+	if got := footer(); got != "no recipients" {
+		t.Errorf("footer = %q, want the error", got)
 	}
 	c.SetError("")
-	if v := ansi.Strip(c.View()); !strings.Contains(v, "ctrl+s send") {
-		t.Errorf("clearing the error should restore hints:\n%s", v)
+	if got := footer(); got != "" {
+		t.Errorf("footer = %q after clearing the error, want it blank", got)
 	}
 }
 

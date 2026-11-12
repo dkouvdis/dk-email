@@ -19,10 +19,10 @@ type Section struct {
 	Keys  []key.Binding
 }
 
-// Border, padding, header, the blank lines around the content, and footer.
-// The help popup adds a filter row under its header.
+// Border, header and the blank line above the content. The help popup adds
+// a filter row under its header.
 const (
-	helpChromeRows = 2 + 4
+	helpChromeRows = 2 + 2
 	helpFilterRows = 1
 	helpChromeCols = 2 + 2
 	keyDescGap     = 3
@@ -229,14 +229,17 @@ func (h Help) viewH() int {
 
 func (h Help) scrollable() bool { return len(h.lines) > h.viewH() }
 
-func (h Help) footer() string {
-	switch {
-	case h.filter.Focused():
-		return "enter keep · esc clear"
-	case h.scrollable():
-		return "/ filter · j/k/pgup/pgdn scroll · esc/q close"
+// Hints are the keys that currently work, for the hint bar.
+func (h Help) Hints() []key.Binding {
+	b := func(k, desc string) key.Binding { return key.NewBinding(key.WithKeys(k), key.WithHelp(k, desc)) }
+	if h.filter.Focused() {
+		return []key.Binding{b("enter", "keep"), b("esc", "clear")}
 	}
-	return "/ filter · esc/q close"
+	closeKeys := b("esc/q/?", "close")
+	if h.scrollable() {
+		return []key.Binding{b("k/↑", "up"), b("j/↓", "down"), b("pgup/pgdn", "page"), b("g/G", "top/bottom"), b("/", "filter"), closeKeys}
+	}
+	return []key.Binding{b("/", "filter"), closeKeys}
 }
 
 // View renders the popup, or "" when there's no room for it.
@@ -249,9 +252,7 @@ func (h Help) View() string {
 		return ""
 	}
 
-	badge := h.st.badge.Render("esc close")
-	title := h.st.title.Render("Keys")
-	header := title + strings.Repeat(" ", max(innerW-lipgloss.Width(title)-lipgloss.Width(badge), 1)) + badge
+	header := h.st.title.Render("Keys")
 
 	bodyW := innerW - 2
 	bar := h.scrollbar(vh)
@@ -274,7 +275,6 @@ func (h Help) View() string {
 	content := []string{ansi.Truncate(header, innerW, ""), filterLine}
 	content = append(content, "")
 	content = append(content, rows...)
-	content = append(content, "", h.st.dim.Render(ansi.Truncate(h.footer(), innerW, "…")))
 	return h.st.box.Width(innerW + helpChromeCols).Render(strings.Join(content, "\n"))
 }
 

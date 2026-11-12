@@ -1,6 +1,6 @@
 ╭──────────────────────────────╮╭──────────────────────────────────────────────────────────────────────────────────────╮
 │ Personal                     ││ Inbo╭──────────────────────────────────────────╮                                     │
-│ ▶ Inbox                    2 ││  ●  │ Keys                          esc close  │                               13:30 │
+│ ▶ Inbox                    2 ││  ●  │ Keys                                     │                               13:30 │
 │   Sent Mail                  ││  ●  │ / press / to filter by key or descripti… │                               Nov 8 │
 │   All Mail                   ││     │                                          │                                     │
 │   Trash                      ││     │ Navigation                             ┃ │                                     │
@@ -10,7 +10,7 @@
 │   Inbox                    1 ││     │   G           bottom                   ┃ │                                     │
 │   Archive                    ││     │   h/←         left pane                ┃ │                                     │
 │                              ││     │   l/→         right pane               ┃ │                                     │
-│                              ││     │   tab         next pane                  │                                     │
+│                              ││     │   tab         next pane                ┃ │                                     │
 │                              ││     │   shift+tab   previous pane              │                                     │
 │                              ││     │                                          │                                     │
 │                              ││     │ Threads                                  │                                     │
@@ -21,10 +21,10 @@
 │                              ││     │   e           archive                    │                                     │
 │                              ││     │   d           delete                     │                                     │
 │                              ││     │   m           move                       │                                     │
+│                              ││     │   ctrl+r      refresh                    │                                     │
 │                              ││     │                                          │                                     │
-│                              ││     │ / filter · j/k/pgup/pgdn scroll · esc/q… │                                     │
 │                              ││     ╰──────────────────────────────────────────╯                                     │
 │                              ││                                                                                      │
 ╰──────────────────────────────╯╰──────────────────────────────────────────────────────────────────────────────────────╯
                                                                                                                   narrow
-Up: k/↑ | Down: j/↓ | Open: enter | Expand: space | Read/unread: u | Star: s | Archive: e | … | Help: ? | Close: q      
+Up: k/↑ | Down: j/↓ | Page: pgup/pgdn | Top/bottom: g/G | Filter: / | Close: esc/q/?                                    

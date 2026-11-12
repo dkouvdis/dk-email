@@ -119,6 +119,11 @@ Every task also meets the standing bar before it counts as done:
 - [x] SPEC.md keybindings and boundaries.
 - [x] AGENTS.md and `.github/copilot-instructions.md` updated with identical bodies.
 
+### P1: Popup polish
+
+- [x] While a popup is open the panes behind it are dimmed: no selected row, no focused border colour.
+- [x] One key-hint style for every popup: the bottom bar shows "Desc: key | Desc: key" for the top-most popup (connect, help, picker, composer, reader), and the in-popup key footers and `esc close` badges are gone.
+
 ### Checkpoint 3
 
 - [ ] All green. You decide the release tag.
