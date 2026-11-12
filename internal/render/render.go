@@ -22,12 +22,9 @@ import (
 // error; problems in the body (unknown charsets, broken multipart) keep
 // whatever text could be read.
 func Parse(r io.Reader) (mail.Message, error) {
-	e, err := message.Read(r)
-	if e == nil {
-		return mail.Message{}, fmt.Errorf("parse message: %w", err)
-	}
-	if err != nil && !message.IsUnknownCharset(err) && !message.IsUnknownEncoding(err) {
-		return mail.Message{}, fmt.Errorf("parse message: %w", err)
+	e, rootUnknownCharset, err := readEntity(r)
+	if err != nil {
+		return mail.Message{}, err
 	}
 
 	h := gomail.Header{Header: e.Header}
@@ -35,9 +32,80 @@ func Parse(r io.Reader) (mail.Message, error) {
 
 	var plain, html string
 	var havePlain, haveHTML bool
-	_ = e.Walk(func(_ []int, part *message.Entity, err error) error {
+	walkLeaves(e, rootUnknownCharset, func(l leaf) {
+		if l.attachment {
+			n, _ := io.Copy(io.Discard, l.body)
+			msg.Attachments = append(msg.Attachments, mail.Attachment{
+				Name:        l.name,
+				ContentType: l.mediaType,
+				Size:        n,
+			})
+			return
+		}
+		// A truncated part still yields the bytes read before the error.
+		b, _ := io.ReadAll(l.body)
+		switch {
+		case l.mediaType == "text/plain" && !havePlain:
+			plain, havePlain = string(b), true
+		case l.mediaType == "text/html" && !haveHTML:
+			html, haveHTML = string(b), true
+		}
+	})
+
+	switch {
+	case havePlain && !(haveHTML && plainIsJunk(plain)):
+		msg.Body = plain
+	case haveHTML:
+		msg.Body = htmlToMarkdown(html)
+		msg.BodyFromHTML = true
+	}
+	msg.Body = strings.TrimRight(Sanitize(msg.Body), " \n")
+	return msg, nil
+}
+
+// readEntity reads the message structure. Only unreadable top-level headers
+// are an error; an unknown charset or transfer encoding still yields an
+// entity. unknownCharset reports that the entity's own charset could not be
+// converted, which Walk does not report for the root entity.
+func readEntity(r io.Reader) (e *message.Entity, unknownCharset bool, err error) {
+	e, err = message.Read(r)
+	if e == nil {
+		return nil, false, fmt.Errorf("parse message: %w", err)
+	}
+	if err != nil && !message.IsUnknownCharset(err) && !message.IsUnknownEncoding(err) {
+		return nil, false, fmt.Errorf("parse message: %w", err)
+	}
+	return e, message.IsUnknownCharset(err), nil
+}
+
+// leaf is a non-multipart part of a message.
+type leaf struct {
+	mediaType string // lower-case; text/plain when the part has no Content-Type
+	// attachment is the one rule for what counts as an attachment, shared by
+	// Parse (metadata) and Parts (bytes): an attachment disposition, a
+	// filename (Content-Disposition filename, else Content-Type name), or any
+	// type other than text/plain and text/html.
+	attachment bool
+	name       string // display name of an attachment, "(unnamed)" if it has none
+	// charset is the part's declared charset parameter, "" if none.
+	// charsetKept means body still has those original bytes because the
+	// charset is unknown; otherwise body is UTF-8 for text parts.
+	charset     string
+	charsetKept bool
+	body        io.Reader
+}
+
+// walkLeaves calls fn for every non-multipart part of e, in message order.
+// body is only valid during the call. rootUnknownCharset is readEntity's flag
+// for e itself, since Walk only reports charset errors of nested parts.
+func walkLeaves(e *message.Entity, rootUnknownCharset bool, fn func(leaf)) {
+	_ = e.Walk(func(path []int, part *message.Entity, err error) error {
 		if part == nil {
 			return nil
+		}
+		unknownCharset := message.IsUnknownCharset(err)
+		if len(path) == 0 {
+			unknownCharset = rootUnknownCharset
 		}
 		mediaType, params, _ := part.Header.ContentType()
 		if mediaType == "" {
@@ -52,35 +120,13 @@ func Parse(r io.Reader) (mail.Message, error) {
 			name = params["name"]
 		}
 		isText := mediaType == "text/plain" || mediaType == "text/html"
+		l := leaf{mediaType: mediaType, body: part.Body, charset: params["charset"], charsetKept: unknownCharset}
 		if disp == "attachment" || name != "" || !isText {
-			n, _ := io.Copy(io.Discard, part.Body)
-			msg.Attachments = append(msg.Attachments, mail.Attachment{
-				Name:        attachmentName(name),
-				ContentType: mediaType,
-				Size:        n,
-			})
-			return nil
+			l.attachment, l.name = true, attachmentName(name)
 		}
-		// A truncated part still yields the bytes read before the error.
-		b, _ := io.ReadAll(part.Body)
-		switch {
-		case mediaType == "text/plain" && !havePlain:
-			plain, havePlain = string(b), true
-		case mediaType == "text/html" && !haveHTML:
-			html, haveHTML = string(b), true
-		}
+		fn(l)
 		return nil
 	})
-
-	switch {
-	case havePlain && !(haveHTML && plainIsJunk(plain)):
-		msg.Body = plain
-	case haveHTML:
-		msg.Body = htmlToMarkdown(html)
-		msg.BodyFromHTML = true
-	}
-	msg.Body = strings.TrimRight(Sanitize(msg.Body), " \n")
-	return msg, nil
 }
 
 func headerSummary(h gomail.Header) mail.Summary {

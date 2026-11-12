@@ -1,0 +1,48 @@
+From: a@example.com
+To: b@example.com
+Subject: Nested
+Content-Type: multipart/mixed; boundary="outer"
+
+--outer
+Content-Type: multipart/related; boundary="rel"
+
+--rel
+Content-Type: multipart/alternative; boundary="alt"
+
+--alt
+Content-Type: text/plain; charset=utf-8
+
+Hello.
+--alt
+Content-Type: text/html; charset=utf-8
+
+<p>Hello <img src="cid:logo"></p>
+--alt--
+--rel
+Content-Type: image/png
+Content-ID: <logo>
+Content-Disposition: inline
+Content-Transfer-Encoding: base64
+
+iVBORw0KGgo=
+--rel
+Content-Type: image/gif
+Content-Disposition: inline; filename="spacer.gif"
+Content-Transfer-Encoding: base64
+
+R0lGODlhAQABAAAAACw=
+--rel--
+--outer
+Content-Type: application/pdf
+Content-Disposition: attachment;
+ filename*=UTF-8''r%C3%A9sum%C3%A9%20%E2%82%AC.pdf
+Content-Transfer-Encoding: base64
+
+JVBERi0xLjQK
+--outer
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: attachment; filename="notes.txt"
+Content-Transfer-Encoding: quoted-printable
+
+caf=C3=A9 =3D 1
+--outer--
