@@ -5,7 +5,6 @@ package ui
 import (
 	"fmt"
 	"log/slog"
-	"os/exec"
 	"slices"
 	"strings"
 	"time"
@@ -97,16 +96,10 @@ type Model struct {
 	moveTargets []mail.Summary
 	status      string
 	statusErr   bool
-	// editorCmd builds the command that edits a draft file; tests replace
-	// it. editorPath is the draft file waiting for the editor to return.
-	editorCmd  func(path string) *exec.Cmd
-	editorPath string
 	// draft is the message being composed, nil when there is none; sending
-	// is set while it is being delivered. The confirm popup shows draft.
-	draft       *draftState
-	sending     bool
-	showConfirm bool
-	confirmPop  popup.Confirm
+	// is set while it is being delivered. The composer popup edits draft.
+	draft   *draftState
+	sending bool
 }
 
 // New builds the root model. Init connects every account with connect. log
@@ -134,7 +127,6 @@ func New(cfg config.Config, connect Connector, log *slog.Logger) Model {
 		side:          sidebar.New(th, names),
 		open:          openFolder{account: -1},
 		every:         tick,
-		editorCmd:     shellEditorCmd,
 		needsPassword: map[int]bool{},
 		connectFor:    -1,
 		list:          threadlist.New(th, time.Now),
@@ -179,6 +171,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleWheel(tea.Mouse(msg))
 	case tea.PasteMsg:
 		switch {
+		case m.composing():
+			return m.updateComposer(msg)
 		case m.showConnect:
 			m.connectPop = m.connectPop.Paste(msg)
 		case m.showHelp:
@@ -212,12 +206,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleRefresh(msg)
 	case connectedMsg:
 		return m.handleConnected(msg)
-	case editorDoneMsg:
-		return m.handleEditorDone(msg)
 	case sentMsg:
 		return m.handleSent(msg)
 	case replyFetchedMsg:
 		return m.handleReplyFetched(msg)
+	default:
+		// Whatever else the composer's inputs wait for, such as a clipboard read.
+		if m.composing() {
+			return m.updateComposer(msg)
+		}
 	}
 	return m, nil
 }
@@ -236,7 +233,9 @@ func (m *Model) relayout() {
 	m.helpPop.SetSize(m.panes.Popup.W, m.panes.Popup.H)
 	m.picker.SetSize(m.panes.Popup.W, m.panes.Popup.H)
 	m.connectPop.SetSize(m.panes.Popup.W, m.panes.Popup.H)
-	m.confirmPop.SetSize(m.panes.Popup.W, m.panes.Popup.H)
+	if m.composing() {
+		m.draft.pop.SetSize(m.panes.Popup.W, m.panes.Popup.H)
+	}
 	frame := m.styles.pane.GetVerticalFrameSize()
 	m.side = m.side.SetSize(max(m.panes.Sidebar.W-m.styles.pane.GetHorizontalFrameSize(), 0), max(m.panes.Sidebar.H-frame, 0))
 	m.list = m.list.SetHeight(max(m.panes.List.H-frame-listHeaderRows, 0))
@@ -258,10 +257,9 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.log.Debug("quit")
 		return m, tea.Quit
 	}
-	// The confirm popup takes every key: only y, e and d do anything, so a
-	// draft is never dropped by accident.
-	if m.showConfirm {
-		return m.handleConfirmKey(msg)
+	// The composer takes every key, so nothing behind it can act.
+	if m.composing() {
+		return m.updateComposer(msg)
 	}
 	// The connect form takes every key, so q can be typed into it.
 	if m.showConnect {
@@ -289,13 +287,6 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// q closes the topmost popup before it quits.
 	if key.Matches(msg, m.keys.Quit) {
 		if m.closeTopPopup() {
-			return m, nil
-		}
-		if m.sending || m.draft != nil {
-			m.status, m.statusErr = statusFinishDraft, false
-			if m.sending {
-				m.status = statusSending
-			}
 			return m, nil
 		}
 		m.log.Debug("quit")
@@ -379,7 +370,9 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) popupOpen() bool { return m.showHelp || m.showPicker || m.readerPopup }
+func (m Model) popupOpen() bool {
+	return m.showHelp || m.showPicker || m.readerPopup || m.composing()
+}
 
 // closeTopPopup closes the popup drawn on top, if any: help or the picker,
 // then the reader popup beneath them.
@@ -465,6 +458,10 @@ func (m Model) render() string {
 		w, h := popup.FrameInner(p.W, p.H)
 		screen = popup.Overlay(screen, popup.Frame(m.theme, m.read.View(w, h), p.W, p.H), p.X, p.Y)
 	}
+	if m.composing() {
+		p := m.panes.Popup
+		screen = popup.Overlay(screen, m.draft.pop.View(), p.X, p.Y)
+	}
 	pop := ""
 	switch {
 	case m.showHelp:
@@ -473,9 +470,6 @@ func (m Model) render() string {
 		pop = m.picker.View()
 	case m.showConnect:
 		pop = m.connectPop.View()
-	}
-	if m.showConfirm {
-		pop = m.confirmPop.View()
 	}
 	x, y := popup.Center(m.width, m.height-footerRows, pop)
 	screen = popup.Overlay(screen, pop, x, y)
@@ -554,6 +548,10 @@ func (m Model) renderStatus() string {
 // lazygit style ("Archive: e | Delete: d"), marks a cut with …, and always
 // ends with Help: ? | Quit: q.
 func (m Model) renderHints() string {
+	if m.composing() {
+		line := ansi.Truncate("ctrl+s send · tab next field · esc close", m.width, "")
+		return m.styles.hint.Render(line + strings.Repeat(" ", max(m.width-ansi.StringWidth(line), 0)))
+	}
 	const sep = " | "
 	item := func(b key.Binding) string {
 		d := b.Help().Desc

@@ -2,7 +2,6 @@ package ui
 
 import (
 	"errors"
-	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/dkouvdis/dk-email/internal/mail"
 	"github.com/dkouvdis/dk-email/internal/mail/mailtest"
+	"github.com/dkouvdis/dk-email/internal/ui/popup"
 )
 
 var (
@@ -34,7 +34,6 @@ func replyFixture(t *testing.T) (Model, *mailtest.Sender, *mailtest.Fake, replyU
 // replyFixtureWith is replyFixture where the latest message has atts.
 func replyFixtureWith(t *testing.T, atts []mail.Attachment) (Model, *mailtest.Sender, *mailtest.Fake, replyUIDs) {
 	t.Helper()
-	t.Setenv("TMPDIR", t.TempDir())
 	s := &mailtest.Sender{}
 	f := newFixture()
 	f.personalSender = s
@@ -54,7 +53,6 @@ func replyFixtureWith(t *testing.T, atts []mail.Attachment) (Model, *mailtest.Se
 
 	m := started(t, f, 160, 30)
 	m.accts[0].Email, m.accts[0].FromName = replyMe.Email, replyMe.Name
-	m.editorCmd = func(path string) *exec.Cmd { return exec.Command("true", path) }
 	return m, s, f.personal, u
 }
 
@@ -68,8 +66,8 @@ func replied(t *testing.T, m Model, k string) Model {
 	if m.draft != nil && m.draft.loading {
 		m = send(t, m, cmd())
 	}
-	if m.draft == nil || m.draft.loading || m.editorPath == "" {
-		t.Fatalf("%s didn't open the editor (draft %v, status %q)", k, m.draft, m.status)
+	if !m.composing() {
+		t.Fatalf("%s didn't open the composer (draft %v, status %q)", k, m.draft, m.status)
 	}
 	return m
 }
@@ -95,27 +93,36 @@ func TestReply_CollapsedThreadRepliesToTheLatestMessage(t *testing.T) {
 	m, _, fake, u := replyFixture(t)
 
 	m, cmd := keyCmd(t, m, "r")
-	if cmd == nil || m.draft == nil || !m.draft.loading || m.status != "Loading message…" || m.editorPath != "" {
-		t.Fatalf("cmd %v, draft %v, status %q, editor %q; want a pending fetch", cmd != nil, m.draft, m.status, m.editorPath)
+	if cmd == nil || m.draft == nil || !m.draft.loading || m.status != "Loading message…" || m.composing() {
+		t.Fatalf("cmd %v, draft %v, status %q; want a pending fetch", cmd != nil, m.draft, m.status)
+	}
+	if v := plain(m); strings.Contains(v, "Reply · ") {
+		t.Errorf("composer opened before the fetch finished:\n%s", v)
 	}
 	m = send(t, m, cmd())
 
-	if m.draft == nil || m.draft.loading || m.editorPath == "" {
-		t.Fatalf("draft %v, editor %q; want the editor open", m.draft, m.editorPath)
+	if !m.composing() {
+		t.Fatalf("draft %v; want the composer open", m.draft)
 	}
 	if got := messageFetches(fake); len(got) != 1 || got[0] != u.latest {
 		t.Errorf("fetched %v, want just the latest message %d", got, u.latest)
 	}
 	latest := fake.Messages("INBOX")[u.latest-1]
-	want := "To: Dave <dave@example.com>\n" +
-		"Cc: \n" +
-		"Bcc: \n" +
-		"Subject: Re: Offsite\n" +
-		"\n\n\n" +
-		"On " + latest.Date.Format("Mon, 2 Jan 2006 at 15:04") + ", Dave <dave@example.com> wrote:\n" +
-		"> Body of o3.\n>\n> Second paragraph.\n"
-	if m.draft.orig != want {
-		t.Errorf("template:\n%q\nwant\n%q", m.draft.orig, want)
+	want := popup.ComposeValues{
+		To:      "Dave <dave@example.com>",
+		Subject: "Re: Offsite",
+		Body:    "\n\nOn " + latest.Date.Format("Mon, 2 Jan 2006 at 15:04") + ", Dave <dave@example.com> wrote:\n> Body of o3.\n>\n> Second paragraph.\n",
+	}
+	if got := m.draft.pop.Values(); got != want {
+		t.Errorf("values:\n%+v\nwant\n%+v", got, want)
+	}
+	if view := plain(m); !strings.Contains(view, "Reply · Re: Offsite · me@example.com") {
+		t.Errorf("composer title missing:\n%s", view)
+	}
+	// A reply starts in the body, above the quote.
+	typedAtTop := typed(t, m, "Hi")
+	if got := typedAtTop.draft.pop.Values().Body; !strings.HasPrefix(got, "Hi\n\nOn ") {
+		t.Errorf("typing landed in %q; want the top of the body", got)
 	}
 	d := m.draft.base
 	if d.From != replyMe || d.InReplyTo != "o3" || strings.Join(d.References, " ") != "o1 o2 o3" ||
@@ -139,10 +146,12 @@ func TestReply_ReplyAllIncludesToAndCcMinusMe(t *testing.T) {
 	if got := addrs(d.Cc); got != "alice@example.com,carol@example.com" {
 		t.Errorf("Cc = %s (me must be gone, case-insensitively)", got)
 	}
-	for _, want := range []string{"To: Dave <dave@example.com>, Bob <bob@example.com>\n", "Cc: Alice <alice@example.com>, Carol <carol@example.com>\n"} {
-		if !strings.Contains(m.draft.orig, want) {
-			t.Errorf("template missing %q:\n%s", want, m.draft.orig)
-		}
+	v := m.draft.pop.Values()
+	if v.To != "Dave <dave@example.com>, Bob <bob@example.com>" || v.Cc != "Alice <alice@example.com>, Carol <carol@example.com>" {
+		t.Errorf("To %q, Cc %q", v.To, v.Cc)
+	}
+	if view := plain(m); !strings.Contains(view, "Reply all · Re: Offsite · me@example.com") {
+		t.Errorf("composer title missing:\n%s", view)
 	}
 }
 
@@ -159,8 +168,8 @@ func TestReply_ExpandedRowRepliesToTheSelectedMessage(t *testing.T) {
 	if got := addrs(d.To); got != "alice@example.com" || d.InReplyTo != "o1" || d.ReplyTo.UID != u.first || d.Subject != "Re: Offsite" {
 		t.Errorf("draft = %+v", d)
 	}
-	if !strings.Contains(m.draft.orig, "> Body of o1.") {
-		t.Errorf("template doesn't quote the selected message:\n%s", m.draft.orig)
+	if !strings.Contains(m.draft.pop.Values().Body, "> Body of o1.") {
+		t.Errorf("body doesn't quote the selected message:\n%s", m.draft.pop.Values().Body)
 	}
 }
 
@@ -186,15 +195,15 @@ func TestReply_ReaderOpenedOnASelectedMessageRepliesToItWithoutRefetching(t *tes
 
 	m, cmd := keyCmd(t, m, "r")
 
-	if cmd == nil || m.draft == nil || m.draft.loading || m.editorPath == "" {
-		t.Fatalf("draft %v, editor %q; want the editor open at once from the reader's copy", m.draft, m.editorPath)
+	if cmd != nil || !m.composing() {
+		t.Fatalf("draft %v; want the composer open at once from the reader's copy", m.draft)
 	}
 	if got := len(messageFetches(fake)); got != before {
 		t.Errorf("fetched %d more times, want the loaded body reused", got-before)
 	}
 	d := m.draft.base
-	if d.ReplyTo.UID != u.first || addrs(d.To) != "alice@example.com" || !strings.Contains(m.draft.orig, "> Body of o1.") {
-		t.Errorf("draft = %+v\n%s", d, m.draft.orig)
+	if d.ReplyTo.UID != u.first || addrs(d.To) != "alice@example.com" || !strings.Contains(m.draft.pop.Values().Body, "> Body of o1.") {
+		t.Errorf("draft = %+v\n%s", d, m.draft.pop.Values().Body)
 	}
 }
 
@@ -213,8 +222,8 @@ func TestReply_ReaderOnAnUnreadThreadRepliesToTheLatestNotTheOldestUnread(t *tes
 			t.Errorf("%s fetched %v, want the latest message %d fetched last", k, got, u.latest)
 		}
 		d := m2.draft.base
-		if d.ReplyTo.UID != u.latest || d.InReplyTo != "o3" || !strings.Contains(m2.draft.orig, "> Body of o3.") {
-			t.Errorf("%s draft = %+v\n%s", k, d, m2.draft.orig)
+		if d.ReplyTo.UID != u.latest || d.InReplyTo != "o3" || !strings.Contains(m2.draft.pop.Values().Body, "> Body of o3.") {
+			t.Errorf("%s draft = %+v\n%s", k, d, m2.draft.pop.Values().Body)
 		}
 	}
 }
@@ -261,7 +270,7 @@ func TestReply_NotConfiguredAccountSaysSo(t *testing.T) {
 	for _, k := range []string{"r", "R"} {
 		m2, cmd := keyCmd(t, m, k)
 		want := "Sending isn't set up for Work: add smtp_host to its config"
-		if cmd != nil || m2.draft != nil || m2.editorPath != "" || m2.status != want {
+		if cmd != nil || m2.draft != nil || m2.status != want {
 			t.Errorf("%s: cmd %v, draft %v, status %q", k, cmd != nil, m2.draft, m2.status)
 		}
 	}
@@ -269,15 +278,15 @@ func TestReply_NotConfiguredAccountSaysSo(t *testing.T) {
 
 func TestReply_BlockedWhileAnotherDraftIsOpenOrSending(t *testing.T) {
 	m, _, fake, _ := replyFixture(t)
-	m, _ = keyCmd(t, m, "c") // editor "running"
+	m, _ = keyCmd(t, m, "r") // fetch pending
 	if m.draft == nil {
 		t.Fatal("setup: no draft")
 	}
 
-	m, cmd := keyCmd(t, m, "r")
+	m, cmd := keyCmd(t, m, "R")
 
 	if cmd != nil || m.status != "Finish or discard the draft first" || len(messageFetches(fake)) != 0 {
-		t.Errorf("r during a draft: cmd %v, status %q", cmd != nil, m.status)
+		t.Errorf("R during a draft: cmd %v, status %q", cmd != nil, m.status)
 	}
 	m.draft, m.sending = nil, true
 	m, cmd = keyCmd(t, m, "R")
@@ -291,7 +300,7 @@ func TestReply_PendingFetchHoldsTheDraftSlot(t *testing.T) {
 	m, _, fake, _ := replyFixture(t)
 	m, _ = keyCmd(t, m, "r")
 
-	for k, want := range map[string]string{"r": "Finish or discard the draft first", "R": "Finish or discard the draft first", "c": "Finish or discard the draft first", "q": "Finish or discard the draft first"} {
+	for k, want := range map[string]string{"r": "Finish or discard the draft first", "R": "Finish or discard the draft first", "c": "Finish or discard the draft first"} {
 		m2, cmd := keyCmd(t, m, k)
 		if cmd != nil || m2.status != want {
 			t.Errorf("%s while loading: cmd %v, status %q, want %q", k, cmd != nil, m2.status, want)
@@ -309,8 +318,8 @@ func TestReply_FetchErrorClearsTheDraftAndShowsTheError(t *testing.T) {
 	m, cmd := keyCmd(t, m, "r")
 	m = send(t, m, cmd())
 
-	if m.draft != nil || m.editorPath != "" || !m.statusErr || m.status != "open message: connection reset" {
-		t.Errorf("draft %v, editor %q, status %q (err %v)", m.draft, m.editorPath, m.status, m.statusErr)
+	if m.draft != nil || !m.statusErr || m.status != "open message: connection reset" {
+		t.Errorf("draft %v, status %q (err %v)", m.draft, m.status, m.statusErr)
 	}
 	fake.Fail(mailtest.MethodMessage, nil)
 	if _, cmd := keyCmd(t, m, "r"); cmd == nil {
@@ -323,44 +332,28 @@ func TestReply_StaleFetchResultIsIgnored(t *testing.T) {
 
 	m = send(t, m, replyFetchedMsg{account: 0, folder: "INBOX", msg: mail.Message{Summary: mail.Summary{UID: 1}}})
 
-	if m.draft != nil || m.editorPath != "" {
-		t.Errorf("draft %v, editor %q; a result nobody waits for must not open the editor", m.draft, m.editorPath)
+	if m.draft != nil {
+		t.Errorf("draft %v; a result nobody waits for must not open the composer", m.draft)
 	}
 }
 
-func TestReply_UntouchedTemplateIsDiscarded(t *testing.T) {
+func TestReply_UntouchedComposerClosesAtOnce(t *testing.T) {
 	m, s, _, _ := replyFixture(t)
 	m = replied(t, m, "r")
 
-	m = send(t, m, editorDoneMsg{text: m.draft.orig, orig: m.draft.orig})
+	m = send(t, m, press("esc"))
 
-	if m.draft != nil || m.showConfirm || m.status != "Draft discarded" || len(s.Sent()) != 0 {
-		t.Errorf("draft %v, popup %v, status %q", m.draft, m.showConfirm, m.status)
-	}
-}
-
-func TestReply_ConfirmPopupShowsSubjectAndRecipients(t *testing.T) {
-	m, _, _, _ := replyFixture(t)
-	m = replied(t, m, "R")
-	text := strings.Replace(m.draft.orig, "Subject: Re: Offsite\n\n", "Subject: Re: Offsite\n\nSounds good.\n", 1)
-
-	m = send(t, m, editorDoneMsg{text: text, orig: m.draft.orig})
-
-	view := plain(m)
-	for _, want := range []string{"Send message?", "Me Myself <me@example.com>", "Dave <dave@example.com>", "Bob <bob@example.com>", "Alice <alice@example.com>", "Re: Offsite", "Sounds good."} {
-		if !strings.Contains(view, want) {
-			t.Errorf("popup missing %q:\n%s", want, view)
-		}
+	if m.composing() || m.status != "" || len(s.Sent()) != 0 {
+		t.Errorf("composing %v, status %q", m.composing(), m.status)
 	}
 }
 
 func TestReply_SendCarriesThreadingAndAnsweredTarget(t *testing.T) {
 	m, s, _, u := replyFixture(t)
 	m = replied(t, m, "r")
-	text := strings.Replace(m.draft.orig, "Subject: Re: Offsite\n\n", "Subject: Re: Offsite\n\nSounds good.\n", 1)
-	m = send(t, m, editorDoneMsg{text: text, orig: m.draft.orig})
+	m = typed(t, m, "Sounds good.")
 
-	m = yes(t, m)
+	m = sendKey(t, m)
 
 	got := s.Sent()
 	if len(got) != 1 {

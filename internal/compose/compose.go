@@ -1,6 +1,6 @@
-// Package compose builds outgoing messages: the empty new-message draft, the
-// editor file the user edits (Format and Parse), and the RFC 5322 bytes that
-// are sent (Build). It is pure: no network, no UI.
+// Package compose builds outgoing messages: the new-message, reply and
+// forward drafts, the composer's text fields (Fields), and the RFC 5322 bytes
+// that are sent (Build). It is pure: no network, no UI.
 package compose
 
 import (

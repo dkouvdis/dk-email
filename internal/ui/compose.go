@@ -14,7 +14,6 @@ import (
 	"github.com/dkouvdis/dk-email/internal/compose"
 	"github.com/dkouvdis/dk-email/internal/mail"
 	"github.com/dkouvdis/dk-email/internal/ui/popup"
-	"github.com/dkouvdis/dk-email/internal/ui/reader"
 )
 
 const (
@@ -23,32 +22,24 @@ const (
 	statusDiscarded   = "Draft discarded"
 )
 
-// draftState is the message being composed, from the first editor launch
-// until it is sent or discarded. It lives only in memory.
+// draftState is the message being composed, from the first key press until
+// it is sent or closed. It lives only in memory.
 type draftState struct {
 	account int
-	// base is the draft the editor file was built from; every parse starts
-	// from it so fields the file doesn't carry (From, threading) survive.
+	// base is the draft the composer was filled from; every send parses the
+	// fields against it so what they don't carry (From, threading, the
+	// original of a forward) survives.
 	base mail.Draft
-	// text is the file as last read back from the editor. It stays empty
-	// until the confirm popup first opens, which is how a re-edit is told
-	// apart from the first edit.
-	text string
-	// orig is the template the editor first opened with.
-	orig string
-	// parsed is text parsed against base. It is what gets sent.
-	parsed   mail.Draft
-	parseErr error
-	sendErr  error
 	// loading is set while the message being replied to is fetched, before
-	// any editor has opened. It holds the slot so no other draft starts.
+	// the composer opens. It holds the slot so no other draft starts.
 	loading bool
-	// attachments are the original's attachments of a forward, as listed in
-	// the confirm popup. The sender copies them from the original message.
-	attachments []mail.Attachment
+	// pop is the composer, an overlay: opening and closing it never touches
+	// the view beneath.
+	pop popup.Compose
 }
 
-func (d *draftState) reedit() bool { return d.text != "" }
+// composing reports whether the composer is open.
+func (m Model) composing() bool { return m.draft != nil && !m.draft.loading }
 
 // sentMsg reports the outcome of sending a draft.
 type sentMsg struct {
@@ -92,105 +83,74 @@ func (m Model) startCompose() (Model, tea.Cmd) {
 	if !ok {
 		return m, nil
 	}
-	return m.startDraft(account, compose.New(m.identity(account)), nil)
+	return m.startDraft(account, compose.New(m.identity(account)), composeNew)
 }
 
-// startDraft opens base in the editor as the draft being composed. atts are
-// the attachments the draft will carry, for display.
-func (m Model) startDraft(account int, base mail.Draft, atts []mail.Attachment) (Model, tea.Cmd) {
-	text := compose.Format(base)
-	m.draft = &draftState{account: account, base: base, orig: text, attachments: atts}
-	m, cmd := m.startEditor(text)
-	if cmd == nil {
-		m.draft = nil // the editor never started; the error is in the status
+// startDraft opens base in the composer. A reply starts in the body, above
+// its quote; everything else starts in To.
+func (m Model) startDraft(account int, base mail.Draft, kind composeKind) (Model, tea.Cmd) {
+	fields := compose.FieldsOf(base)
+	title := kind.action()
+	if fields.Subject != "" {
+		title += " · " + fields.Subject
+	}
+	title += " · " + m.identity(account).Email
+	focus := popup.ComposeTo
+	if kind == composeReply || kind == composeReplyAll {
+		focus = popup.ComposeBody
+	}
+	pop := popup.NewCompose(m.theme, title, popup.ComposeValues(fields), focus)
+	pop.SetSize(m.panes.Popup.W, m.panes.Popup.H)
+	pop.EnableSave(false)
+	m.draft = &draftState{account: account, base: base, pop: pop}
+	m.log.Debug("popup opened", "popup", "compose", "action", kind.String())
+	return m, nil
+}
+
+// closeDraft closes the composer, returning to the view beneath it.
+func (m *Model) closeDraft() {
+	m.draft = nil
+	m.log.Debug("popup closed", "popup", "compose")
+}
+
+// updateComposer gives msg to the composer and acts on what it asks for.
+func (m Model) updateComposer(msg tea.Msg) (Model, tea.Cmd) {
+	d := m.draft
+	var res popup.ComposeResult
+	var cmd tea.Cmd
+	d.pop, res, cmd = d.pop.Update(msg)
+	switch res {
+	case popup.ComposeSend:
+		return m.startSend()
+	case popup.ComposeClose:
+		m.closeDraft()
+	case popup.ComposeDiscard:
+		m.closeDraft()
+		m.status, m.statusErr = statusDiscarded, false
 	}
 	return m, cmd
 }
 
-// discardDraft drops the draft and closes the confirm popup.
-func (m *Model) discardDraft() {
-	m.draft, m.showConfirm = nil, false
-	m.status, m.statusErr = statusDiscarded, false
-	m.log.Debug("draft discarded")
-}
-
-// openConfirm shows the confirm popup for the current draft.
-func (m *Model) openConfirm() {
-	d := m.draft
-	atts := make([]string, len(d.attachments))
-	for i, a := range d.attachments {
-		atts[i] = fmt.Sprintf("%s (%s)", a.Name, reader.FormatSize(a.Size))
-	}
-	m.confirmPop = popup.NewConfirm(m.theme, d.parsed, atts, d.parseErr, d.sendErr)
-	m.confirmPop.SetSize(m.panes.Popup.W, m.panes.Popup.H)
-	m.showConfirm = true
-	m.log.Debug("popup opened", "popup", "confirm", "parse error", d.parseErr != nil, "send error", d.sendErr != nil)
-}
-
-// handleEditorDone is where the edited draft arrives: an unchanged or empty
-// file is discarded, anything else is parsed and put to the confirm popup.
-func (m Model) handleEditorDone(msg editorDoneMsg) (tea.Model, tea.Cmd) {
-	m.editorPath = ""
-	d := m.draft
-	if d == nil {
-		if msg.err != nil {
-			m.setError(msg.err)
-		}
-		return m, nil
-	}
-	if msg.err != nil {
-		m.setError(msg.err)
-		if d.reedit() {
-			m.openConfirm() // keep the text from before the failed edit
-		} else {
-			m.draft = nil
-		}
-		return m, nil
-	}
-	if strings.TrimSpace(msg.text) == "" || (!d.reedit() && msg.text == d.orig) {
-		m.discardDraft()
-		return m, nil
-	}
-	d.text, d.sendErr = msg.text, nil
-	d.parsed, d.parseErr = compose.Parse(msg.text, d.base)
-	m.openConfirm()
-	return m, nil
-}
-
-func (m Model) handleConfirmKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	var r popup.ConfirmResult
-	m.confirmPop, r = m.confirmPop.Update(msg)
-	switch r {
-	case popup.ConfirmSend:
-		return m.startSend()
-	case popup.ConfirmEdit:
-		m.showConfirm = false
-		m.draft.sendErr = nil
-		m, cmd := m.startEditor(m.draft.text)
-		if cmd == nil {
-			m.openConfirm() // the editor never started; the error is in the status
-		}
-		return m, cmd
-	case popup.ConfirmDiscard:
-		m.discardDraft()
-	}
-	return m, nil
-}
-
-// startSend closes the popup and sends the parsed draft in the background.
+// startSend parses the composer's fields and sends them in the background,
+// leaving the composer open and locked meanwhile. A parse error is shown in
+// the composer, which stays editable.
 func (m Model) startSend() (Model, tea.Cmd) {
 	d := m.draft
 	sender := m.senders[d.account]
 	if sender == nil {
-		d.sendErr = errors.New("sending isn't set up for this account")
-		m.openConfirm()
+		d.pop.SetError("Sending isn't set up for this account")
 		return m, nil
 	}
-	d.sendErr = nil
-	m.showConfirm, m.sending = false, true
+	draft, err := compose.Fields(d.pop.Values()).Draft(d.base)
+	if err != nil {
+		d.pop.SetError(err.Error())
+		return m, nil
+	}
+	d.pop.SetBusy(statusSending)
+	m.sending = true
 	m.status, m.statusErr = statusSending, false
-	m.log.Debug("send started", "account", m.accts[d.account].Name, "recipients", len(recipients(d.parsed)))
-	return m, sendDraft(sender, d.account, d.parsed)
+	m.log.Debug("send started", "account", m.accts[d.account].Name, "recipients", len(recipients(draft)))
+	return m, sendDraft(sender, d.account, draft)
 }
 
 // sendDraft runs in a tea.Cmd. The transport enforces its own timeout.
@@ -209,18 +169,18 @@ func (m Model) handleSent(msg sentMsg) (tea.Model, tea.Cmd) {
 	}
 	switch {
 	case msg.err == nil:
-		m.draft = nil
+		m.closeDraft()
 		m.status, m.statusErr = sentStatus(msg.draft), false
 	case errors.Is(msg.err, mail.ErrAfterDelivery):
 		// Delivered, so there's nothing to retry.
-		m.draft = nil
+		m.closeDraft()
 		m.status, m.statusErr = capitalize(msg.err.Error()), true
-	case m.draft == nil:
+	case !m.composing():
 		m.setError(msg.err)
 	default:
-		m.draft.sendErr = msg.err
-		m.status, m.statusErr = "Send failed", false
-		m.openConfirm()
+		m.draft.pop.SetBusy("")
+		m.draft.pop.SetError("Send failed: " + msg.err.Error())
+		m.status, m.statusErr = "", false
 	}
 	return m, nil
 }

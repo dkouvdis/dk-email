@@ -15,10 +15,10 @@ import (
 // recipients. In-Reply-To and References thread the reply and ReplyTo marks
 // msg as the message to flag \Answered after sending.
 //
-// Body is the part of the editor file after the header block. Format shows
-// it as an empty line for the user's text, a blank line, the attribution
-// "On <date>, <from> wrote:" and msg.Body quoted with "> " on every line
-// ("> " becomes ">" on empty lines), ending with a newline:
+// Body starts with an empty line for the user's text, a blank line, the
+// attribution "On <date>, <from> wrote:" and msg.Body quoted with "> " on
+// every line ("> " becomes ">" on empty lines), ending with a newline. With
+// the headers, the composer shows:
 //
 //	To: Alice <alice@example.com>
 //	Cc:

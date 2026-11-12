@@ -9,7 +9,7 @@ func paneLine(r Rect, y int) int { return y - r.Y - 1 }
 // thread is selected, and opens when it's clicked again. Clicks do nothing
 // while a popup is open.
 func (m Model) handleClick(ms tea.Mouse) (Model, tea.Cmd) {
-	if ms.Button != tea.MouseLeft || m.popupOpen() || m.showConnect || m.showConfirm {
+	if ms.Button != tea.MouseLeft || m.popupOpen() || m.showConnect {
 		return m, nil
 	}
 	p := m.panes
@@ -47,7 +47,7 @@ func (m Model) handleWheel(ms tea.Mouse) (Model, tea.Cmd) {
 	}
 	var cmd tea.Cmd
 	switch {
-	case m.showConnect || m.showConfirm:
+	case m.showConnect:
 	case m.popupOpen():
 		next, c := m.handleKey(k)
 		return next.(Model), c

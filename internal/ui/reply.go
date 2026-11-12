@@ -19,13 +19,19 @@ const statusLoadingReply = "Loading message…"
 type composeKind int
 
 const (
-	composeReply composeKind = iota
+	composeNew composeKind = iota
+	composeReply
 	composeReplyAll
 	composeForward
 )
 
 func (k composeKind) String() string {
-	return [...]string{"reply", "reply all", "forward"}[k]
+	return [...]string{"new message", "reply", "reply all", "forward"}[k]
+}
+
+// action is k's name in the composer's title.
+func (k composeKind) action() string {
+	return [...]string{"New message", "Reply", "Reply all", "Forward"}[k]
 }
 
 // replyFetchedMsg carries the message a reply, reply-all or forward is
@@ -108,17 +114,17 @@ func (m Model) startFromTarget(kind composeKind) (Model, tea.Cmd) {
 	return m, fetchReply(m.boxes[account], account, folder, target.UID, kind)
 }
 
-// startMessageDraft opens the editor on kind's draft for msg. A forward also
-// remembers msg's attachments, which the confirm popup lists.
+// startMessageDraft opens the composer on kind's draft for msg. A forward's
+// attachments aren't listed; the sender copies them from the original.
 func (m Model) startMessageDraft(account int, folder string, msg mail.Message, kind composeKind) (Model, tea.Cmd) {
 	me := m.identity(account)
 	switch kind {
 	case composeReplyAll:
-		return m.startDraft(account, compose.ReplyAll(msg, folder, me), nil)
+		return m.startDraft(account, compose.ReplyAll(msg, folder, me), kind)
 	case composeForward:
-		return m.startDraft(account, compose.Forward(msg, folder, me), msg.Attachments)
+		return m.startDraft(account, compose.Forward(msg, folder, me), kind)
 	}
-	return m.startDraft(account, compose.Reply(msg, folder, me), nil)
+	return m.startDraft(account, compose.Reply(msg, folder, me), kind)
 }
 
 func (m Model) handleReplyFetched(msg replyFetchedMsg) (Model, tea.Cmd) {

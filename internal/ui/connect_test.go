@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -162,14 +161,11 @@ func TestConnect_NewAccountGetsItsSender(t *testing.T) {
 	if len(m.senders) != len(m.boxes) || m.senders[0] != o.sender {
 		t.Fatalf("senders = %v, want the new account's sender", m.senders)
 	}
-	m.editorCmd = func(path string) *exec.Cmd { return exec.Command("true", path) }
-	t.Setenv("TMPDIR", t.TempDir())
-	next, cmd = m.Update(press("c"))
+	next, _ = m.Update(press("c"))
 	m = next.(Model)
-	if cmd == nil || m.draft == nil {
-		t.Errorf("c on the new account: cmd %v, draft %v, status %q", cmd != nil, m.draft, m.status)
+	if !m.composing() {
+		t.Errorf("c on the new account: draft %v, status %q", m.draft, m.status)
 	}
-	_ = m.Close()
 }
 
 func TestConnect_FailedTestSavesNothing(t *testing.T) {

@@ -33,28 +33,23 @@ func TestReply_Golden(t *testing.T) {
 	msg := original()
 	msg.MessageID = "m1@example.com"
 	msg.Body = "Shall we try the new place?\n\nLet me know.\n"
-	want := "To: Alice <alice@example.com>\n" +
-		"Cc: \n" +
-		"Bcc: \n" +
-		"Subject: Re: Lunch on Friday\n" +
-		"\n" +
-		"\n" + // the line for the user's text
+	want := "\n" + // the line for the user's text
 		"\n" +
 		"On Tue, 10 Nov 2026 at 12:00, Alice <alice@example.com> wrote:\n" +
 		"> Shall we try the new place?\n" +
 		">\n" +
 		"> Let me know.\n"
-	got := Format(Reply(msg, "INBOX", me))
-	if got != want {
-		t.Errorf("Format(Reply) =\n%q\nwant\n%q", got, want)
+	base := Reply(msg, "INBOX", me)
+	if base.Body != want {
+		t.Errorf("Reply body =\n%q\nwant\n%q", base.Body, want)
 	}
-	// The untouched template parses back to the same draft.
-	d, err := Parse(got, mail.Draft{})
+	// The untouched fields parse back to the same draft.
+	d, err := FieldsOf(base).Draft(base)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if d.Subject != "Re: Lunch on Friday" || len(d.To) != 1 {
-		t.Errorf("Parse(template) = %#v", d)
+	if d.Subject != "Re: Lunch on Friday" || len(d.To) != 1 || d.Body != base.Body {
+		t.Errorf("Draft(fields) = %#v", d)
 	}
 }
 

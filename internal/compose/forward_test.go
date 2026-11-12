@@ -14,12 +14,7 @@ func TestForward_Golden(t *testing.T) {
 	msg.To = []mail.Address{me, ben}
 	msg.Cc = []mail.Address{carol}
 	msg.Body = "Shall we try the new place?\n\nLet me know.\n"
-	want := "To: \n" +
-		"Cc: \n" +
-		"Bcc: \n" +
-		"Subject: Fwd: Lunch on Friday\n" +
-		"\n" +
-		"\n" + // the line for the user's text
+	want := "\n" + // the line for the user's text
 		"\n" +
 		"---------- Forwarded message ----------\n" +
 		"From: Alice <alice@example.com>\n" +
@@ -31,21 +26,22 @@ func TestForward_Golden(t *testing.T) {
 		"Shall we try the new place?\n" +
 		"\n" +
 		"Let me know.\n"
-	got := Format(Forward(msg, "INBOX", me))
-	if got != want {
-		t.Errorf("Format(Forward) =\n%q\nwant\n%q", got, want)
-	}
-	// Untouched, the template can't be sent: it has no recipient.
 	base := Forward(msg, "INBOX", me)
-	if _, err := Parse(got, base); err == nil {
-		t.Error("Parse(untouched template) succeeded, want a no-recipients error")
+	if base.Body != want {
+		t.Errorf("Forward body =\n%q\nwant\n%q", base.Body, want)
 	}
-	d, err := Parse(strings.Replace(got, "To: \n", "To: z@example.com\n", 1), base)
+	// Untouched, the draft can't be sent: it has no recipient.
+	f := FieldsOf(base)
+	if _, err := f.Draft(base); err == nil {
+		t.Error("Draft(untouched fields) succeeded, want a no-recipients error")
+	}
+	f.To = "z@example.com"
+	d, err := f.Draft(base)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if d.Subject != "Fwd: Lunch on Friday" || d.Body != base.Body || d.ForwardOf == nil || d.From != me {
-		t.Errorf("Parse(filled template) = %#v", d)
+		t.Errorf("Draft(filled fields) = %#v", d)
 	}
 }
 

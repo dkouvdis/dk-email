@@ -11,10 +11,10 @@ import (
 // no In-Reply-To, References or ReplyTo. ForwardOf points at msg so the
 // sender copies its attachments.
 //
-// Body is the part of the editor file after the header block: an empty line
-// for the user's text, a blank line, then the forwarded-message block with
-// msg.Body unquoted, ending with a newline. The Date line is left out when
-// msg has no date and the Cc line when it has no Cc:
+// Body starts with an empty line for the user's text, a blank line, then the
+// forwarded-message block with msg.Body unquoted, ending with a newline. The
+// Date line is left out when msg has no date and the Cc line when it has no
+// Cc. With the headers, the composer shows:
 //
 //	To:
 //	Cc:

@@ -3,31 +3,27 @@ package ui
 import (
 	"errors"
 	"fmt"
-	"os"
-	"os/exec"
 	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/dkouvdis/dk-email/internal/mail"
 	"github.com/dkouvdis/dk-email/internal/mail/mailtest"
+	"github.com/dkouvdis/dk-email/internal/ui/popup"
 )
-
-const goodDraft = "To: Alice <alice@example.com>\nCc: bob@example.com\nBcc:\nSubject: Lunch\n\nShall we?\nSecond line.\n"
 
 // composeFixture is a started model where Personal can send through the
 // returned sender and Work can't.
 func composeFixture(t *testing.T) (Model, *mailtest.Sender) {
 	t.Helper()
-	t.Setenv("TMPDIR", t.TempDir())
 	s := &mailtest.Sender{}
 	f := newFixture()
 	f.personalSender = s
 	m := started(t, f, 160, 30)
 	m.accts[0].Email, m.accts[0].FromName = "me@example.com", "Me Myself"
-	m.editorCmd = func(path string) *exec.Cmd { return exec.Command("true", path) }
 	return m, s
 }
 
@@ -38,64 +34,116 @@ func keyCmd(t *testing.T, m Model, k string) (Model, tea.Cmd) {
 	return next.(Model), cmd
 }
 
-// edited is c followed by the editor returning text.
-func edited(t *testing.T, m Model, text string) Model {
+// typed types text into the composer; "\n" is enter.
+func typed(t *testing.T, m Model, text string) Model {
 	t.Helper()
-	m, cmd := keyCmd(t, m, "c")
-	if cmd == nil || m.draft == nil {
-		t.Fatalf("c didn't start an edit (cmd %v, draft %v, status %q)", cmd != nil, m.draft, m.status)
+	for _, r := range text {
+		if r == '\n' {
+			m = send(t, m, press("enter"))
+			continue
+		}
+		m = send(t, m, press(string(r)))
 	}
-	return send(t, m, editorDoneMsg{text: text, orig: m.draft.orig})
+	return m
 }
 
-// yes presses y and delivers the send result back to the model.
-func yes(t *testing.T, m Model) Model {
+// written opens the composer with c and fills in To, Subject and the body.
+func written(t *testing.T, m Model, to, subject, body string) Model {
 	t.Helper()
-	m, cmd := keyCmd(t, m, "y")
+	m, _ = keyCmd(t, m, "c")
+	if !m.composing() {
+		t.Fatalf("c didn't open the composer (status %q)", m.status)
+	}
+	m = typed(t, m, to)
+	m = send(t, m, press("tab"), press("tab"), press("tab"))
+	m = typed(t, m, subject)
+	m = send(t, m, press("tab"))
+	return typed(t, m, body)
+}
+
+// sendKey presses ctrl+s and delivers the send result back to the model.
+func sendKey(t *testing.T, m Model) Model {
+	t.Helper()
+	m, cmd := keyCmd(t, m, "ctrl+s")
 	if cmd == nil {
-		t.Fatalf("y started nothing (status %q)", m.status)
+		t.Fatalf("ctrl+s started nothing (status %q)", m.status)
 	}
 	return send(t, m, cmd())
 }
 
-func TestCompose_UnchangedFileIsDiscardedSilently(t *testing.T) {
-	m, s := composeFixture(t)
+func TestCompose_COpensTheComposerInTo(t *testing.T) {
+	m, _ := composeFixture(t)
+
 	m, _ = keyCmd(t, m, "c")
 
-	m = send(t, m, editorDoneMsg{text: m.draft.orig, orig: m.draft.orig})
-
-	if m.showConfirm || m.draft != nil || m.status != "Draft discarded" || len(s.Sent()) != 0 {
-		t.Errorf("popup %v, draft %v, status %q, sent %d; want a silent discard", m.showConfirm, m.draft, m.status, len(s.Sent()))
-	}
-	if strings.Contains(plain(m), "Send message?") {
-		t.Error("confirm popup drawn")
-	}
-}
-
-func TestCompose_EmptyFileIsDiscarded(t *testing.T) {
-	m, s := composeFixture(t)
-
-	m = edited(t, m, " \n\t\n")
-
-	if m.showConfirm || m.draft != nil || m.status != "Draft discarded" || len(s.Sent()) != 0 {
-		t.Errorf("popup %v, draft %v, status %q; want a discard", m.showConfirm, m.draft, m.status)
-	}
-}
-
-func TestCompose_TemplateHasAccountFromAndIsSentFromIt(t *testing.T) {
-	m, s := composeFixture(t)
-
-	m = edited(t, m, goodDraft)
-	if !m.showConfirm {
-		t.Fatalf("no confirm popup; status %q", m.status)
+	if !m.composing() || m.draft.pop.Values() != (popup.ComposeValues{}) {
+		t.Fatalf("draft %v; want an empty composer", m.draft)
 	}
 	view := plain(m)
-	for _, want := range []string{"Send message?", "Me Myself <me@example.com>", "Alice <alice@example.com>", "bob@example.com", "Lunch", "Shall we?", "Second line.", "y send · e edit · d discard"} {
+	for _, want := range []string{"New message · me@example.com", "To", "Cc", "Bcc", "Subject"} {
 		if !strings.Contains(view, want) {
-			t.Errorf("popup missing %q:\n%s", want, view)
+			t.Errorf("view missing %q:\n%s", want, view)
 		}
 	}
-	m = yes(t, m)
+	m = typed(t, m, "bob")
+	if got := m.draft.pop.Values().To; got != "bob" {
+		t.Errorf("To = %q, want typing to land in the focused To field", got)
+	}
+}
+
+func TestCompose_HintsRowShowsComposerKeys(t *testing.T) {
+	m, _ := composeFixture(t)
+	m, _ = keyCmd(t, m, "c")
+
+	if h := strings.TrimSpace(ansi.Strip(m.renderHints())); h != "ctrl+s send · tab next field · esc close" {
+		t.Errorf("hints = %q", h)
+	}
+}
+
+func TestCompose_ComposerSwallowsKeys(t *testing.T) {
+	m, s := composeFixture(t)
+	m, _ = keyCmd(t, m, "c")
+	focus, mode := m.focus, m.mode
+	row, _, _ := m.list.Selected()
+
+	for _, k := range []string{"tab", "shift+tab", "q", "e", "d", "?", "a", "A", "v", "j", "ctrl+r", "c", "r", "R", "f"} {
+		m, _ = keyCmd(t, m, k)
+		if !m.composing() || m.showHelp || m.showPicker || m.showConnect || m.focus != focus || m.mode != mode {
+			t.Fatalf("%q reached the main view (composing %v, focus %v)", k, m.composing(), m.focus)
+		}
+	}
+	if got, _, _ := m.list.Selected(); got.Latest().UID != row.Latest().UID {
+		t.Error("the list selection moved while composing")
+	}
+	if len(s.Sent()) != 0 || m.status == "Draft discarded" {
+		t.Error("a key acted on the draft")
+	}
+}
+
+func TestCompose_PasteGoesToTheComposer(t *testing.T) {
+	m, _ := composeFixture(t)
+	m, _ = keyCmd(t, m, "c")
+
+	m = send(t, m, tea.PasteMsg{Content: "a@example.com"})
+
+	if got := m.draft.pop.Values().To; got != "a@example.com" {
+		t.Errorf("To = %q after a paste", got)
+	}
+}
+
+func TestCompose_SendParsesTheFieldsAndSends(t *testing.T) {
+	m, s := composeFixture(t)
+	m = written(t, m, "Alice <alice@example.com>", "Lunch", "Shall we?\nSecond line.\n")
+
+	m, cmd := keyCmd(t, m, "ctrl+s")
+
+	if cmd == nil || !m.sending || !m.composing() || m.status != "Sending…" {
+		t.Fatalf("cmd %v, sending %v, composing %v, status %q", cmd != nil, m.sending, m.composing(), m.status)
+	}
+	if view := plain(m); !strings.Contains(view, "Sending…") {
+		t.Errorf("composer should say Sending…:\n%s", view)
+	}
+	m = send(t, m, cmd())
 
 	sent := s.Sent()
 	if len(sent) != 1 {
@@ -104,229 +152,107 @@ func TestCompose_TemplateHasAccountFromAndIsSentFromIt(t *testing.T) {
 	d := sent[0]
 	if d.From != (mail.Address{Name: "Me Myself", Email: "me@example.com"}) ||
 		len(d.To) != 1 || d.To[0].Email != "alice@example.com" ||
-		len(d.Cc) != 1 || d.Cc[0].Email != "bob@example.com" ||
 		d.Subject != "Lunch" || d.Body != "Shall we?\nSecond line.\n" {
 		t.Errorf("draft = %+v", d)
 	}
-	if m.draft != nil || m.sending || m.showConfirm || m.status != "Sent to alice@example.com (+1)" || m.statusErr {
-		t.Errorf("draft %v, sending %v, popup %v, status %q (err %v)", m.draft, m.sending, m.showConfirm, m.status, m.statusErr)
+	if m.composing() || m.sending || m.status != "Sent to alice@example.com" || m.statusErr {
+		t.Errorf("composing %v, sending %v, status %q (err %v)", m.composing(), m.sending, m.status, m.statusErr)
 	}
 }
 
-func TestCompose_PopupKeepsTheViewTheSizeOfTheTerminal(t *testing.T) {
-	m, _ := composeFixture(t)
-	m = edited(t, m, goodDraft)
+func TestCompose_BadAddressShowsTheErrorAndDoesNotSend(t *testing.T) {
+	m, s := composeFixture(t)
+	m = written(t, m, "not an address", "Hi", "body")
 
-	view := m.View().Content
-	if w, h := lipgloss.Width(view), lipgloss.Height(view); w != 160 || h != 30 {
-		t.Errorf("view is %dx%d, want 160x30", w, h)
+	m, cmd := keyCmd(t, m, "ctrl+s")
+
+	if cmd != nil || m.sending || !m.composing() || len(s.Sent()) != 0 {
+		t.Fatalf("cmd %v, sending %v, composing %v, sent %d", cmd != nil, m.sending, m.composing(), len(s.Sent()))
+	}
+	if view := plain(m); !strings.Contains(view, "To: invalid address list") {
+		t.Errorf("composer should show the parse error:\n%s", view)
+	}
+	if got := m.draft.pop.Values(); got.Subject != "Hi" || got.Body != "body" {
+		t.Errorf("values = %+v; editing should continue from what was typed", got)
 	}
 }
 
-func TestCompose_SendingStateWhileInFlight(t *testing.T) {
-	m, _ := composeFixture(t)
-	m = edited(t, m, goodDraft)
+func TestCompose_NoRecipientsShowsTheError(t *testing.T) {
+	m, s := composeFixture(t)
+	m, _ = keyCmd(t, m, "c")
 
-	m, cmd := keyCmd(t, m, "y")
+	m, cmd := keyCmd(t, m, "ctrl+s")
 
-	if !m.sending || m.showConfirm || m.status != "Sending…" || cmd == nil {
-		t.Errorf("sending %v, popup %v, status %q", m.sending, m.showConfirm, m.status)
+	if cmd != nil || len(s.Sent()) != 0 || !strings.Contains(plain(m), "no recipients") {
+		t.Errorf("cmd %v, sent %d, view:\n%s", cmd != nil, len(s.Sent()), plain(m))
 	}
-	m, qcmd := keyCmd(t, m, "q")
-	if qcmd != nil || m.status != "Sending…" {
-		t.Errorf("q while sending: quit cmd %v, status %q; want blocked", qcmd != nil, m.status)
-	}
-	m, ccmd := keyCmd(t, m, "c")
-	if ccmd != nil || m.status != "Sending…" || m.editorPath != "" {
-		t.Errorf("c while sending: cmd %v, status %q", ccmd != nil, m.status)
+}
+
+func TestCompose_BusyComposerIgnoresKeysButCtrlCQuits(t *testing.T) {
+	m, s := composeFixture(t)
+	m = written(t, m, "alice@example.com", "Hi", "x")
+	m, _ = keyCmd(t, m, "ctrl+s")
+	before := m.draft.pop.Values()
+
+	for _, k := range []string{"y", "esc", "tab", "q", "c", "ctrl+s"} {
+		var cmd tea.Cmd
+		m, cmd = keyCmd(t, m, k)
+		if cmd != nil || !m.composing() || m.draft.pop.Values() != before {
+			t.Fatalf("%q while sending: cmd %v, composing %v, values %+v", k, cmd != nil, m.composing(), m.draft.pop.Values())
+		}
 	}
 	if _, cmd := m.Update(press("ctrl+c")); cmd == nil {
 		t.Error("ctrl+c should still quit while sending")
 	}
-}
-
-func TestCompose_EditReopensEditorWithCurrentText(t *testing.T) {
-	m, _ := composeFixture(t)
-	m = edited(t, m, goodDraft)
-
-	m, cmd := keyCmd(t, m, "e")
-
-	if cmd == nil || m.editorPath == "" || m.showConfirm {
-		t.Fatalf("e: cmd %v, editor %q, popup %v; want the editor open", cmd != nil, m.editorPath, m.showConfirm)
-	}
-	data, err := os.ReadFile(m.editorPath)
-	if err != nil || string(data) != goodDraft {
-		t.Errorf("editor file = %q, %v; want the current text", data, err)
-	}
-	// Leaving it unchanged still returns to the popup.
-	m = send(t, m, editorDoneMsg{text: goodDraft, orig: goodDraft})
-	if !m.showConfirm || m.draft == nil {
-		t.Errorf("popup %v, draft %v; want the popup back", m.showConfirm, m.draft)
-	}
-	_ = m.Close()
-}
-
-func TestCompose_ReeditedTextIsWhatGetsSent(t *testing.T) {
-	m, s := composeFixture(t)
-	m = edited(t, m, goodDraft)
-	m, _ = keyCmd(t, m, "e")
-	m = send(t, m, editorDoneMsg{text: "To: z@example.com\nSubject: Changed\n\nnew body", orig: goodDraft})
-
-	m = yes(t, m)
-
-	got := s.Sent()
-	if len(got) != 1 || got[0].To[0].Email != "z@example.com" || got[0].Subject != "Changed" || got[0].Body != "new body" {
-		t.Errorf("sent = %+v", got)
+	if len(s.Sent()) != 0 {
+		t.Error("keys while busy sent something")
 	}
 }
 
-func TestCompose_ReeditEmptiedFileDiscards(t *testing.T) {
-	m, _ := composeFixture(t)
-	m = edited(t, m, goodDraft)
-	m, _ = keyCmd(t, m, "e")
-
-	m = send(t, m, editorDoneMsg{text: "\n", orig: goodDraft})
-
-	if m.draft != nil || m.showConfirm || m.status != "Draft discarded" {
-		t.Errorf("draft %v, popup %v, status %q", m.draft, m.showConfirm, m.status)
-	}
-}
-
-func TestCompose_EditorErrorOnFirstEditDiscards(t *testing.T) {
+func TestCompose_CtrlCQuitsWhileComposing(t *testing.T) {
 	m, _ := composeFixture(t)
 	m, _ = keyCmd(t, m, "c")
 
-	m = send(t, m, editorDoneMsg{err: errors.New("editor failed: exit status 1")})
-
-	if m.draft != nil || m.showConfirm || !m.statusErr || !strings.Contains(m.status, "editor failed") {
-		t.Errorf("draft %v, popup %v, status %q (err %v)", m.draft, m.showConfirm, m.status, m.statusErr)
-	}
-}
-
-func TestCompose_EditorErrorOnReeditKeepsTextAndReopensPopup(t *testing.T) {
-	m, s := composeFixture(t)
-	m = edited(t, m, goodDraft)
-	m, _ = keyCmd(t, m, "e")
-
-	m = send(t, m, editorDoneMsg{err: errors.New("editor failed: exit status 1")})
-
-	if m.draft == nil || m.draft.text != goodDraft || !m.showConfirm || !m.statusErr {
-		t.Fatalf("draft %v, popup %v, status %q (err %v)", m.draft, m.showConfirm, m.status, m.statusErr)
-	}
-	m = yes(t, m)
-	if got := s.Sent(); len(got) != 1 || got[0].Subject != "Lunch" {
-		t.Errorf("sent = %+v, want the text from before the failed edit", got)
-	}
-}
-
-func TestCompose_DiscardDropsTheDraft(t *testing.T) {
-	m, s := composeFixture(t)
-	m = edited(t, m, goodDraft)
-
-	m, _ = keyCmd(t, m, "d")
-
-	if m.draft != nil || m.showConfirm || m.status != "Draft discarded" || len(s.Sent()) != 0 {
-		t.Errorf("draft %v, popup %v, status %q", m.draft, m.showConfirm, m.status)
-	}
-	if _, cmd := keyCmd(t, m, "c"); cmd == nil {
-		t.Error("c should work again after a discard")
-	}
-}
-
-func TestCompose_EscAndQKeepThePopup(t *testing.T) {
-	m, s := composeFixture(t)
-	m = edited(t, m, goodDraft)
-
-	for _, k := range []string{"esc", "q", "x", "enter", "c", "?", "a"} {
-		var cmd tea.Cmd
-		m, cmd = keyCmd(t, m, k)
-		if cmd != nil || !m.showConfirm || m.draft == nil || m.showHelp || m.showPicker {
-			t.Fatalf("%q: cmd %v, popup %v, draft %v; the popup should swallow it", k, cmd != nil, m.showConfirm, m.draft)
-		}
-	}
-	if len(s.Sent()) != 0 {
-		t.Error("something was sent")
-	}
 	if _, cmd := m.Update(press("ctrl+c")); cmd == nil {
-		t.Error("ctrl+c should quit even with the popup open")
+		t.Error("ctrl+c should quit with the composer open")
 	}
 }
 
-func TestCompose_QIsBlockedWhileADraftIsOpen(t *testing.T) {
-	m, _ := composeFixture(t)
-	m = edited(t, m, goodDraft)
-	m, _ = keyCmd(t, m, "e") // popup closed, editor "running"
-	if m.draft == nil || m.showConfirm {
-		t.Fatal("setup: want a draft with no popup")
-	}
-
-	m, cmd := keyCmd(t, m, "q")
-
-	if cmd != nil || m.status != "Finish or discard the draft first" {
-		t.Errorf("quit cmd %v, status %q; want q blocked", cmd != nil, m.status)
-	}
-	_ = m.Close()
-}
-
-func TestCompose_ParseErrorDisablesSend(t *testing.T) {
-	m, s := composeFixture(t)
-	m = edited(t, m, "Too: a@example.com\nSubject: x\n\nbody")
-	if !m.showConfirm {
-		t.Fatal("no popup")
-	}
-	view := plain(m)
-	if !strings.Contains(view, `unknown header "Too"`) || !strings.Contains(view, "e edit · d discard") || strings.Contains(view, "y send") {
-		t.Errorf("popup should show the error and no y:\n%s", view)
-	}
-
-	m, cmd := keyCmd(t, m, "y")
-
-	if cmd != nil || m.sending || !m.showConfirm || len(s.Sent()) != 0 {
-		t.Errorf("y with a parse error: cmd %v, sending %v, popup %v", cmd != nil, m.sending, m.showConfirm)
-	}
-	// e fixes it.
-	m, _ = keyCmd(t, m, "e")
-	m = send(t, m, editorDoneMsg{text: goodDraft, orig: "x"})
-	m = yes(t, m)
-	if len(s.Sent()) != 1 {
-		t.Errorf("sent %d after fixing, want 1", len(s.Sent()))
-	}
-}
-
-func TestCompose_FailureReopensPopupAndRetrySendsOnce(t *testing.T) {
+func TestCompose_FailureKeepsTheComposerAndRetrySendsAgain(t *testing.T) {
 	m, s := composeFixture(t)
 	s.FailWith(errors.New("smtp: connection refused"))
-	m = edited(t, m, goodDraft)
+	m = written(t, m, "alice@example.com", "Lunch", "Shall we?")
 
-	m = yes(t, m)
+	m = sendKey(t, m)
 
-	if m.sending || m.draft == nil || !m.showConfirm || len(s.Sent()) != 1 {
-		t.Fatalf("sending %v, draft %v, popup %v, sent %d", m.sending, m.draft, m.showConfirm, len(s.Sent()))
+	if m.sending || !m.composing() || len(s.Sent()) != 1 {
+		t.Fatalf("sending %v, composing %v, sent %d", m.sending, m.composing(), len(s.Sent()))
 	}
 	if view := plain(m); !strings.Contains(view, "Send failed: smtp: connection refused") || !strings.Contains(view, "Lunch") {
-		t.Errorf("popup should show the error and the draft:\n%s", view)
+		t.Errorf("composer should show the error and the draft:\n%s", view)
 	}
+	m = typed(t, m, "!") // editing resumes
 
-	m = yes(t, m)
+	m = sendKey(t, m)
 
 	got := s.Sent()
-	if len(got) != 2 || got[0].Subject != got[1].Subject || got[1].To[0].Email != "alice@example.com" {
-		t.Errorf("sent = %+v; want the same draft twice", got)
+	if len(got) != 2 || got[0].Subject != got[1].Subject || got[1].Body != "Shall we?!" {
+		t.Errorf("sent = %+v; want the draft twice, the second with the edit", got)
 	}
-	if m.draft != nil || m.showConfirm || m.status != "Sent to alice@example.com (+1)" {
-		t.Errorf("draft %v, popup %v, status %q", m.draft, m.showConfirm, m.status)
+	if m.composing() || m.status != "Sent to alice@example.com" {
+		t.Errorf("composing %v, status %q", m.composing(), m.status)
 	}
 }
 
-func TestCompose_AfterDeliveryWarnsAndDoesNotRetry(t *testing.T) {
+func TestCompose_AfterDeliveryClosesWithAWarningAndDoesNotRetry(t *testing.T) {
 	m, s := composeFixture(t)
 	s.FailWith(fmt.Errorf("sent, but couldn't save a copy to Sent: disk full: %w", mail.ErrAfterDelivery))
-	m = edited(t, m, goodDraft)
+	m = written(t, m, "alice@example.com", "Lunch", "Shall we?")
 
-	m = yes(t, m)
+	m = sendKey(t, m)
 
-	if m.draft != nil || m.showConfirm || m.sending {
-		t.Errorf("draft %v, popup %v, sending %v; want everything closed", m.draft, m.showConfirm, m.sending)
+	if m.composing() || m.sending {
+		t.Errorf("composing %v, sending %v; want everything closed", m.composing(), m.sending)
 	}
 	if !m.statusErr || !strings.HasPrefix(m.status, "Sent, but couldn't save a copy to Sent") {
 		t.Errorf("status %q (err %v), want the capitalised warning", m.status, m.statusErr)
@@ -334,22 +260,146 @@ func TestCompose_AfterDeliveryWarnsAndDoesNotRetry(t *testing.T) {
 	if len(s.Sent()) != 1 {
 		t.Errorf("sent %d times", len(s.Sent()))
 	}
-	if _, cmd := keyCmd(t, m, "y"); cmd != nil {
-		t.Error("y after delivery started another send")
+}
+
+func TestCompose_SendResultWithNoDraftOnlyShowsTheError(t *testing.T) {
+	m, _ := composeFixture(t)
+
+	m = send(t, m, sentMsg{err: errors.New("smtp: down")})
+
+	if m.composing() || !m.statusErr || m.status != "smtp: down" {
+		t.Errorf("composing %v, status %q (err %v)", m.composing(), m.status, m.statusErr)
 	}
 }
 
-func TestCompose_CBlockedDuringADraft(t *testing.T) {
-	m, _ := composeFixture(t)
-	m = edited(t, m, goodDraft)
-	m, _ = keyCmd(t, m, "e") // draft open, no popup
+func TestCompose_EscOnAnUntouchedComposerClosesAtOnce(t *testing.T) {
+	m, s := composeFixture(t)
+	m, _ = keyCmd(t, m, "c")
 
-	m, cmd := keyCmd(t, m, "c")
+	m, _ = keyCmd(t, m, "esc")
 
-	if cmd != nil || m.status != "Finish or discard the draft first" {
-		t.Errorf("cmd %v, status %q", cmd != nil, m.status)
+	if m.composing() || m.status != "" || len(s.Sent()) != 0 {
+		t.Errorf("composing %v, status %q; want a silent close", m.composing(), m.status)
 	}
-	_ = m.Close()
+}
+
+func TestCompose_EscAfterTypingAsksThenDiscardOrKeepEditing(t *testing.T) {
+	m, s := composeFixture(t)
+	m = written(t, m, "alice@example.com", "Lunch", "Shall we?")
+
+	m, _ = keyCmd(t, m, "esc")
+	if !m.composing() || !m.draft.pop.Prompting() {
+		t.Fatal("esc after typing should ask")
+	}
+	if view := plain(m); !strings.Contains(view, "Discard draft?  d discard · e keep editing") || strings.Contains(view, " s save") {
+		t.Errorf("prompt should offer only d and e:\n%s", view)
+	}
+
+	m, _ = keyCmd(t, m, "e")
+	if !m.composing() || m.draft.pop.Prompting() || m.draft.pop.Values().Body != "Shall we?" {
+		t.Fatalf("e should return to editing with the text intact (values %+v)", m.draft.pop.Values())
+	}
+
+	m, _ = keyCmd(t, m, "esc")
+	m, _ = keyCmd(t, m, "d")
+	if m.composing() || m.status != "Draft discarded" || m.statusErr || len(s.Sent()) != 0 {
+		t.Errorf("composing %v, status %q (err %v)", m.composing(), m.status, m.statusErr)
+	}
+	if m2, cmd := keyCmd(t, m, "c"); cmd != nil || !m2.composing() {
+		t.Error("c should open a new composer after a discard")
+	}
+}
+
+func TestCompose_ClosingReturnsToTheListUnchanged(t *testing.T) {
+	m, _ := composeFixture(t)
+	m = send(t, m, press("j"))
+	row, _, _ := m.list.Selected()
+	focus := m.focus
+	m = written(t, m, "a@example.com", "", "")
+
+	for _, closeKeys := range [][]string{{"esc", "d"}, {"ctrl+s"}} {
+		m2 := m
+		for _, k := range closeKeys {
+			m2, _ = keyCmd(t, m2, k)
+		}
+		if closeKeys[0] == "ctrl+s" {
+			m2 = send(t, m2, sentMsg{draft: mail.Draft{To: []mail.Address{{Email: "a@example.com"}}}})
+		}
+		got, _, _ := m2.list.Selected()
+		if m2.composing() || m2.readerPopup || m2.focus != focus || got.Latest().UID != row.Latest().UID {
+			t.Errorf("after %v: composing %v, reader %v, focus %v, selected %v; want the list as it was", closeKeys, m2.composing(), m2.readerPopup, m2.focus, got.Latest().UID)
+		}
+	}
+}
+
+func TestCompose_ClosingReturnsToTheReader(t *testing.T) {
+	m, _, _, u := replyFixture(t)
+	m = pressSettled(t, m, "enter")
+	if !m.readerPopup || m.read.Current() != u.first {
+		t.Fatalf("setup: reader %v, current %d", m.readerPopup, m.read.Current())
+	}
+	row, _, _ := m.list.Selected()
+
+	m, _ = keyCmd(t, m, "c")
+	if !m.composing() || !m.readerPopup {
+		t.Fatalf("composing %v, reader %v; the composer is an overlay", m.composing(), m.readerPopup)
+	}
+	m = typed(t, m, "x")
+	m = send(t, m, press("esc"), press("d"))
+
+	got, _, _ := m.list.Selected()
+	if m.composing() || !m.readerPopup || m.read.Current() != u.first || got.Latest().UID != row.Latest().UID {
+		t.Errorf("composing %v, reader %v, current %d, selected %v; want the reader as it was", m.composing(), m.readerPopup, m.read.Current(), got.Latest().UID)
+	}
+	if view := plain(m); !strings.Contains(view, "Body of o1.") || strings.Contains(view, "New message") {
+		t.Errorf("view should show the reader again:\n%s", view)
+	}
+}
+
+func TestCompose_ComposerIsDrawnOverTheReaderAtTheViewSize(t *testing.T) {
+	m, _, _, _ := replyFixture(t)
+	m = pressSettled(t, m, "enter")
+	m, _ = keyCmd(t, m, "c")
+
+	view := m.View().Content
+	if w, h := lipgloss.Width(view), lipgloss.Height(view); w != 160 || h != 30 {
+		t.Errorf("view is %dx%d, want 160x30", w, h)
+	}
+	if strings.Contains(plain(m), "Body of o1.") {
+		t.Error("the reader shows through the composer")
+	}
+}
+
+func TestCompose_ResizeResizesTheComposer(t *testing.T) {
+	m, _ := composeFixture(t)
+	m, _ = keyCmd(t, m, "c")
+	before := plain(m)
+
+	m = send(t, m, size(100, 24))
+
+	view := m.View().Content
+	if w, h := lipgloss.Width(view), lipgloss.Height(view); w != 100 || h != 24 {
+		t.Errorf("view is %dx%d, want 100x24", w, h)
+	}
+	if after := plain(m); after == before || !strings.Contains(after, "New message · me@example.com") {
+		t.Errorf("composer didn't redraw at the new size:\n%s", after)
+	}
+}
+
+func TestCompose_MouseIsReleasedWhileComposing(t *testing.T) {
+	m, _ := composeFixture(t)
+	if m.View().MouseMode != tea.MouseModeCellMotion {
+		t.Fatal("setup: the mouse should be captured on the list")
+	}
+
+	m, _ = keyCmd(t, m, "c")
+
+	if m.View().MouseMode == tea.MouseModeCellMotion {
+		t.Error("mouse still captured with the composer open")
+	}
+	if m2 := send(t, m, click(60, 3)); !m2.composing() || m2.readerPopup {
+		t.Error("a click acted behind the composer")
+	}
 }
 
 func TestCompose_NotConfiguredAccountSaysSo(t *testing.T) {
@@ -363,44 +413,8 @@ func TestCompose_NotConfiguredAccountSaysSo(t *testing.T) {
 	m, cmd := keyCmd(t, m, "c")
 
 	want := "Sending isn't set up for Work: add smtp_host to its config"
-	if cmd != nil || m.draft != nil || m.editorPath != "" || m.status != want || m.statusErr {
-		t.Errorf("cmd %v, draft %v, editor %q, status %q (err %v)", cmd != nil, m.draft, m.editorPath, m.status, m.statusErr)
-	}
-}
-
-func TestCompose_CtrlRStillRefreshes(t *testing.T) {
-	m, _ := composeFixture(t)
-	m = edited(t, m, goodDraft)
-	m, _ = keyCmd(t, m, "e")
-
-	m, cmd := keyCmd(t, m, "ctrl+r")
-
-	if cmd == nil {
-		t.Errorf("ctrl+r with a draft open did nothing; status %q", m.status)
-	}
-	_ = m.Close()
-}
-
-func TestCompose_RealStubEditorRoundTrip(t *testing.T) {
-	m, s := composeFixture(t)
-	m.editorCmd = func(path string) *exec.Cmd {
-		return exec.Command("sh", "-c", `printf 'To: x@example.com\nSubject: Hi\n\nfrom the stub\n' > "$1"`, "--", path)
-	}
-	m, _ = keyCmd(t, m, "c")
-	path := m.editorPath
-	if err := m.editorCmd(path).Run(); err != nil {
-		t.Fatal(err)
-	}
-
-	m = send(t, m, finishEditor(path, m.draft.orig, nil))
-	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
-		t.Errorf("draft file left behind (stat err %v)", err)
-	}
-	m = yes(t, m)
-
-	got := s.Sent()
-	if len(got) != 1 || got[0].To[0].Email != "x@example.com" || got[0].Body != "from the stub\n" {
-		t.Errorf("sent = %+v", got)
+	if cmd != nil || m.draft != nil || m.status != want || m.statusErr {
+		t.Errorf("cmd %v, draft %v, status %q (err %v)", cmd != nil, m.draft, m.status, m.statusErr)
 	}
 }
 
