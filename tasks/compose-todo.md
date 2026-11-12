@@ -117,7 +117,7 @@ Every task also meets the standing bar before it counts as done:
 - [x] README: no `$EDITOR`; composer keys, Drafts and reopening drafts.
 - [x] Help popup Compose group lists the composer keys.
 - [x] SPEC.md keybindings and boundaries.
-- [ ] AGENTS.md and `.github/copilot-instructions.md` updated with identical bodies.
+- [x] AGENTS.md and `.github/copilot-instructions.md` updated with identical bodies.
 
 ### Checkpoint 3
 
