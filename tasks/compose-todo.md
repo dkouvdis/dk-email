@@ -54,13 +54,13 @@ Every task also meets the standing bar before it counts as done:
 
 **Acceptance criteria:**
 
-- [ ] `c`, `r`, `R` and `f` open the composer in the 90% popup with the title `New message` / `Reply` / `Reply all` / `Forward` · subject · From address.
-- [ ] New message and forward focus To; reply and reply-all focus the body with the cursor at the top, above the quote.
-- [ ] While the composer is open every key goes to it, except `ctrl+c` (quit). Pane, archive and delete keys don't fire.
-- [ ] `ctrl+s` parses and sends. Parse and send errors show in the footer and editing continues; `ErrAfterDelivery` closes the popup with the error in the status bar.
-- [ ] Closing returns to the reader if it was open, otherwise the list, with selection and focus unchanged.
-- [ ] The hints row shows the composer keys while it's open.
-- [ ] `editor.go`, `popup/confirm.go`, `compose.Format` / `compose.Parse` and their tests are removed; `$VISUAL` / `$EDITOR` are no longer read.
+- [x] `c`, `r`, `R` and `f` open the composer in the 90% popup with the title `New message` / `Reply` / `Reply all` / `Forward` · subject · From address.
+- [x] New message and forward focus To; reply and reply-all focus the body with the cursor at the top, above the quote.
+- [x] While the composer is open every key goes to it, except `ctrl+c` (quit). Pane, archive and delete keys don't fire.
+- [x] `ctrl+s` parses and sends. Parse and send errors show in the footer and editing continues; `ErrAfterDelivery` closes the popup with the error in the status bar.
+- [x] Closing returns to the reader if it was open, otherwise the list, with selection and focus unchanged.
+- [x] The hints row shows the composer keys while it's open.
+- [x] `editor.go`, `popup/confirm.go`, `compose.Format` / `compose.Parse` and their tests are removed; `$VISUAL` / `$EDITOR` are no longer read.
 
 **Verification:** `go test -race ./internal/...`
 
@@ -68,7 +68,7 @@ Every task also meets the standing bar before it counts as done:
 
 ### Checkpoint 1
 
-- [ ] Automated: tests, vet and gofmt are green.
+- [x] Automated: tests, vet and gofmt are green.
 - [ ] Manual: `c`, `r`, `R` and `f` send to yourself; a bad address shows in the footer; a send with the network off fails in the footer and retries with `ctrl+s`.
 
 ---
@@ -84,11 +84,11 @@ Every task also meets the standing bar before it counts as done:
 
 ### D2: compose and send
 
-- [ ] `mail.Draft.DraftOf *MessageRef`; `mail.Drafter` interface with `SaveDraft(ctx, d) error` and `OpenDraft(ctx, ref) (Draft, error)`.
-- [ ] `compose.Build` has a draft mode that writes Bcc; sending never does.
-- [ ] `send.Sender.SaveDraft` appends to Drafts with `\Draft` and `\Seen`, includes forwarded attachments, then deletes `DraftOf`. A failed delete returns an error wrapping `ErrDraftSaved`.
-- [ ] `Send` deletes `DraftOf` after delivery; failure wraps `ErrAfterDelivery`.
-- [ ] `compose.FromRaw` rebuilds a draft from the saved raw message (addresses incl. Bcc, subject, text body, In-Reply-To, References); `OpenDraft` sets `DraftOf`, and `ForwardOf` when the draft has attachments.
+- [x] `mail.Draft.DraftOf *MessageRef`; `mail.Drafter` interface with `SaveDraft(ctx, d) error` and `OpenDraft(ctx, ref) (Draft, error)`.
+- [x] `compose.Build` has a draft mode that writes Bcc; sending never does.
+- [x] `send.Sender.SaveDraft` appends to Drafts with `\Draft` and `\Seen`, includes forwarded attachments, then deletes `DraftOf`. A failed delete returns an error wrapping `ErrDraftSaved`.
+- [x] `Send` deletes `DraftOf` after delivery; failure wraps `ErrAfterDelivery`.
+- [x] `compose.FromRaw` rebuilds a draft from the saved raw message (addresses incl. Bcc, subject, text body, In-Reply-To, References); `OpenDraft` sets `DraftOf`, and `ForwardOf` when the draft has attachments.
 
 ### D3: Save from the composer
 
