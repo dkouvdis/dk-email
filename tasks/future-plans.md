@@ -9,20 +9,27 @@ _Nothing yet._
 
 ## Outgoing
 
-Deferred from SMTP v1 (reply, reply-all, forward, new message; plain text,
-composed in `$EDITOR`).
+Sending covers reply, reply-all, forward and new message in plain text,
+written in dk-email's built-in composer, with drafts saved to and reopened
+from the IMAP Drafts folder ([compose-plan.md](compose-plan.md)).
 
 - **Attach local files**: add files from disk to replies and new messages
-  (e.g. an `Attach:` header line in the editor file, or a file picker).
-  Forwarding the original message's attachments is already in v1.
-- **Markdown → HTML sending**: write Markdown in `$EDITOR` and send
+  (e.g. a file picker in the composer). Forwarding the original message's
+  attachments already works.
+- **Markdown → HTML sending**: write Markdown and send
   `multipart/alternative` (plain text + HTML) so links like `[here](https://…)`
-  render as clickable text. v1 must keep body building behind a seam so this
-  can be added without a rewrite.
-- **Save drafts to the IMAP Drafts folder**: persist unfinished or failed
-  messages to the account's Drafts-role folder so they survive restarts and
-  sync with other clients. In v1, a failed send keeps the draft in memory only
-  (retry or re-edit), and an empty/unchanged body cancels.
+  render as clickable text. Body building stays behind a seam so this can be
+  added without a rewrite.
+- **Mark the original answered for resumed replies**: a reply saved to Drafts
+  and sent later keeps its threading headers, but the original isn't flagged
+  `\Answered` because the link to it isn't stored with the draft.
+- **Undo in the composer**: the Bubbles textarea has no undo history.
+- **Address autocomplete**: suggest recipients from recent mail.
+- **Optional `$EDITOR` mode**: opt-in hand-off to an external editor for
+  people who prefer vim or similar, alongside the built-in composer.
+- **Hard wrapping / format=flowed**: the body is sent exactly as typed;
+  wrapping long lines or sending `format=flowed` would read better in some
+  clients.
 
 ## Accounts
 
