@@ -15,29 +15,43 @@ import (
 
 const statusLoadingReply = "Loading message…"
 
-// replyFetchedMsg carries the message a reply is waiting for.
+// composeKind is what a draft built from an existing message does with it.
+type composeKind int
+
+const (
+	composeReply composeKind = iota
+	composeReplyAll
+	composeForward
+)
+
+func (k composeKind) String() string {
+	return [...]string{"reply", "reply all", "forward"}[k]
+}
+
+// replyFetchedMsg carries the message a reply, reply-all or forward is
+// waiting for.
 type replyFetchedMsg struct {
 	account int
 	folder  string
-	all     bool
+	kind    composeKind
 	msg     mail.Message
 	err     error
 }
 
-func fetchReply(mb mail.Mailbox, account int, folder string, uid mail.UID, all bool) tea.Cmd {
+func fetchReply(mb mail.Mailbox, account int, folder string, uid mail.UID, kind composeKind) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), messageTimeout)
 		defer cancel()
 		msg, err := mb.Message(ctx, folder, uid)
-		return replyFetchedMsg{account: account, folder: folder, all: all, msg: msg, err: err}
+		return replyFetchedMsg{account: account, folder: folder, kind: kind, msg: msg, err: err}
 	}
 }
 
-// replyTarget is the message r and R answer. In the reader it is the message
-// the reader was opened on from an expanded row, else the thread's latest.
-// On the list it is the selected message on an expanded row, else the
+// actionTarget is the message r, R and f act on. In the reader it is the
+// message the reader was opened on from an expanded row, else the thread's
+// latest. On the list it is the selected message on an expanded row, else the
 // newest message of the thread under the cursor.
-func (m Model) replyTarget() (mail.Summary, bool) {
+func (m Model) actionTarget() (mail.Summary, bool) {
 	var targets []mail.Summary
 	if m.readerPopup && m.open.account >= 0 && !m.open.loading {
 		if uid := m.read.ReplyTarget(); uid != 0 {
@@ -57,35 +71,54 @@ func (m Model) replyTarget() (mail.Summary, bool) {
 	}), true
 }
 
-// startReply drafts a reply to the target message. The message is taken from
-// the reader when it already has it, and fetched otherwise; the draft slot is
-// held meanwhile.
+// startReply drafts a reply, or a reply-all, to the target message.
 func (m Model) startReply(all bool) (Model, tea.Cmd) {
+	if all {
+		return m.startFromTarget(composeReplyAll)
+	}
+	return m.startFromTarget(composeReply)
+}
+
+// startForward drafts a forward of the target message.
+func (m Model) startForward() (Model, tea.Cmd) {
+	return m.startFromTarget(composeForward)
+}
+
+// startFromTarget drafts kind from the target message. The message is taken
+// from the reader when it already has it, and fetched otherwise; the draft
+// slot is held meanwhile.
+func (m Model) startFromTarget(kind composeKind) (Model, tea.Cmd) {
 	account, ok := m.draftAccount()
 	if !ok {
 		return m, nil
 	}
-	target, ok := m.replyTarget()
+	target, ok := m.actionTarget()
 	if !ok || m.boxes[account] == nil {
 		return m, nil
 	}
 	folder := m.open.folder
 	if m.read.Showing(account, folder, target.UID) {
 		if msg, ok := m.read.Message(target.UID); ok {
-			return m.startDraft(account, m.replyDraft(account, folder, msg, all))
+			return m.startMessageDraft(account, folder, msg, kind)
 		}
 	}
 	m.draft = &draftState{account: account, loading: true}
 	m.setStatus(statusLoadingReply)
-	m.log.Debug("reply: fetching message", "account", m.accts[account].Name, "all", all)
-	return m, fetchReply(m.boxes[account], account, folder, target.UID, all)
+	m.log.Debug("compose: fetching message", "account", m.accts[account].Name, "action", kind.String())
+	return m, fetchReply(m.boxes[account], account, folder, target.UID, kind)
 }
 
-func (m Model) replyDraft(account int, folder string, msg mail.Message, all bool) mail.Draft {
-	if all {
-		return compose.ReplyAll(msg, folder, m.identity(account))
+// startMessageDraft opens the editor on kind's draft for msg. A forward also
+// remembers msg's attachments, which the confirm popup lists.
+func (m Model) startMessageDraft(account int, folder string, msg mail.Message, kind composeKind) (Model, tea.Cmd) {
+	me := m.identity(account)
+	switch kind {
+	case composeReplyAll:
+		return m.startDraft(account, compose.ReplyAll(msg, folder, me), nil)
+	case composeForward:
+		return m.startDraft(account, compose.Forward(msg, folder, me), msg.Attachments)
 	}
-	return compose.Reply(msg, folder, m.identity(account))
+	return m.startDraft(account, compose.Reply(msg, folder, me), nil)
 }
 
 func (m Model) handleReplyFetched(msg replyFetchedMsg) (Model, tea.Cmd) {
@@ -101,5 +134,5 @@ func (m Model) handleReplyFetched(msg replyFetchedMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.setStatus("")
-	return m.startDraft(msg.account, m.replyDraft(msg.account, msg.folder, msg.msg, msg.all))
+	return m.startMessageDraft(msg.account, msg.folder, msg.msg, msg.kind)
 }

@@ -64,7 +64,7 @@ func (k KeyMap) HelpSections() []popup.Section {
 	return []popup.Section{
 		{Title: "Navigation", Keys: []key.Binding{k.Up, k.Down, k.Top, k.Bottom, k.Left, k.Right, k.NextPane, k.PrevPane}},
 		{Title: "Threads", Keys: []key.Binding{k.Open, k.Expand, k.ToggleRead, k.Star, k.Archive, k.Delete, k.Move, k.Refresh}},
-		{Title: "Compose", Keys: []key.Binding{k.Reply, k.ReplyAll, k.Compose}},
+		{Title: "Compose", Keys: []key.Binding{k.Reply, k.ReplyAll, k.Forward, k.Compose}},
 		{Title: "Accounts & view", Keys: []key.Binding{k.Picker, k.Filter, k.Connect, k.ToggleView}},
 		{Title: "General", Keys: []key.Binding{k.Help, k.Back, k.Quit, k.ForceQuit}},
 	}
@@ -75,7 +75,7 @@ func (k KeyMap) HelpSections() []popup.Section {
 // the end. ? and q are added by the bar itself so they're never cut off.
 func (k KeyMap) hints(focus Pane, reading bool, kind Kind) []key.Binding {
 	if reading {
-		return []key.Binding{k.Up, k.Down, k.Back, k.Expand, k.ToggleRead, k.Star, k.Archive, k.Delete, k.Move, k.Reply, k.Compose}
+		return []key.Binding{k.Up, k.Down, k.Back, k.Expand, k.ToggleRead, k.Star, k.Archive, k.Delete, k.Move, k.Reply, k.Forward, k.Compose}
 	}
 	keys := []key.Binding{k.Up, k.Down, k.Open}
 	if kind == KindList {
@@ -83,7 +83,7 @@ func (k KeyMap) hints(focus Pane, reading bool, kind Kind) []key.Binding {
 	}
 	switch focus {
 	case PaneList:
-		keys = append(keys, k.Expand, k.ToggleRead, k.Star, k.Archive, k.Delete, k.Move, k.Reply, k.Compose)
+		keys = append(keys, k.Expand, k.ToggleRead, k.Star, k.Archive, k.Delete, k.Move, k.Reply, k.Forward, k.Compose)
 	case PaneSidebar:
 		keys = append(keys, key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "filter")))
 	}

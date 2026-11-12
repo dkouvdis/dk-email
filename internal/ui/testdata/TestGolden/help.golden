@@ -11,7 +11,7 @@
 │   Archive                    ││       │   h/←         left pane            ┃ │                                       │
 │                              ││       │   l/→         right pane           ┃ │                                       │
 │                              ││       │   tab         next pane            ┃ │                                       │
-│                              ││       │   shift+tab   previous pane        ┃ │                                       │
+│                              ││       │   shift+tab   previous pane          │                                       │
 │                              ││       │                                      │                                       │
 │                              ││       │ Threads                              │                                       │
 │                              ││       │   enter       open                   │                                       │

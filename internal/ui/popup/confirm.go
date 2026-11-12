@@ -18,6 +18,11 @@ const (
 	confirmPreviewRows = 8
 	minConfirmInner    = 30
 	minConfirmHeight   = 10
+	// maxConfirmAttachments is the most rows the attachment list takes,
+	// "+n more" included.
+	maxConfirmAttachments = 5
+	// minConfirmPreview is the body rows kept when attachments compete for room.
+	minConfirmPreview = 2
 )
 
 // ConfirmResult is what a key press asks of the model.
@@ -34,18 +39,21 @@ const (
 // draft with y send, e edit and d discard. Esc and q do nothing, so a draft
 // is only ever dropped on purpose.
 type Confirm struct {
-	draft      mail.Draft
-	parseErr   error
-	sendErr    error
-	maxW, maxH int
-	st         helpStyles
-	keys       struct{ send, edit, discard key.Binding }
+	draft       mail.Draft
+	attachments []string
+	parseErr    error
+	sendErr     error
+	maxW, maxH  int
+	st          helpStyles
+	keys        struct{ send, edit, discard key.Binding }
 }
 
-// NewConfirm shows d. parseErr is why the edited file couldn't be read, which
-// disables sending; sendErr is why the last attempt to send d failed.
-func NewConfirm(th theme.Theme, d mail.Draft, parseErr, sendErr error) Confirm {
-	c := Confirm{draft: d, parseErr: parseErr, sendErr: sendErr, st: newHelpStyles(th)}
+// NewConfirm shows d. attachments describe the files the message carries,
+// each already formatted, e.g. "report.pdf (1.2 MB)". parseErr is why the
+// edited file couldn't be read, which disables sending; sendErr is why the
+// last attempt to send d failed.
+func NewConfirm(th theme.Theme, d mail.Draft, attachments []string, parseErr, sendErr error) Confirm {
+	c := Confirm{draft: d, attachments: attachments, parseErr: parseErr, sendErr: sendErr, st: newHelpStyles(th)}
 	c.keys.send = key.NewBinding(key.WithKeys("y"))
 	c.keys.edit = key.NewBinding(key.WithKeys("e"))
 	c.keys.discard = key.NewBinding(key.WithKeys("d"))
@@ -109,9 +117,13 @@ func (c Confirm) View() string {
 	}
 	tail = append(tail, "", c.st.dim.Render(fit(footer)))
 
-	// head and tail are fixed; the body preview takes what room is left.
-	room := min(confirmPreviewRows+1, c.maxH-2-len(head)-len(tail)-1)
+	// head and tail are fixed; the attachments and the body preview share
+	// what room is left.
+	free := c.maxH - 2 - len(head) - len(tail) - 1
+	atts := c.attachmentRows(free - minConfirmPreview)
+	room := min(confirmPreviewRows+1, free-len(atts))
 	lines := append([]string{}, head...)
+	lines = append(lines, atts...)
 	lines = append(lines, "")
 	lines = append(lines, c.preview(max(room, 0), innerW)...)
 	lines = append(lines, tail...)
@@ -119,6 +131,34 @@ func (c Confirm) View() string {
 		lines[i] = ansi.Truncate(l, innerW, "")
 	}
 	return c.st.box.Width(innerW + helpChromeCols).Render(strings.Join(lines, "\n"))
+}
+
+// attachmentRows lists the attachments in at most room rows (and at most
+// maxConfirmAttachments): a label row, then one row each, the last being
+// "+n more" when they don't all fit. With no room for the list it is just the
+// label and a count.
+func (c Confirm) attachmentRows(room int) []string {
+	n := len(c.attachments)
+	if n == 0 || room < 1 {
+		return nil
+	}
+	label := c.st.dim.Render("Attachments")
+	limit := min(maxConfirmAttachments, room-1)
+	if limit < 1 {
+		return []string{label + c.st.dim.Render(fmt.Sprintf(" (%d)", n))}
+	}
+	shown := c.attachments
+	if n > limit {
+		shown = shown[:limit-1]
+	}
+	rows := []string{label}
+	for _, a := range shown {
+		rows = append(rows, "  "+strings.NewReplacer("\r", " ", "\n", " ").Replace(a))
+	}
+	if more := n - len(shown); more > 0 {
+		rows = append(rows, c.st.dim.Render(fmt.Sprintf("  +%d more", more)))
+	}
+	return rows
 }
 
 // preview is the body cut to n rows; when it's longer, the last row is ….

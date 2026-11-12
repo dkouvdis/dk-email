@@ -2,6 +2,7 @@ package popup
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -23,7 +24,7 @@ func testDraft() mail.Draft {
 }
 
 func newTestConfirm(parseErr, sendErr error) Confirm {
-	c := NewConfirm(theme.Default(), testDraft(), parseErr, sendErr)
+	c := NewConfirm(theme.Default(), testDraft(), nil, parseErr, sendErr)
 	c.SetSize(100, 30)
 	return c
 }
@@ -44,7 +45,7 @@ func TestConfirm_ShowsDraftAndFooter(t *testing.T) {
 func TestConfirm_ShowsBccWhenPresent(t *testing.T) {
 	d := testDraft()
 	d.Bcc = []mail.Address{{Email: "hidden@example.com"}}
-	c := NewConfirm(theme.Default(), d, nil, nil)
+	c := NewConfirm(theme.Default(), d, nil, nil, nil)
 	c.SetSize(100, 30)
 
 	if view := ansi.Strip(c.View()); !strings.Contains(view, "Bcc") || !strings.Contains(view, "hidden@example.com") {
@@ -109,7 +110,7 @@ func TestConfirm_BodyPreviewIsCutAndTruncated(t *testing.T) {
 	}
 	lines[0] = strings.Repeat("w", 200)
 	d.Body = strings.Join(lines, "\n")
-	c := NewConfirm(theme.Default(), d, nil, nil)
+	c := NewConfirm(theme.Default(), d, nil, nil, nil)
 	c.SetSize(100, 40)
 
 	view := c.View()
@@ -126,7 +127,7 @@ func TestConfirm_BodyPreviewIsCutAndTruncated(t *testing.T) {
 func TestConfirm_EmptyBodyAndSmallSize(t *testing.T) {
 	d := testDraft()
 	d.Body = ""
-	c := NewConfirm(theme.Default(), d, nil, nil)
+	c := NewConfirm(theme.Default(), d, nil, nil, nil)
 	c.SetSize(100, 30)
 	if view := ansi.Strip(c.View()); !strings.Contains(view, "(empty message)") {
 		t.Errorf("view missing the empty-body note:\n%s", view)
@@ -139,5 +140,57 @@ func TestConfirm_EmptyBodyAndSmallSize(t *testing.T) {
 	c.SetSize(20, 5)
 	if c.View() != "" {
 		t.Error("a popup with no room should render nothing")
+	}
+}
+
+func TestConfirm_ListsAttachments(t *testing.T) {
+	c := NewConfirm(theme.Default(), testDraft(), []string{"report.pdf (1.2 MB)", "notes.txt (512 B)"}, nil, nil)
+	c.SetSize(100, 30)
+
+	view := ansi.Strip(c.View())
+
+	for _, want := range []string{"Attachments", "  report.pdf (1.2 MB)", "  notes.txt (512 B)", "Shall we?"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("view missing %q:\n%s", want, view)
+		}
+	}
+	if strings.Index(view, "Subject") > strings.Index(view, "Attachments") || strings.Index(view, "Attachments") > strings.Index(view, "Shall we?") {
+		t.Errorf("attachments should sit between the headers and the body:\n%s", view)
+	}
+	if strings.Contains(ansi.Strip(newTestConfirm(nil, nil).View()), "Attachments") {
+		t.Error("a message without attachments shows the section")
+	}
+}
+
+func TestConfirm_LongAttachmentListIsCut(t *testing.T) {
+	var atts []string
+	for i := range 9 {
+		atts = append(atts, fmt.Sprintf("file%d.bin (1 B)", i))
+	}
+	c := NewConfirm(theme.Default(), testDraft(), atts, nil, nil)
+	c.SetSize(100, 40)
+
+	view := ansi.Strip(c.View())
+
+	if !strings.Contains(view, "file3.bin") || strings.Contains(view, "file4.bin") || !strings.Contains(view, "+5 more") {
+		t.Errorf("want 4 files then +5 more:\n%s", view)
+	}
+	if !strings.Contains(view, "Shall we?") {
+		t.Errorf("the body preview was crowded out:\n%s", view)
+	}
+}
+
+func TestConfirm_AttachmentListShrinksToFitSmallPopups(t *testing.T) {
+	atts := []string{"a.bin (1 B)", "b.bin (1 B)", "c.bin (1 B)", "d.bin (1 B)"}
+	for h := 16; h <= 20; h++ {
+		c := NewConfirm(theme.Default(), testDraft(), atts, nil, nil)
+		c.SetSize(100, h)
+		view := c.View()
+		if got := lipgloss.Height(view); got > h {
+			t.Errorf("height %d: popup is %d rows tall\n%s", h, got, ansi.Strip(view))
+		}
+		if !strings.Contains(ansi.Strip(view), "Attachments") {
+			t.Errorf("height %d: attachments not mentioned\n%s", h, ansi.Strip(view))
+		}
 	}
 }

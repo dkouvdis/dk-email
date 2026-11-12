@@ -14,6 +14,7 @@ import (
 	"github.com/dkouvdis/dk-email/internal/compose"
 	"github.com/dkouvdis/dk-email/internal/mail"
 	"github.com/dkouvdis/dk-email/internal/ui/popup"
+	"github.com/dkouvdis/dk-email/internal/ui/reader"
 )
 
 const (
@@ -42,6 +43,9 @@ type draftState struct {
 	// loading is set while the message being replied to is fetched, before
 	// any editor has opened. It holds the slot so no other draft starts.
 	loading bool
+	// attachments are the original's attachments of a forward, as listed in
+	// the confirm popup. The sender copies them from the original message.
+	attachments []mail.Attachment
 }
 
 func (d *draftState) reedit() bool { return d.text != "" }
@@ -88,13 +92,14 @@ func (m Model) startCompose() (Model, tea.Cmd) {
 	if !ok {
 		return m, nil
 	}
-	return m.startDraft(account, compose.New(m.identity(account)))
+	return m.startDraft(account, compose.New(m.identity(account)), nil)
 }
 
-// startDraft opens base in the editor as the draft being composed.
-func (m Model) startDraft(account int, base mail.Draft) (Model, tea.Cmd) {
+// startDraft opens base in the editor as the draft being composed. atts are
+// the attachments the draft will carry, for display.
+func (m Model) startDraft(account int, base mail.Draft, atts []mail.Attachment) (Model, tea.Cmd) {
 	text := compose.Format(base)
-	m.draft = &draftState{account: account, base: base, orig: text}
+	m.draft = &draftState{account: account, base: base, orig: text, attachments: atts}
 	m, cmd := m.startEditor(text)
 	if cmd == nil {
 		m.draft = nil // the editor never started; the error is in the status
@@ -112,7 +117,11 @@ func (m *Model) discardDraft() {
 // openConfirm shows the confirm popup for the current draft.
 func (m *Model) openConfirm() {
 	d := m.draft
-	m.confirmPop = popup.NewConfirm(m.theme, d.parsed, d.parseErr, d.sendErr)
+	atts := make([]string, len(d.attachments))
+	for i, a := range d.attachments {
+		atts[i] = fmt.Sprintf("%s (%s)", a.Name, reader.FormatSize(a.Size))
+	}
+	m.confirmPop = popup.NewConfirm(m.theme, d.parsed, atts, d.parseErr, d.sendErr)
 	m.confirmPop.SetSize(m.panes.Popup.W, m.panes.Popup.H)
 	m.showConfirm = true
 	m.log.Debug("popup opened", "popup", "confirm", "parse error", d.parseErr != nil, "send error", d.sendErr != nil)

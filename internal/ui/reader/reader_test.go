@@ -268,8 +268,8 @@ func TestEmptyAndClose(t *testing.T) {
 
 func TestFormatSize(t *testing.T) {
 	for in, want := range map[int64]string{0: "0 B", 999: "999 B", 2048: "2.0 KB", 5 << 20: "5.0 MB"} {
-		if got := formatSize(in); got != want {
-			t.Errorf("formatSize(%d) = %q, want %q", in, got, want)
+		if got := FormatSize(in); got != want {
+			t.Errorf("FormatSize(%d) = %q, want %q", in, got, want)
 		}
 	}
 }

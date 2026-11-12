@@ -148,12 +148,11 @@ func TestKeys_HelpHasComposeSection(t *testing.T) {
 		if s.Title != "Compose" {
 			continue
 		}
-		// f is bound but not wired yet, so it isn't advertised.
 		var got []string
 		for _, k := range s.Keys {
 			got = append(got, k.Help().Key)
 		}
-		if want := []string{"r", "R", "c"}; !slices.Equal(got, want) {
+		if want := []string{"r", "R", "f", "c"}; !slices.Equal(got, want) {
 			t.Errorf("Compose section keys = %v, want %v", got, want)
 		}
 		return

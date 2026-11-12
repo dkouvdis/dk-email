@@ -28,6 +28,12 @@ type replyUIDs struct{ first, second, latest mail.UID }
 // newest thread in the inbox, whose first message is the only unread one.
 func replyFixture(t *testing.T) (Model, *mailtest.Sender, *mailtest.Fake, replyUIDs) {
 	t.Helper()
+	return replyFixtureWith(t, nil)
+}
+
+// replyFixtureWith is replyFixture where the latest message has atts.
+func replyFixtureWith(t *testing.T, atts []mail.Attachment) (Model, *mailtest.Sender, *mailtest.Fake, replyUIDs) {
+	t.Helper()
 	t.Setenv("TMPDIR", t.TempDir())
 	s := &mailtest.Sender{}
 	f := newFixture()
@@ -36,6 +42,9 @@ func replyFixture(t *testing.T) (Model, *mailtest.Sender, *mailtest.Fake, replyU
 		m := msg("", subject, fixedNow.Add(-ago), seen, id, refs...)
 		m.From, m.To, m.Cc = from, to, cc
 		m.Body = "Body of " + id + ".\n\nSecond paragraph."
+		if id == "o3" {
+			m.Attachments = atts
+		}
 		return f.personal.AddMessage("INBOX", m)
 	}
 	var u replyUIDs
@@ -375,11 +384,11 @@ func TestReply_HintsAdvertiseReply(t *testing.T) {
 	m, _, _, _ := replyFixture(t)
 	m = send(t, m, size(240, 30))
 	hints := func() string { return ansi.Strip(m.renderHints()) }
-	if h := hints(); !strings.Contains(h, "Reply: r | New message: c") {
+	if h := hints(); !strings.Contains(h, "Reply: r | Forward: f | New message: c") {
 		t.Errorf("list hints = %q", h)
 	}
 	m = pressSettled(t, m, "enter")
-	if h := hints(); !strings.Contains(h, "Reply: r | New message: c") {
+	if h := hints(); !strings.Contains(h, "Reply: r | Forward: f | New message: c") {
 		t.Errorf("reader hints = %q", h)
 	}
 }

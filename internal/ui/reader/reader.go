@@ -397,7 +397,7 @@ func (m Model) expandedLines(s mail.Summary, width int) []string {
 	if len(b.msg.Attachments) > 0 {
 		out = append(out, "", m.st.label.Render("Attachments:"))
 		for _, a := range b.msg.Attachments {
-			out = append(out, "  "+a.Name+m.st.dim.Render(fmt.Sprintf("  %s, %s", a.ContentType, formatSize(a.Size))))
+			out = append(out, "  "+a.Name+m.st.dim.Render(fmt.Sprintf("  %s, %s", a.ContentType, FormatSize(a.Size))))
 		}
 	}
 	return out
@@ -467,7 +467,8 @@ func wrapStyled(st lipgloss.Style, text string, width int) []string {
 	return lines
 }
 
-func formatSize(n int64) string {
+// FormatSize is n bytes in B, KB or MB, e.g. "1.2 MB".
+func FormatSize(n int64) string {
 	switch {
 	case n >= 1<<20:
 		return fmt.Sprintf("%.1f MB", float64(n)/(1<<20))

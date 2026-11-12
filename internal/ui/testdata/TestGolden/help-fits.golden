@@ -1,14 +1,16 @@
 ╭──────────────────────────────╮╭──────────────────────────────────────────────────────────────────────────────────────╮
 │ Personal                     ││ Inbox · 2 unread                                                                     │
-│ ▶ Inbox                    2 ││  ●    ╭──────────────────────────────────────╮                                 13:30 │
-│   Sent Mail                  ││  ●    │ Keys                      esc close  │                                 Nov 8 │
-│   All Mail                   ││       │ / press / to filter by key or descr… │                                       │
-│   Trash                      ││       │                                      │                                       │
-│   Receipts                 1 ││       │ Navigation                           │                                       │
-│                              ││       │   k/↑         up                     │                                       │
-│ Work                         ││       │   j/↓         down                   │                                       │
-│   Inbox                    1 ││       │   g           top                    │                                       │
-│   Archive                    ││       │   G           bottom                 │                                       │
+│ ▶ Inbox                    2 ││  ●    Bob                     Re: Plan (2)                                     13:30 │
+│   Sent Mail                  ││  ●    Carol                   Lunch?                                           Nov 8 │
+│   All Mail                   ││       ╭──────────────────────────────────────╮                                       │
+│   Trash                      ││       │ Keys                      esc close  │                                       │
+│   Receipts                 1 ││       │ / press / to filter by key or descr… │                                       │
+│                              ││       │                                      │                                       │
+│ Work                         ││       │ Navigation                           │                                       │
+│   Inbox                    1 ││       │   k/↑         up                     │                                       │
+│   Archive                    ││       │   j/↓         down                   │                                       │
+│                              ││       │   g           top                    │                                       │
+│                              ││       │   G           bottom                 │                                       │
 │                              ││       │   h/←         left pane              │                                       │
 │                              ││       │   l/→         right pane             │                                       │
 │                              ││       │   tab         next pane              │                                       │
@@ -27,6 +29,7 @@
 │                              ││       │ Compose                              │                                       │
 │                              ││       │   r           reply                  │                                       │
 │                              ││       │   R           reply all              │                                       │
+│                              ││       │   f           forward                │                                       │
 │                              ││       │   c           new message            │                                       │
 │                              ││       │                                      │                                       │
 │                              ││       │ Accounts & view                      │                                       │
@@ -43,6 +46,7 @@
 │                              ││       │                                      │                                       │
 │                              ││       │ / filter · esc/q close               │                                       │
 │                              ││       ╰──────────────────────────────────────╯                                       │
+│                              ││                                                                                      │
 │                              ││                                                                                      │
 │                              ││                                                                                      │
 ╰──────────────────────────────╯╰──────────────────────────────────────────────────────────────────────────────────────╯

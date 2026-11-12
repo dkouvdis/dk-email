@@ -179,7 +179,7 @@ func TestModel_HintsFollowFocus(t *testing.T) {
 	if !strings.Contains(hints(), "Archive: e") || strings.Contains(hints(), "Accounts") {
 		t.Errorf("narrow list hints = %q, want triage keys and no account picker", hints())
 	}
-	if !strings.Contains(hints(), "Reply: r | New message: c") {
+	if !strings.Contains(hints(), "Reply: r | Forward: f | New message: c") {
 		t.Errorf("narrow list hints = %q, want Reply before New message", hints())
 	}
 	m = send(t, m, press("h"))
@@ -352,7 +352,7 @@ func TestGolden(t *testing.T) {
 		{"list-reader-popup", 70, 24, false, []string{"enter"}},
 		{"help", 120, 30, false, []string{"?"}},
 		{"help-scrolled", 120, 30, false, []string{"?", "G"}},
-		{"help-fits", 120, 50, false, []string{"?"}},
+		{"help-fits", 120, 54, false, []string{"?"}},
 		{"help-filtered", 120, 30, false, []string{"?", "/", "a", "r", "c", "h"}},
 	}
 	for _, tt := range tests {

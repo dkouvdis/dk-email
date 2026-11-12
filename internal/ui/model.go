@@ -325,6 +325,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m.startReply(false)
 		case key.Matches(msg, m.keys.ReplyAll):
 			return m.startReply(true)
+		case key.Matches(msg, m.keys.Forward):
+			return m.startForward()
 		case m.isTriageKey(msg):
 			return m.triage(msg)
 		}
@@ -359,6 +361,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.startReply(false)
 	case m.focus == PaneList && key.Matches(msg, m.keys.ReplyAll):
 		return m.startReply(true)
+	case m.focus == PaneList && key.Matches(msg, m.keys.Forward):
+		return m.startForward()
 	case m.focus == PaneSidebar:
 		var cmd tea.Cmd
 		m.side, cmd = m.side.Update(msg)
