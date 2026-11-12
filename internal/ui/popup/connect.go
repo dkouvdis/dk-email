@@ -26,6 +26,9 @@ const (
 	fTLS
 	fSource
 	fSecret // the 1Password reference or the keychain password
+	fSMTPHost
+	fSMTPPort
+	fSMTPTLS
 	fSubmit
 	fieldCount
 )
@@ -65,6 +68,10 @@ type Connect struct {
 	source   int
 	autoHost bool // the host and port came from the Gmail pre-fill
 
+	smtpTLS     string
+	autoSMTP    bool // the SMTP fields came from the Gmail pre-fill
+	smtpTouched bool // the user edited an SMTP field, so Gmail never fills it
+
 	passwordOnly bool
 	account      config.Account // the saved account in password-only mode
 	existing     []string       // lowercased names already in use
@@ -100,13 +107,16 @@ func NewPasswordPrompt(th theme.Theme, acct config.Account) Connect {
 }
 
 func newForm(th theme.Theme) Connect {
-	c := Connect{tls: config.TLSImplicit, st: newHelpStyles(th)}
+	c := Connect{tls: config.TLSImplicit, smtpTLS: config.TLSImplicit, st: newHelpStyles(th)}
 	placeholders := map[int]string{
 		fName:  "Personal",
 		fEmail: "me@example.com",
 		fUser:  "same as email",
 		fHost:  "imap.example.com",
 		fPort:  "993",
+
+		fSMTPHost: "optional, enables sending",
+		fSMTPPort: "465",
 	}
 	for i := range fieldCount {
 		if !isInput(i) {
@@ -126,7 +136,7 @@ func newForm(th theme.Theme) Connect {
 	return c
 }
 
-func isInput(f int) bool { return f != fTLS && f != fSource && f != fSubmit }
+func isInput(f int) bool { return f != fTLS && f != fSource && f != fSMTPTLS && f != fSubmit }
 
 // PasswordOnly reports whether this is a password prompt for a saved account.
 func (c Connect) PasswordOnly() bool { return c.passwordOnly }
@@ -202,7 +212,7 @@ func (c Connect) Update(msg tea.KeyPressMsg) (Connect, ConnectResult) {
 		return c, ConnectSubmitted
 	case key.Matches(msg, c.keys.submit):
 		c.move(1)
-	case (c.focus == fTLS || c.focus == fSource) && key.Matches(msg, c.keys.toggle):
+	case (c.focus == fTLS || c.focus == fSource || c.focus == fSMTPTLS) && key.Matches(msg, c.keys.toggle):
 		c.toggle()
 	case isInput(c.focus):
 		before := c.inputs[c.focus].Value()
@@ -243,6 +253,15 @@ func (c *Connect) toggle() {
 			c.tls = config.TLSImplicit
 			c.inputs[fPort].Placeholder = "993"
 		}
+	case fSMTPTLS:
+		if c.smtpTLS == config.TLSImplicit {
+			c.smtpTLS = config.TLSStartTLS
+			c.inputs[fSMTPPort].Placeholder = "587"
+		} else {
+			c.smtpTLS = config.TLSImplicit
+			c.inputs[fSMTPPort].Placeholder = "465"
+		}
+		c.edited(fSMTPTLS)
 	case fSource:
 		c.source = 1 - c.source
 		c.inputs[fSecret].SetValue("")
@@ -261,12 +280,16 @@ func (c *Connect) updateSecretInput() {
 	}
 }
 
-// edited reacts to typing: a Gmail address fills in Gmail's server unless
-// a host was typed by hand, and leaving Gmail clears what it filled in.
+// edited reacts to typing: a Gmail address fills in Gmail's servers unless
+// they were typed by hand, and leaving Gmail clears what it filled in. The
+// SMTP fields are pre-filled only until the user has touched one of them, so
+// clearing the filled-in host to opt out of sending sticks.
 func (c *Connect) edited(f int) {
 	switch f {
 	case fHost, fPort:
 		c.autoHost = false
+	case fSMTPHost, fSMTPPort, fSMTPTLS:
+		c.autoSMTP, c.smtpTouched = false, true
 	case fEmail:
 		email := strings.ToLower(strings.TrimSpace(c.inputs[fEmail].Value()))
 		_, domain, _ := strings.Cut(email, "@")
@@ -282,6 +305,18 @@ func (c *Connect) edited(f int) {
 			c.inputs[fHost].SetValue("")
 			c.inputs[fPort].SetValue("")
 			c.autoHost = false
+		}
+		switch {
+		case gmail && (c.autoSMTP || !c.smtpTouched):
+			c.inputs[fSMTPHost].SetValue("smtp.gmail.com")
+			c.inputs[fSMTPPort].SetValue("465")
+			c.smtpTLS = config.TLSImplicit
+			c.inputs[fSMTPPort].Placeholder = "465"
+			c.autoSMTP = true
+		case !gmail && c.autoSMTP:
+			c.inputs[fSMTPHost].SetValue("")
+			c.inputs[fSMTPPort].SetValue("")
+			c.autoSMTP = false
 		}
 	}
 }
@@ -306,10 +341,14 @@ func (c Connect) validate() string {
 	case c.value(fHost) == "":
 		return "IMAP host is required"
 	}
-	if p := c.value(fPort); p != "" {
-		if n, err := strconv.Atoi(p); err != nil || n < 1 || n > 65535 {
-			return "Port must be a number from 1 to 65535"
-		}
+	if !validPort(c.value(fPort)) {
+		return "Port must be a number from 1 to 65535"
+	}
+	switch {
+	case !validPort(c.value(fSMTPPort)):
+		return "SMTP port must be a number from 1 to 65535"
+	case c.value(fSMTPHost) == "" && c.value(fSMTPPort) != "":
+		return "SMTP port is set but SMTP host is empty"
 	}
 	switch {
 	case c.source == sourceOnePassword && c.value(fSecret) == "":
@@ -318,6 +357,15 @@ func (c Connect) validate() string {
 		return "Password is required"
 	}
 	return ""
+}
+
+// validPort accepts an empty port, which means the default.
+func validPort(p string) bool {
+	if p == "" {
+		return true
+	}
+	n, err := strconv.Atoi(p)
+	return err == nil && n >= 1 && n <= 65535
 }
 
 func containsFold(names []string, name string) bool {
@@ -331,7 +379,8 @@ func containsFold(names []string, name string) bool {
 }
 
 // Request is the submitted account. Optional fields left empty stay empty,
-// so config defaults apply when it's saved.
+// so config defaults apply when it's saved. The SMTP port and TLS are
+// included only with an SMTP host; without one the account can't send.
 func (c Connect) Request() ConnectRequest {
 	if c.passwordOnly {
 		return ConnectRequest{Account: c.account, Password: c.inputs[fSecret].Value()}
@@ -346,6 +395,10 @@ func (c Connect) Request() ConnectRequest {
 		a.Username = u
 	}
 	a.IMAPPort, _ = strconv.Atoi(c.value(fPort))
+	if a.SMTPHost = c.value(fSMTPHost); a.SMTPHost != "" {
+		a.SMTPPort, _ = strconv.Atoi(c.value(fSMTPPort))
+		a.SMTPTLS = c.smtpTLS
+	}
 	if c.source == sourceOnePassword {
 		a.PasswordCmd = "op read " + shellQuote(c.value(fSecret))
 		return ConnectRequest{Account: a}
@@ -395,7 +448,15 @@ func (c Connect) View() string {
 	if c.source == sourceKeychain {
 		note = "Saved in the OS keychain, never in config.toml"
 	}
-	lines = append(lines, strings.Repeat(" ", labelW+1)+c.st.dim.Render(ansi.Truncate(note, innerW-labelW-1, "…")), "")
+	lines = append(lines, strings.Repeat(" ", labelW+1)+c.st.dim.Render(ansi.Truncate(note, innerW-labelW-1, "…")))
+	if !c.passwordOnly {
+		lines = append(lines,
+			c.inputRow(fSMTPHost, innerW),
+			c.inputRow(fSMTPPort, innerW),
+			c.choiceRow(fSMTPTLS, "SMTP TLS", []string{"implicit", "starttls"}, map[bool]int{true: 0, false: 1}[c.smtpTLS == config.TLSImplicit]),
+		)
+	}
+	lines = append(lines, "")
 
 	button := "[ Test & save ]"
 	switch {
@@ -435,7 +496,7 @@ func (c Connect) label(f int, text string) string {
 }
 
 func (c Connect) inputRow(f, innerW int) string {
-	names := map[int]string{fName: "Name", fEmail: "Email", fUser: "Username", fHost: "IMAP host", fPort: "Port", fSecret: "Reference"}
+	names := map[int]string{fName: "Name", fEmail: "Email", fUser: "Username", fHost: "IMAP host", fPort: "Port", fSecret: "Reference", fSMTPHost: "SMTP host", fSMTPPort: "SMTP port"}
 	if f == fSecret && c.source == sourceKeychain {
 		names[fSecret] = "Password"
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -23,6 +24,10 @@ type Onboarding struct {
 	// Dial logs in. A non-empty password is used as is; otherwise the
 	// account's password_cmd (or keychain entry) supplies it.
 	Dial func(ctx context.Context, acct config.Account, password string) (Conn, error)
+	// VerifySMTP tests a new account's SMTP login before it's saved. It is
+	// given the typed password, or "" when password_cmd supplies it. Nil
+	// skips the test.
+	VerifySMTP func(ctx context.Context, acct config.Account, password string) error
 	// AddAccount saves a new account: password, if any, to the keychain,
 	// then the account to config.toml.
 	AddAccount func(acct config.Account, password string) error
@@ -105,7 +110,8 @@ func (m Model) handleConnectKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 }
 
 // testAndSave logs in and lists folders, and only if both work saves the
-// account (or its password). On any failure nothing is saved.
+// account (or its password). A new account with an SMTP host must also pass
+// VerifySMTP. On any failure nothing is saved.
 func testAndSave(o Onboarding, gen, index int, req popup.ConnectRequest) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), connectTimeout)
@@ -129,6 +135,11 @@ func testAndSave(o Onboarding, gen, index int, req popup.ConnectRequest) tea.Cmd
 			return fail(err)
 		}
 		res.conn = conn
+		if index < 0 && o.VerifySMTP != nil && strings.TrimSpace(req.Account.SMTPHost) != "" {
+			if err := o.VerifySMTP(ctx, req.Account, req.Password); err != nil {
+				return fail(fmt.Errorf("IMAP login worked, but SMTP failed: %w", err))
+			}
+		}
 		if res.folders, err = conn.Mailbox.Folders(ctx); err != nil {
 			return fail(fmt.Errorf("list folders: %w", err))
 		}
