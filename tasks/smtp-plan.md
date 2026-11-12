@@ -53,10 +53,10 @@ The full details are in [smtp-todo.md](smtp-todo.md).
 - [x] S5: Compose: new-message template, editor-file parse, plain-text MIME build
 - [x] S6: IMAP `Append`, `\Answered` and `Raw`
 - [x] S7: Send orchestration (`internal/send`)
-- [ ] S8: `c` end-to-end: wiring, confirm popup, send state, retry
+- [x] S8: `c` end-to-end: wiring, confirm popup, send state, retry
 
 ### Checkpoint 2: New message
-- [ ] `c` sends to yourself on Gmail (one copy in Sent) and on a non-Gmail account (APPENDed copy in Sent). A network-off failure retries cleanly.
+- [x] `c` sends to yourself on Gmail (one copy in Sent) and on a non-Gmail account (APPENDed copy in Sent). A network-off failure retries cleanly.
 
 ### Phase 3: Reply and forward
 - [ ] S9: Reply and reply-all (`r`, `R`) with threading and `\Answered`
