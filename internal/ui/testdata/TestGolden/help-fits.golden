@@ -1,52 +1,52 @@
 ╭──────────────────────────────╮╭──────────────────────────────────────────────────────────────────────────────────────╮
 │ Personal                     ││ Inbox · 2 unread                                                                     │
 │ ▶ Inbox                    2 ││  ●    Bob                     Re: Plan (2)                                     13:30 │
-│   Sent Mail                  ││  ●    Carol                   Lunch?                                           Nov 8 │
-│   All Mail                   ││       ╭──────────────────────────────────────╮                                       │
-│   Trash                      ││       │ Keys                      esc close  │                                       │
-│   Receipts                 1 ││       │ / press / to filter by key or descr… │                                       │
-│                              ││       │                                      │                                       │
-│ Work                         ││       │ Navigation                           │                                       │
-│   Inbox                    1 ││       │   k/↑         up                     │                                       │
-│   Archive                    ││       │   j/↓         down                   │                                       │
-│                              ││       │   g           top                    │                                       │
-│                              ││       │   G           bottom                 │                                       │
-│                              ││       │   h/←         left pane              │                                       │
-│                              ││       │   l/→         right pane             │                                       │
-│                              ││       │   tab         next pane              │                                       │
-│                              ││       │   shift+tab   previous pane          │                                       │
-│                              ││       │                                      │                                       │
-│                              ││       │ Threads                              │                                       │
-│                              ││       │   enter       open                   │                                       │
-│                              ││       │   space       expand                 │                                       │
-│                              ││       │   u           read/unread            │                                       │
-│                              ││       │   s           star                   │                                       │
-│                              ││       │   e           archive                │                                       │
-│                              ││       │   d           delete                 │                                       │
-│                              ││       │   m           move                   │                                       │
-│                              ││       │   ctrl+r      refresh                │                                       │
-│                              ││       │                                      │                                       │
-│                              ││       │ Compose                              │                                       │
-│                              ││       │   r           reply                  │                                       │
-│                              ││       │   R           reply all              │                                       │
-│                              ││       │   f           forward                │                                       │
-│                              ││       │   c           new message            │                                       │
-│                              ││       │                                      │                                       │
-│                              ││       │ Accounts & view                      │                                       │
-│                              ││       │   a           accounts               │                                       │
-│                              ││       │   /           filter folders         │                                       │
-│                              ││       │   A           connect account        │                                       │
-│                              ││       │   v           split/list             │                                       │
-│                              ││       │                                      │                                       │
-│                              ││       │ General                              │                                       │
-│                              ││       │   ?           help                   │                                       │
-│                              ││       │   esc         back                   │                                       │
-│                              ││       │   q           quit                   │                                       │
-│                              ││       │   ctrl+c      quit now               │                                       │
-│                              ││       │                                      │                                       │
-│                              ││       │ / filter · esc/q close               │                                       │
-│                              ││       ╰──────────────────────────────────────╯                                       │
-│                              ││                                                                                      │
+│   Sent Mail                  ││  ●  ╭──────────────────────────────────────────╮                               Nov 8 │
+│   All Mail                   ││     │ Keys                          esc close  │                                     │
+│   Trash                      ││     │ / press / to filter by key or descripti… │                                     │
+│   Receipts                 1 ││     │                                          │                                     │
+│                              ││     │ Navigation                             ┃ │                                     │
+│ Work                         ││     │   k/↑         up                       ┃ │                                     │
+│   Inbox                    1 ││     │   j/↓         down                     ┃ │                                     │
+│   Archive                    ││     │   g           top                      ┃ │                                     │
+│                              ││     │   G           bottom                   ┃ │                                     │
+│                              ││     │   h/←         left pane                ┃ │                                     │
+│                              ││     │   l/→         right pane               ┃ │                                     │
+│                              ││     │   tab         next pane                ┃ │                                     │
+│                              ││     │   shift+tab   previous pane            ┃ │                                     │
+│                              ││     │                                        ┃ │                                     │
+│                              ││     │ Threads                                ┃ │                                     │
+│                              ││     │   enter       open                     ┃ │                                     │
+│                              ││     │   space       expand                   ┃ │                                     │
+│                              ││     │   u           read/unread              ┃ │                                     │
+│                              ││     │   s           star                     ┃ │                                     │
+│                              ││     │   e           archive                  ┃ │                                     │
+│                              ││     │   d           delete                   ┃ │                                     │
+│                              ││     │   m           move                     ┃ │                                     │
+│                              ││     │   ctrl+r      refresh                  ┃ │                                     │
+│                              ││     │                                        ┃ │                                     │
+│                              ││     │ Compose                                ┃ │                                     │
+│                              ││     │   r           reply                    ┃ │                                     │
+│                              ││     │   R           reply all                ┃ │                                     │
+│                              ││     │   f           forward                  ┃ │                                     │
+│                              ││     │   c           new message              ┃ │                                     │
+│                              ││     │   enter       edit draft (in Drafts)   ┃ │                                     │
+│                              ││     │                                        ┃ │                                     │
+│                              ││     │ Composer                               ┃ │                                     │
+│                              ││     │   ctrl+s      send                     ┃ │                                     │
+│                              ││     │   tab         next field               ┃ │                                     │
+│                              ││     │   shift+tab   previous field           ┃ │                                     │
+│                              ││     │   enter       next field (in a header) ┃ │                                     │
+│                              ││     │   esc         close, or save / discard ┃ │                                     │
+│                              ││     │   ctrl+c      quit now                   │                                     │
+│                              ││     │                                          │                                     │
+│                              ││     │ Accounts & view                          │                                     │
+│                              ││     │   a           accounts                   │                                     │
+│                              ││     │   /           filter folders             │                                     │
+│                              ││     │   A           connect account            │                                     │
+│                              ││     │                                          │                                     │
+│                              ││     │ / filter · j/k/pgup/pgdn scroll · esc/q… │                                     │
+│                              ││     ╰──────────────────────────────────────────╯                                     │
 │                              ││                                                                                      │
 │                              ││                                                                                      │
 ╰──────────────────────────────╯╰──────────────────────────────────────────────────────────────────────────────────────╯

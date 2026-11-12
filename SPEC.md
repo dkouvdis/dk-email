@@ -122,15 +122,15 @@ internal/secret/       → password resolution: password_cmd runner, keychain ge
 internal/mail/         → provider-agnostic domain types + Mailbox interface (no IMAP imports)
 internal/mail/imap/    → go-imap v2 implementation of mail.Mailbox
 internal/mail/smtp/    → go-smtp transport (implicit TLS / STARTTLS, AUTH PLAIN)
-internal/compose/      → pure: reply / reply-all / forward / new drafts, editor-file format and parse, MIME build
-internal/send/         → implements mail.Sender: forward attachments, SMTP, Sent copy, \Answered
+internal/compose/      → pure: reply / reply-all / forward / new drafts, composer fields, MIME build (send and draft mode), FromRaw to reopen a draft
+internal/send/         → implements mail.Sender and mail.Drafter: forward attachments, SMTP, Sent copy, \Answered, save / reopen / remove drafts
 internal/thread/       → builds threads from message summaries (pure, no I/O)
 internal/render/       → MIME → displayable text (plain preferred, HTML→text, attachment list)
 internal/ui/           → root Bubble Tea model, layout calculation, keymap, styles
 internal/ui/sidebar/   → folders pane
 internal/ui/threadlist/→ thread list pane
 internal/ui/reader/    → conversation view (pane + popup reuse the same model)
-internal/ui/popup/     → picker, connect-account form, help, confirm
+internal/ui/popup/     → picker, connect-account form, help, compose (the built-in message composer)
 docs/intent/           → confirmed intent docs
 .goreleaser.yaml       → build, archive, changelog, Homebrew cask config
 .github/workflows/     → ci.yml (test/vet/gofmt on push & PR), release.yml (GoReleaser on v* tags)
@@ -152,7 +152,7 @@ type Mailbox interface {
 }
 ```
 
-`Summary` carries UID, From, To, Subject, Date, Flags, Message-ID, In-Reply-To and References, which is all that threading needs. **Sending is implemented behind a separate `mail.Sender` interface** (SMTP), so `Mailbox` never had to change to add reply/compose. See [tasks/smtp-spec.md](tasks/smtp-spec.md) for the sending design.
+`Summary` carries UID, From, To, Subject, Date, Flags, Message-ID, In-Reply-To and References, which is all that threading needs. **Sending is implemented behind a separate `mail.Sender` interface** (SMTP), so `Mailbox` never had to change to add reply/compose. Drafts sit behind a second small interface, `mail.Drafter` (`SaveDraft`, `OpenDraft`), which `send.Sender` also implements; the UI uses it only for accounts that can send. Saving and removing drafts happen on the IMAP side through `DraftsFolder` and `Delete`, and `Delete` needs UIDPLUS so it never issues a plain `EXPUNGE`. See [tasks/smtp-spec.md](tasks/smtp-spec.md) for the sending design and [tasks/compose-plan.md](tasks/compose-plan.md) for the composer.
 
 There's **one IMAP connection per account**, opened lazily and serialized behind a mutex. All network calls run inside `tea.Cmd`s with a context timeout, so the UI never blocks.
 
@@ -221,7 +221,21 @@ password_cmd = "op read op://Personal/Gmail/app-password"   # omit to use the ke
 
 Actions on a **collapsed thread** apply to every message in it. On an expanded row, or in the reader, they apply to the selected message. Opening a message marks it read.
 
-The **`?` help popup** is sized to its content, groups keys into sections, and scrolls with `j`/`k`, `↑`/`↓`, `pgup`/`pgdn` and `g`/`G`. Inside it, `/` filters the keys by key or description.
+**Composer:** `c`, `r`, `R` and `f` open a built-in plain-text composer in the ~90% popup, titled with the action, the subject and the account's address. The terminal is never handed to another program. It has To, Cc, Bcc, Subject and body fields:
+
+| Key | Action |
+|---|---|
+| `ctrl+s` | send |
+| `tab` / `shift+tab` | next / previous field |
+| `enter` | in a header field, next field (in the body, a new line) |
+| `esc` | close at once if nothing changed, otherwise ask: `s` save to Drafts · `d` discard · `e` keep editing · `esc` save & close |
+| `ctrl+c` | quit, even while composing |
+
+- Replies start in the body above the quote. New messages and forwards start in To. The body is sent exactly as typed, soft-wrapped on screen only, with tabs becoming 4 spaces. A forward's attachments are still sent, but aren't listed.
+- A parse or send error shows in the composer's footer, and `ctrl+s` retries. If the message was delivered but a follow-up (Sent copy, `\Answered`, removing the draft) failed, the composer closes with the error in the status bar and the message is never resent.
+- **Drafts:** saving stores the message in the account's Drafts-role folder flagged `\Draft` and `\Seen`. It needs no recipients, and keeps Bcc, threading headers and forwarded attachments. `enter` (or a click to open) on a message in the Drafts folder reopens it in the composer. Saving again replaces the old copy, and sending removes it. Removing one message needs the IMAP UIDPLUS extension; without it the old copy is kept and the status says so. A resumed reply still threads, but doesn't mark the original `\Answered`.
+
+The **`?` help popup** is sized to its content, groups keys into sections (including Compose and Composer), and scrolls with `j`/`k`, `↑`/`↓`, `pgup`/`pgdn` and `g`/`G`. Inside it, `/` filters the keys by key or description.
 
 **Mouse** (added 2026-11-10 at your request): clicking a folder in the sidebar opens it. Clicking a thread or message row selects it, and clicking the selected row again opens it. The wheel acts like `↑`/`↓` in the open popup, or else in the pane under the pointer, and never opens anything. While a popup is open the app releases the mouse to the terminal, so cmd/ctrl+click opens links in the message. The terminal's alternate-scroll mode keeps the wheel scrolling the popup.
 

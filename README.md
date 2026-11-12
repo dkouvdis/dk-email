@@ -6,7 +6,7 @@ A keyboard-driven terminal email client for triaging several IMAP accounts (Gmai
 - Groups replies into threads, ordered by newest activity.
 - Lets you mark read/unread, star, archive, delete (to Trash) and move mail without leaving the keyboard.
 - Has two layouts: narrow (folders │ threads, the default) and list (threads only), toggled with `v`. List is forced below 80 columns.
-- Replies, reply-alls, forwards and new messages are written in your `$EDITOR` and sent over SMTP. See [Sending mail](#sending-mail).
+- Replies, reply-alls, forwards and new messages are written in a built-in composer and sent over SMTP. See [Sending mail](#sending-mail).
 - Reads passwords from 1Password (`op read`), any other command, or the OS keychain. They are never stored in a plain-text file.
 
 v0.x is a personal tool: it reads, triages and sends mail. Nothing is cached on disk.
@@ -216,32 +216,38 @@ save_sent    = false               # optional, save a copy to Sent; default: fal
 
 - `r` replies, `R` replies to everyone, `f` forwards and `c` starts a new message from the current account.
 - **Target:** on a collapsed thread and in the reader, `r`, `R` and `f` use the thread's latest message. On an expanded row, they use the selected message.
-- dk-email opens `$VISUAL`, else `$EDITOR`, else `vi`. Values with arguments, such as `code --wait`, work. The message is a temporary file, deleted after the editor exits.
-- The file starts with a header block, then a blank line, then the body:
+- The composer opens in a popup, with **To**, **Cc**, **Bcc**, **Subject** and the body as plain-text fields. Its title shows the action, the subject and the account's address. dk-email never hands the terminal to another program.
+- Replies start in the body, above the quote. New messages and forwards start in `To`. `From` isn't editable: it's always the account's address (and `from_name`).
+- Addresses are separated by commas, as in `Alice <alice@example.com>, bob@example.com`.
+- The body is sent exactly as typed. Long lines are only wrapped on screen, and tabs become 4 spaces.
 
-  ```
-  To: Alice <alice@example.com>
-  Cc:
-  Bcc:
-  Subject: Re: Lunch on Friday
+| Key | Action |
+|---|---|
+| `ctrl+s` | send |
+| `tab` / `shift+tab` | next / previous field |
+| `enter` | in a header field, move to the next field (in the body, a new line) |
+| `esc` | close at once if nothing changed, otherwise ask what to do |
+| `ctrl+c` | quit, even while composing |
 
-  On Tue, 10 Nov 2026 at 12:00, Alice <alice@example.com> wrote:
-  > Shall we try the new place?
-  ```
+- If you press `esc` after changing something, the footer asks: `s` saves to Drafts, `d` discards, `e` keeps editing, and `esc` saves and closes. A draft is only discarded on purpose. If the account can't save drafts, only `d` and `e` are offered.
+- Sending happens in the background (`Sending…`). A bad address or a failed send shows in the composer's footer, with your text intact, and `ctrl+s` retries. `q` types a `q` while you compose, so it never quits by accident.
+- If the message was delivered but saving the Sent copy, marking the original answered or removing the draft failed, the composer closes and the status bar says so. dk-email never retries then, so nothing is sent twice.
 
-  Only `To`, `Cc`, `Bcc` and `Subject` are read, with addresses separated by commas. An unknown header, such as a `Too:` typo, is an error. `From` isn't in the file: it's always the account's address (and `from_name`).
-- If you quit the editor without changing the file, or with an empty one, the draft is discarded and nothing is asked.
-- Otherwise a **confirm popup** shows From, To, Cc, Bcc, Subject, any attachments and the start of the body: `y` sends, `e` reopens the editor, and `d` discards. `esc` and `q` do nothing there, so a draft is only ever discarded on purpose. Header or address errors show in the popup, and `y` is disabled until you fix them with `e`.
-- Sending happens in the background (`Sending…`). If it fails, the confirm popup reopens with the same draft and the error, so `y` retries and your text is never lost. `q` won't quit while a draft is open or a send is in flight. `ctrl+c` still quits at once.
-- If the message was delivered but saving the Sent copy or marking the original answered failed, the status says so. dk-email never retries then, so nothing is sent twice.
+### Drafts
+
+- Choosing **save** in the `esc` prompt stores the message in the account's Drafts folder, flagged `\Draft` and `\Seen`. Saving needs no recipients. The saved copy keeps `Bcc`, the threading headers of a reply and a forward's attachments.
+- Press `enter` on a message in the Drafts folder (or click to open it) to reopen it in the composer. Saving it again replaces the old copy, and sending it removes the draft.
+- Removing a single message needs the IMAP **UIDPLUS** extension, which Gmail, Fastmail and most other servers have. Without it, the old copy is kept and the status says so, so you may see two copies in Drafts. dk-email never uses a plain `EXPUNGE`, which could remove other messages you flagged for deletion.
+- A resumed reply still threads, but sending it doesn't mark the original answered.
+- Drafts work for accounts that have `smtp_host`, like the other compose keys.
 
 ### Reply, reply all and forward
 
 - **Reply** goes to the message's `Reply-To`, else its sender. If the message is from you, it goes to its original recipients. The subject gets `Re: `, and `In-Reply-To` and `References` are set so the reply threads correctly. Only the target message is quoted. After sending, the original is marked answered.
 - **Reply all** also includes the original's To and Cc, minus your own address, with duplicates removed.
-- **Forward** starts with an empty `To` and the subject `Fwd: …`. The original's attachments are re-attached with their original names and types, and listed in the confirm popup. They can't be removed in this version.
+- **Forward** starts with an empty `To` and the subject `Fwd: …`. The original's attachments are re-attached with their original names and types. They aren't listed in the composer and can't be removed in this version.
 - Outgoing mail is plain text.
-- `Bcc` recipients get the message, but the `Bcc` header is never written.
+- `Bcc` recipients get the message, but the `Bcc` header is never written to a sent message. Only the saved draft keeps it.
 
 ### Connect popup
 
@@ -265,7 +271,7 @@ The connect-account popup has optional **SMTP host**, **SMTP port** and **SMTP T
 | `q` | close the open popup, otherwise quit | `ctrl+c` | quit, even with a popup open |
 
 - Actions on a collapsed thread apply to every message in it. On an expanded row, or in the reader, they apply to the selected message. Opening a message marks it read.
-- `r`, `R` and `f` work on the thread list and in the reader. `c` works anywhere a folder is open. See [Sending mail](#sending-mail).
+- `r`, `R` and `f` work on the thread list and in the reader. `c` works anywhere a folder is open. In the Drafts folder, `enter` reopens a draft in the composer. See [Sending mail](#sending-mail).
 - `enter` opens the conversation in a popup, and `esc` closes it. In the reader, `pgup`/`pgdn` (or `ctrl+u`/`ctrl+d`) scroll by a page, and `space` expands or collapses every message.
 - **Mouse:** clicking a folder opens it. Clicking a thread selects it, and clicking it again opens it. The scroll wheel moves the selection (or scrolls the open popup) but never opens anything. Links in a message are underlined; cmd+click (ctrl+click on Linux) opens them while the reader popup is open, in terminals that support hyperlinks. To select text in the terminal, hold shift (or option on macOS) while dragging.
 - In the `?` help popup, `/` filters keys by key or description.

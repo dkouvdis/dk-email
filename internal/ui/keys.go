@@ -61,10 +61,21 @@ func DefaultKeyMap() KeyMap {
 
 // HelpSections groups every key for the ? popup.
 func (k KeyMap) HelpSections() []popup.Section {
+	help := func(keys, desc string) key.Binding {
+		return key.NewBinding(key.WithKeys(keys), key.WithHelp(keys, desc))
+	}
 	return []popup.Section{
 		{Title: "Navigation", Keys: []key.Binding{k.Up, k.Down, k.Top, k.Bottom, k.Left, k.Right, k.NextPane, k.PrevPane}},
 		{Title: "Threads", Keys: []key.Binding{k.Open, k.Expand, k.ToggleRead, k.Star, k.Archive, k.Delete, k.Move, k.Refresh}},
-		{Title: "Compose", Keys: []key.Binding{k.Reply, k.ReplyAll, k.Forward, k.Compose}},
+		{Title: "Compose", Keys: []key.Binding{k.Reply, k.ReplyAll, k.Forward, k.Compose, help("enter", "edit draft (in Drafts)")}},
+		{Title: "Composer", Keys: []key.Binding{
+			help("ctrl+s", "send"),
+			help("tab", "next field"),
+			help("shift+tab", "previous field"),
+			help("enter", "next field (in a header)"),
+			help("esc", "close, or save / discard"),
+			help("ctrl+c", "quit now"),
+		}},
 		{Title: "Accounts & view", Keys: []key.Binding{k.Picker, k.Filter, k.Connect, k.ToggleView}},
 		{Title: "General", Keys: []key.Binding{k.Help, k.Back, k.Quit, k.ForceQuit}},
 	}

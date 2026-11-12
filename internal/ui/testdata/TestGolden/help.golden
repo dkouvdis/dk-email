@@ -1,29 +1,29 @@
 ╭──────────────────────────────╮╭──────────────────────────────────────────────────────────────────────────────────────╮
-│ Personal                     ││ Inbox ╭──────────────────────────────────────╮                                       │
-│ ▶ Inbox                    2 ││  ●    │ Keys                      esc close  │                                 13:30 │
-│   Sent Mail                  ││  ●    │ / press / to filter by key or descr… │                                 Nov 8 │
-│   All Mail                   ││       │                                      │                                       │
-│   Trash                      ││       │ Navigation                         ┃ │                                       │
-│   Receipts                 1 ││       │   k/↑         up                   ┃ │                                       │
-│                              ││       │   j/↓         down                 ┃ │                                       │
-│ Work                         ││       │   g           top                  ┃ │                                       │
-│   Inbox                    1 ││       │   G           bottom               ┃ │                                       │
-│   Archive                    ││       │   h/←         left pane            ┃ │                                       │
-│                              ││       │   l/→         right pane           ┃ │                                       │
-│                              ││       │   tab         next pane            ┃ │                                       │
-│                              ││       │   shift+tab   previous pane          │                                       │
-│                              ││       │                                      │                                       │
-│                              ││       │ Threads                              │                                       │
-│                              ││       │   enter       open                   │                                       │
-│                              ││       │   space       expand                 │                                       │
-│                              ││       │   u           read/unread            │                                       │
-│                              ││       │   s           star                   │                                       │
-│                              ││       │   e           archive                │                                       │
-│                              ││       │   d           delete                 │                                       │
-│                              ││       │   m           move                   │                                       │
-│                              ││       │                                      │                                       │
-│                              ││       │ / filter · j/k/pgup/pgdn scroll · e… │                                       │
-│                              ││       ╰──────────────────────────────────────╯                                       │
+│ Personal                     ││ Inbo╭──────────────────────────────────────────╮                                     │
+│ ▶ Inbox                    2 ││  ●  │ Keys                          esc close  │                               13:30 │
+│   Sent Mail                  ││  ●  │ / press / to filter by key or descripti… │                               Nov 8 │
+│   All Mail                   ││     │                                          │                                     │
+│   Trash                      ││     │ Navigation                             ┃ │                                     │
+│   Receipts                 1 ││     │   k/↑         up                       ┃ │                                     │
+│                              ││     │   j/↓         down                     ┃ │                                     │
+│ Work                         ││     │   g           top                      ┃ │                                     │
+│   Inbox                    1 ││     │   G           bottom                   ┃ │                                     │
+│   Archive                    ││     │   h/←         left pane                ┃ │                                     │
+│                              ││     │   l/→         right pane               ┃ │                                     │
+│                              ││     │   tab         next pane                  │                                     │
+│                              ││     │   shift+tab   previous pane              │                                     │
+│                              ││     │                                          │                                     │
+│                              ││     │ Threads                                  │                                     │
+│                              ││     │   enter       open                       │                                     │
+│                              ││     │   space       expand                     │                                     │
+│                              ││     │   u           read/unread                │                                     │
+│                              ││     │   s           star                       │                                     │
+│                              ││     │   e           archive                    │                                     │
+│                              ││     │   d           delete                     │                                     │
+│                              ││     │   m           move                       │                                     │
+│                              ││     │                                          │                                     │
+│                              ││     │ / filter · j/k/pgup/pgdn scroll · esc/q… │                                     │
+│                              ││     ╰──────────────────────────────────────────╯                                     │
 │                              ││                                                                                      │
 ╰──────────────────────────────╯╰──────────────────────────────────────────────────────────────────────────────────────╯
                                                                                                                   narrow
