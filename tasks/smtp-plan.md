@@ -52,7 +52,7 @@ The full details are in [smtp-todo.md](smtp-todo.md).
 ### Phase 2: First slice, new message
 - [x] S5: Compose: new-message template, editor-file parse, plain-text MIME build
 - [x] S6: IMAP `Append`, `\Answered` and `Raw`
-- [ ] S7: Send orchestration (`internal/send`)
+- [x] S7: Send orchestration (`internal/send`)
 - [ ] S8: `c` end-to-end: wiring, confirm popup, send state, retry
 
 ### Checkpoint 2: New message

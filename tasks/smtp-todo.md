@@ -207,13 +207,13 @@ Also rebind refresh from `r` to `ctrl+r`, and add `r`/`R`/`f`/`c` to `KeyMap`, u
 
 **Acceptance criteria:**
 
-- [ ] With fakes: the call order is correct, the bytes appended equal the bytes sent, `save_sent=false` skips APPEND, and an SMTP failure skips APPEND and flag and does **not** wrap `ErrAfterDelivery`.
-- [ ] An APPEND failure or a flag failure returns an error that `errors.Is(err, mail.ErrAfterDelivery)` matches.
-- [ ] Envelope recipients are To + Cc + Bcc, deduplicated, and the envelope sender is the account `email`.
+- [x] With fakes: the call order is correct, the bytes appended equal the bytes sent, `save_sent=false` skips APPEND, and an SMTP failure skips APPEND and flag and does **not** wrap `ErrAfterDelivery`.
+- [x] An APPEND failure or a flag failure returns an error that `errors.Is(err, mail.ErrAfterDelivery)` matches.
+- [x] Envelope recipients are To + Cc + Bcc, deduplicated, and the envelope sender is the account `email`.
 
 **Verification:**
 
-- [ ] `go test -race ./internal/send/...` passes with ≥ 90% coverage.
+- [x] `go test -race ./internal/send/...` passes with ≥ 90% coverage.
 
 **Dependencies:** S3, S5, S6
 
