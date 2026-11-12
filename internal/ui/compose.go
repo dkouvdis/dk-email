@@ -109,7 +109,8 @@ func (m Model) startCompose() (Model, tea.Cmd) {
 }
 
 // startDraft opens base in the composer. A reply starts in the body, above
-// its quote; everything else starts in To.
+// its quote, and so does a reopened draft that has recipients; everything
+// else starts in To.
 func (m Model) startDraft(account int, base mail.Draft, kind composeKind) (Model, tea.Cmd) {
 	fields := compose.FieldsOf(base)
 	title := kind.action()
@@ -118,7 +119,7 @@ func (m Model) startDraft(account int, base mail.Draft, kind composeKind) (Model
 	}
 	title += " · " + m.identity(account).Email
 	focus := popup.ComposeTo
-	if kind == composeReply || kind == composeReplyAll {
+	if kind == composeReply || kind == composeReplyAll || (kind == composeDraft && len(recipients(base)) > 0) {
 		focus = popup.ComposeBody
 	}
 	pop := popup.NewCompose(m.theme, title, popup.ComposeValues(fields), focus)

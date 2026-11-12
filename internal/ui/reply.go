@@ -23,15 +23,16 @@ const (
 	composeReply
 	composeReplyAll
 	composeForward
+	composeDraft // a saved draft reopened
 )
 
 func (k composeKind) String() string {
-	return [...]string{"new message", "reply", "reply all", "forward"}[k]
+	return [...]string{"new message", "reply", "reply all", "forward", "draft"}[k]
 }
 
 // action is k's name in the composer's title.
 func (k composeKind) action() string {
-	return [...]string{"New message", "Reply", "Reply all", "Forward"}[k]
+	return [...]string{"New message", "Reply", "Reply all", "Forward", "Draft"}[k]
 }
 
 // replyFetchedMsg carries the message a reply, reply-all or forward is

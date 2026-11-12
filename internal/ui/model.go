@@ -214,6 +214,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleDraftSaved(msg)
 	case replyFetchedMsg:
 		return m.handleReplyFetched(msg)
+	case draftOpenedMsg:
+		return m.handleDraftOpened(msg)
 	default:
 		// Whatever else the composer's inputs wait for, such as a clipboard read.
 		if m.composing() {

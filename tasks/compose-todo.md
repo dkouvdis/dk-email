@@ -98,9 +98,9 @@ Every task also meets the standing bar before it counts as done:
 
 ### D4: Reopen drafts
 
-- [ ] `enter` on a message in a Drafts-role folder opens it in the composer (`DraftOf` set) instead of the reader.
-- [ ] Saving again replaces the old copy; sending deletes it.
-- [ ] A resumed forward keeps its attachments (taken from the saved draft).
+- [x] `enter` on a message in a Drafts-role folder opens it in the composer (`DraftOf` set) instead of the reader.
+- [x] Saving again replaces the old copy; sending deletes it.
+- [x] A resumed forward keeps its attachments (taken from the saved draft).
 
 ### Checkpoint 2 (manual, Gmail and one other account)
 
