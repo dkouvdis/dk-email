@@ -50,8 +50,8 @@ The full details are in [smtp-todo.md](smtp-todo.md).
 - [x] Tests, vet and gofmt are clean. A live SMTP send to yourself works on Gmail. The editor round-trip works in a real terminal.
 
 ### Phase 2: First slice, new message
-- [ ] S5: Compose: new-message template, editor-file parse, plain-text MIME build
-- [ ] S6: IMAP `Append`, `\Answered` and `Raw`
+- [x] S5: Compose: new-message template, editor-file parse, plain-text MIME build
+- [x] S6: IMAP `Append`, `\Answered` and `Raw`
 - [ ] S7: Send orchestration (`internal/send`)
 - [ ] S8: `c` end-to-end: wiring, confirm popup, send state, retry
 

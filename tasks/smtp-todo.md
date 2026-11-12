@@ -153,13 +153,13 @@ Also rebind refresh from `r` to `ctrl+r`, and add `r`/`R`/`f`/`c` to `KeyMap`, u
 
 **Acceptance criteria:**
 
-- [ ] `Format` → `Parse` round-trips. Unknown headers, bad addresses and no recipients each return a distinct, readable error.
-- [ ] Golden `.eml` fixtures in `testdata/` cover: ASCII, non-ASCII subject and name, a long line, Bcc omitted, and two attachments.
-- [ ] `go-message` re-parses every built message with the same headers and body.
+- [x] `Format` → `Parse` round-trips. Unknown headers, bad addresses and no recipients each return a distinct, readable error.
+- [x] Golden `.eml` fixtures in `testdata/` cover: ASCII, non-ASCII subject and name, a long line, Bcc omitted, and two attachments.
+- [x] `go-message` re-parses every built message with the same headers and body.
 
 **Verification:**
 
-- [ ] `go test -race ./internal/compose/...` passes with ≥ 90% coverage.
+- [x] `go test -race ./internal/compose/...` passes with ≥ 90% coverage.
 
 **Dependencies:** S2
 
@@ -181,13 +181,13 @@ Also rebind refresh from `r` to `ctrl+r`, and add `r`/`R`/`f`/`c` to `KeyMap`, u
 
 **Acceptance criteria:**
 
-- [ ] Against `imapmemserver`, `Append` to the Sent-role folder stores the exact bytes with `\Seen`, and a later `Summaries` lists it.
-- [ ] `Raw` returns the exact stored bytes and leaves `\Seen` unchanged.
-- [ ] `SetFlag(…, FlagAnswered, true)` sets `\Answered`. `SentFolder` returns false when no Sent-role folder exists.
+- [x] Against `imapmemserver`, `Append` to the Sent-role folder stores the exact bytes with `\Seen`, and a later `Summaries` lists it.
+- [x] `Raw` returns the exact stored bytes and leaves `\Seen` unchanged.
+- [x] `SetFlag(…, FlagAnswered, true)` sets `\Answered`. `SentFolder` returns false when no Sent-role folder exists.
 
 **Verification:**
 
-- [ ] `go test -race ./internal/mail/imap/...` passes, and coverage stays ≥ 80%.
+- [x] `go test -race ./internal/mail/imap/...` passes, and coverage stays ≥ 80%.
 
 **Dependencies:** S2
 
