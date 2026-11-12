@@ -116,7 +116,6 @@ func TestConnect_Validation(t *testing.T) {
 			if tt.name != "ref required" {
 				c = typeIn(c, "op://V/I/p")
 			}
-			c, _ = keys(c, "tab")
 
 			c, r := keys(c, "enter")
 
@@ -135,7 +134,6 @@ func TestConnect_SubmitOnePasswordReference(t *testing.T) {
 	c, _ = keys(c, "right")      // TLS: starttls
 	c, _ = keys(c, "tab", "tab") // source stays 1Password
 	c = typeIn(c, "op://Work Vault/IMAP/password")
-	c, _ = keys(c, "tab")
 
 	c, r := keys(c, "enter")
 
@@ -161,7 +159,6 @@ func TestConnect_SubmitKeychainPasswordIsMasked(t *testing.T) {
 	if v := ansi.Strip(c.View()); strings.Contains(v, "hunter2") || !strings.Contains(v, "keychain") {
 		t.Errorf("password shown or keychain not explained:\n%s", v)
 	}
-	c, _ = keys(c, "tab")
 	c, r := keys(c, "enter")
 
 	req := c.Request()
@@ -170,6 +167,9 @@ func TestConnect_SubmitKeychainPasswordIsMasked(t *testing.T) {
 	}
 	if req.Account.Username != "" || req.Account.IMAPHost != "imap.gmail.com" || req.Account.IMAPPort != 993 {
 		t.Errorf("account = %+v", req.Account)
+	}
+	if a := req.Account; a.SMTPHost != "smtp.gmail.com" || a.SMTPPort != 465 || a.SMTPTLS != config.TLSImplicit {
+		t.Errorf("SMTP = %s:%d %s, want the Gmail pre-fill", a.SMTPHost, a.SMTPPort, a.SMTPTLS)
 	}
 }
 
@@ -281,5 +281,135 @@ func TestConnect_PasteIntoFields(t *testing.T) {
 	c.SetBusy(true)
 	if c.Paste(tea.PasteMsg{Content: "x"}).Request() != before {
 		t.Error("paste while testing changed the form")
+	}
+}
+
+func TestConnect_GmailPrefillsSMTP(t *testing.T) {
+	for _, email := range []string{"me@gmail.com", "Me@GMail.COM", "me@googlemail.com"} {
+		c := fill(newConnect(), "Gmail", email)
+
+		if h, p := c.inputs[fSMTPHost].Value(), c.inputs[fSMTPPort].Value(); h != "smtp.gmail.com" || p != "465" || c.smtpTLS != config.TLSImplicit {
+			t.Errorf("%s: SMTP = %q %q %q, want smtp.gmail.com 465 implicit", email, h, p, c.smtpTLS)
+		}
+	}
+
+	// Leaving Gmail clears what was filled in.
+	c := fill(newConnect(), "Gmail", "me@gmail.com")
+	c, _ = keys(c, "shift+tab")
+	for range len("gmail.com") {
+		c, _ = keys(c, "backspace")
+	}
+	c = typeIn(c, "example.com")
+	if c.inputs[fSMTPHost].Value() != "" || c.inputs[fSMTPPort].Value() != "" {
+		t.Errorf("pre-filled SMTP kept for a non-Gmail address: %q %q", c.inputs[fSMTPHost].Value(), c.inputs[fSMTPPort].Value())
+	}
+}
+
+func TestConnect_GmailPrefillNeverOverwritesTypedSMTP(t *testing.T) {
+	typed := func(c Connect, field int, value string) Connect {
+		c.setFocus(field)
+		c = typeIn(c, value)
+		c.setFocus(fEmail)
+		return typeIn(c, "me@gmail.com")
+	}
+
+	c := typed(newConnect(), fSMTPHost, "smtp.example.com")
+	if c.inputs[fSMTPHost].Value() != "smtp.example.com" || c.inputs[fSMTPPort].Value() != "" || c.autoSMTP {
+		t.Errorf("typed host: SMTP = %q %q auto %v, want it left alone", c.inputs[fSMTPHost].Value(), c.inputs[fSMTPPort].Value(), c.autoSMTP)
+	}
+	c = typed(newConnect(), fSMTPPort, "2525")
+	if c.inputs[fSMTPHost].Value() != "" || c.inputs[fSMTPPort].Value() != "2525" {
+		t.Errorf("typed port: SMTP = %q %q, want it left alone", c.inputs[fSMTPHost].Value(), c.inputs[fSMTPPort].Value())
+	}
+
+	c = newConnect()
+	c.setFocus(fSMTPTLS)
+	c, _ = keys(c, "right")
+	c.setFocus(fEmail)
+	if c = typeIn(c, "me@gmail.com"); c.inputs[fSMTPHost].Value() != "" || c.smtpTLS != config.TLSStartTLS {
+		t.Errorf("chosen TLS: host %q tls %q, want it left alone", c.inputs[fSMTPHost].Value(), c.smtpTLS)
+	}
+
+	// Clearing the filled-in host opts out of sending, and sticks.
+	c = fill(newConnect(), "Gmail", "me@gmail.com")
+	c.setFocus(fSMTPHost)
+	for range len("smtp.gmail.com") {
+		c, _ = keys(c, "backspace")
+	}
+	c.setFocus(fEmail)
+	c, _ = keys(c, "backspace")
+	c = typeIn(c, "m")
+	if c.inputs[fSMTPHost].Value() != "" {
+		t.Errorf("host = %q, a cleared SMTP host must stay cleared", c.inputs[fSMTPHost].Value())
+	}
+}
+
+func TestConnect_SMTPValidation(t *testing.T) {
+	tests := []struct {
+		name       string
+		host, port string
+		want       string // empty: valid
+	}{
+		{"port out of range", "smtp.example.com", "70000", "SMTP port must be a number from 1 to 65535"},
+		{"port not a number", "smtp.example.com", "smtp", "SMTP port must be a number from 1 to 65535"},
+		{"port without host", "", "587", "SMTP port is set but SMTP host is empty"},
+		{"host only", "smtp.example.com", "", ""},
+		{"blank", "", "", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := fill(newConnect(), "Work", "me@example.com", "", "mail.example.com", "")
+			c.setFocus(fSMTPHost)
+			c = fill(c, tt.host, tt.port)
+			c.setFocus(fSecret)
+			c = typeIn(c, "op://V/I/p")
+
+			c, r := keys(c, "enter")
+
+			if tt.want == "" && r != ConnectSubmitted || tt.want != "" && (r != ConnectPending || !strings.Contains(c.err, tt.want)) {
+				t.Errorf("result %v, error %q, want %q", r, c.err, tt.want)
+			}
+		})
+	}
+}
+
+func TestConnect_SMTPRequest(t *testing.T) {
+	submit := func(host, port string, startTLS bool) config.Account {
+		c := fill(newConnect(), "Work", "me@example.com", "", "mail.example.com", "")
+		c.setFocus(fSMTPHost)
+		c = fill(c, host, port)
+		if startTLS {
+			c, _ = keys(c, "right")
+		}
+		c.setFocus(fSecret)
+		c = typeIn(c, "op://V/I/p")
+		c, r := keys(c, "enter")
+		if r != ConnectSubmitted {
+			t.Fatalf("result %v, error %q", r, c.err)
+		}
+		return c.Request().Account
+	}
+
+	if a := submit("", "", true); a.SMTPHost != "" || a.SMTPPort != 0 || a.SMTPTLS != "" {
+		t.Errorf("blank host: SMTP = %q %d %q, want none so no smtp_* keys are saved", a.SMTPHost, a.SMTPPort, a.SMTPTLS)
+	}
+	if a := submit("smtp.example.com", "", false); a.SMTPHost != "smtp.example.com" || a.SMTPPort != 0 || a.SMTPTLS != config.TLSImplicit {
+		t.Errorf("blank port: SMTP = %q %d %q, want the port left to the config default", a.SMTPHost, a.SMTPPort, a.SMTPTLS)
+	}
+	if a := submit("smtp.example.com", "2525", true); a.SMTPPort != 2525 || a.SMTPTLS != config.TLSStartTLS {
+		t.Errorf("typed: SMTP port %d tls %q, want 2525 starttls", a.SMTPPort, a.SMTPTLS)
+	}
+}
+
+func TestConnect_SMTPTLSToggleChangesPortHint(t *testing.T) {
+	c := newConnect()
+	c.setFocus(fSMTPTLS)
+
+	c, _ = keys(c, "right")
+	if v := ansi.Strip(c.View()); c.smtpTLS != config.TLSStartTLS || c.inputs[fSMTPPort].Placeholder != "587" || !strings.Contains(v, "● starttls") {
+		t.Errorf("tls %q, port hint %q after toggling:\n%s", c.smtpTLS, c.inputs[fSMTPPort].Placeholder, v)
+	}
+	if c, _ = keys(c, "space"); c.smtpTLS != config.TLSImplicit || c.inputs[fSMTPPort].Placeholder != "465" {
+		t.Errorf("tls %q, port hint %q after toggling back", c.smtpTLS, c.inputs[fSMTPPort].Placeholder)
 	}
 }

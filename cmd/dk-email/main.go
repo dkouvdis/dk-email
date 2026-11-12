@@ -132,9 +132,16 @@ func dial(ctx context.Context, acct config.Account, password string, log *slog.L
 	return conn, nil
 }
 
+// verifySMTP tests an SMTP login (connect and authenticate, nothing sent);
+// tests replace it to avoid the network.
+var verifySMTP = func(ctx context.Context, acct config.Account, password string) error {
+	return smtp.New(acct, password).Verify(ctx)
+}
+
 // newOnboarding lets the connect popup test and save accounts. A new
 // account's keychain password is stored before the account is appended to
-// configPath, so a saved account always has its password.
+// configPath, so a saved account always has its password. VerifySMTP tests a
+// new account's SMTP login, resolving the password like Dial does.
 func newOnboarding(configPath string, pw passwordResolver, store func(account, password string) error, log *slog.Logger) ui.Onboarding {
 	return ui.Onboarding{
 		Dial: func(ctx context.Context, acct config.Account, password string) (ui.Conn, error) {
@@ -146,6 +153,19 @@ func newOnboarding(configPath string, pw passwordResolver, store func(account, p
 				}
 			}
 			return dial(ctx, acct, password, log)
+		},
+		VerifySMTP: func(ctx context.Context, acct config.Account, password string) error {
+			acct = acct.WithDefaults()
+			if password == "" {
+				var err error
+				if password, err = pw.Resolve(ctx, acct); err != nil {
+					return err
+				}
+			}
+			start := time.Now()
+			err := verifySMTP(ctx, acct, password)
+			log.Debug("smtp login", "account", acct.Name, "ok", err == nil, "took", time.Since(start).Round(time.Millisecond))
+			return err
 		},
 		AddAccount: func(acct config.Account, password string) error {
 			if password != "" {

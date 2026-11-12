@@ -24,6 +24,10 @@ type fakeOnboarding struct {
 	box             *mailtest.Fake
 	sender          mail.Sender
 	dialed          []string // passwords Dial was given
+	dialedAccts     []config.Account
+	verifyErr       error
+	verified        []config.Account
+	verifiedPws     []string
 	added           []config.Account
 	addedPasswords  []string
 	stored          map[string]string
@@ -38,12 +42,18 @@ func newOnboarding() *fakeOnboarding {
 
 func (f *fakeOnboarding) onboarding() Onboarding {
 	return Onboarding{
-		Dial: func(_ context.Context, _ config.Account, password string) (Conn, error) {
+		Dial: func(_ context.Context, acct config.Account, password string) (Conn, error) {
 			f.dialed = append(f.dialed, password)
+			f.dialedAccts = append(f.dialedAccts, acct)
 			if f.dialErr != nil {
 				return Conn{}, f.dialErr
 			}
 			return Conn{Mailbox: f.box, Sender: f.sender}, nil
+		},
+		VerifySMTP: func(_ context.Context, acct config.Account, password string) error {
+			f.verified = append(f.verified, acct)
+			f.verifiedPws = append(f.verifiedPws, password)
+			return f.verifyErr
 		},
 		AddAccount: func(acct config.Account, password string) error {
 			if f.addErr != nil {
@@ -184,6 +194,62 @@ func TestConnect_FailedTestSavesNothing(t *testing.T) {
 	}
 }
 
+func TestConnect_SMTPFailureShowsInThePopupAndSavesNothing(t *testing.T) {
+	o := newOnboarding()
+	o.verifyErr = errors.New(`login to account "Gmail" (smtp.gmail.com:465) failed: 535 bad credentials`)
+	m := firstRun(t, o, nil)
+	m = fillGmailKeychain(t, m, "Gmail", "wrong")
+
+	m = pressSettled(t, m, "enter")
+
+	if len(o.verified) != 1 || o.verifiedPws[0] != "wrong" {
+		t.Fatalf("VerifySMTP calls = %+v, passwords %v", o.verified, o.verifiedPws)
+	}
+	if a := o.verified[0]; a.SMTPHost != "smtp.gmail.com" || a.SMTPPort != 465 || a.SMTPTLS != config.TLSImplicit {
+		t.Errorf("verified SMTP %s:%d %s, want the pre-filled Gmail server", a.SMTPHost, a.SMTPPort, a.SMTPTLS)
+	}
+	v := plain(m)
+	if !m.showConnect || !strings.Contains(v, "IMAP login worked, but SMTP failed") || !strings.Contains(v, "535 bad credentials") || strings.Contains(v, "wrong") {
+		t.Errorf("SMTP error not shown in the popup, or the password leaked:\n%s", v)
+	}
+	if len(o.added) != 0 || len(m.accts) != 0 {
+		t.Error("a failed SMTP check saved or added the account")
+	}
+	if _, err := o.box.Folders(context.Background()); !errors.Is(err, mail.ErrClosed) {
+		t.Error("the tested mailbox wasn't closed")
+	}
+
+	o.verifyErr = nil
+	o.box = mailtest.New() // the first mailbox is closed
+	o.box.AddFolder("INBOX", mail.RoleInbox)
+	m = pressSettled(t, m, "enter")
+	if m.showConnect || len(o.added) != 1 || o.added[0].SMTPHost != "smtp.gmail.com" {
+		t.Errorf("retry: popup open %v, added %+v", m.showConnect, o.added)
+	}
+}
+
+func TestConnect_BlankSMTPHostSkipsVerification(t *testing.T) {
+	o := newOnboarding()
+	o.verifyErr = errors.New("must not be called")
+	m := firstRun(t, o, nil)
+	m = typeKeys(t, m, "Work")
+	m = send(t, m, press("tab"))
+	m = typeKeys(t, m, "me@example.com")
+	m = send(t, m, press("tab"), press("tab"))
+	m = typeKeys(t, m, "mail.example.com")
+	for range 3 { // port, TLS, source
+		m = send(t, m, press("tab"))
+	}
+	m = send(t, m, press("space"), press("tab"))
+	m = typeKeys(t, m, "pw")
+
+	m = pressSettled(t, m, "enter")
+
+	if m.showConnect || len(o.added) != 1 || len(o.verified) != 0 || o.added[0].SMTPHost != "" {
+		t.Errorf("popup open %v, added %+v, verified %+v", m.showConnect, o.added, o.verified)
+	}
+}
+
 func TestConnect_SaveFailureClosesTheMailbox(t *testing.T) {
 	o := newOnboarding()
 	o.addErr = errors.New("permission denied")
@@ -230,7 +296,7 @@ func TestConnect_AAddsASecondAccount(t *testing.T) {
 		t.Fatal("A didn't open the popup")
 	}
 	m = typeKeys(t, m, "Personal")
-	for range 8 { // to the Test & save button
+	for range 11 { // to the Test & save button
 		m = send(t, m, press("tab"))
 	}
 	m = pressSettled(t, m, "enter")
@@ -254,7 +320,9 @@ func TestConnect_MissingPasswordPrompt(t *testing.T) {
 	f := newFixture()
 	f.errs["Work"] = fmt.Errorf("%w: no password: set password_cmd or store one in the keychain", ErrNeedsPassword)
 	o := newOnboarding()
-	m := started(t, f, 140, 34).WithOnboarding(o.onboarding())
+	m := started(t, f, 140, 34)
+	m.accts[1].SMTPHost = "smtp.work.example.com" // saved accounts are never SMTP-tested
+	m = m.WithOnboarding(o.onboarding())
 
 	if !strings.Contains(m.status, "Work needs a password: press A to enter it") {
 		t.Errorf("status = %q", m.status)
@@ -266,6 +334,9 @@ func TestConnect_MissingPasswordPrompt(t *testing.T) {
 	m = typeKeys(t, m, "work-pass")
 	m = pressSettled(t, m, "enter")
 
+	if len(o.verified) != 0 {
+		t.Errorf("a password prompt verified SMTP: %+v", o.verified)
+	}
 	if o.stored["Work"] != "work-pass" || len(o.added) != 0 {
 		t.Errorf("stored %v, added %v; want only Work's password stored", o.stored, o.added)
 	}

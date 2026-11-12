@@ -8,6 +8,8 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -229,5 +231,147 @@ func TestOnboarding_DialBuildsSenderOnlyWithSMTPHost(t *testing.T) {
 	full, err := o.Dial(context.Background(), config.Account{Name: "B", Email: "b@x.com", SMTPHost: "smtp.x.com"}, "typed")
 	if err != nil || full.Mailbox == nil || full.Sender == nil {
 		t.Errorf("with smtp_host: %+v, %v; want a mailbox and a sender", full, err)
+	}
+}
+
+// stubVerifySMTP replaces verifySMTP and records the accounts and passwords
+// it was asked to verify.
+func stubVerifySMTP(t *testing.T, err error) *[]string {
+	t.Helper()
+	var calls []string
+	old := verifySMTP
+	verifySMTP = func(_ context.Context, acct config.Account, password string) error {
+		calls = append(calls, acct.SMTPHost+":"+strconv.Itoa(acct.SMTPPort)+" "+acct.SMTPTLS+" "+password)
+		return err
+	}
+	t.Cleanup(func() { verifySMTP = old })
+	return &calls
+}
+
+// onboard does what the connect popup does for a new account: test it with
+// Dial and, with an SMTP host, VerifySMTP, and only if that works save it.
+func onboard(o ui.Onboarding, acct config.Account, password string) (ui.Conn, error) {
+	ctx := context.Background()
+	conn, err := o.Dial(ctx, acct, password)
+	if err != nil {
+		return conn, err
+	}
+	if o.VerifySMTP != nil && strings.TrimSpace(acct.SMTPHost) != "" {
+		if err := o.VerifySMTP(ctx, acct, password); err != nil {
+			_ = conn.Mailbox.Close()
+			return ui.Conn{}, err
+		}
+	}
+	return conn, o.AddAccount(acct, password)
+}
+
+func TestOnboarding_DialNeverVerifiesSMTP(t *testing.T) {
+	stubDial(t)
+	calls := stubVerifySMTP(t, errors.New("must not be called"))
+	o := newOnboarding("", stubResolver{}, nil, slog.New(slog.DiscardHandler))
+
+	conn, err := o.Dial(context.Background(), config.Account{Name: "A", Email: "a@x.com", SMTPHost: "smtp.x.com"}, "pw")
+
+	if err != nil || conn.Sender == nil || len(*calls) != 0 {
+		t.Errorf("Dial = %+v, %v, SMTP checks %v; want a sender and no SMTP check", conn, err, *calls)
+	}
+}
+
+func TestOnboarding_VerifySMTPUsesTheTypedPasswordAndDefaults(t *testing.T) {
+	calls := stubVerifySMTP(t, nil)
+	o := newOnboarding("", stubResolver{err: errors.New("must not resolve")}, nil, slog.New(slog.DiscardHandler))
+
+	err := o.VerifySMTP(context.Background(), config.Account{Name: "A", Email: "a@x.com", SMTPHost: "smtp.x.com", SMTPTLS: config.TLSStartTLS}, "typed")
+
+	if want := []string{"smtp.x.com:587 starttls typed"}; err != nil || !slices.Equal(*calls, want) {
+		t.Errorf("verified %v (%v), want %v", *calls, err, want)
+	}
+}
+
+func TestOnboarding_VerifySMTPResolvesPasswordCmdPassword(t *testing.T) {
+	calls := stubVerifySMTP(t, nil)
+	var buf bytes.Buffer
+	log := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	o := newOnboarding("", stubResolver{password: "from-1password"}, nil, log)
+
+	err := o.VerifySMTP(context.Background(), config.Account{Name: "A", Email: "a@x.com", PasswordCmd: "op read x", SMTPHost: "smtp.x.com"}, "")
+
+	if want := []string{"smtp.x.com:465 implicit from-1password"}; err != nil || !slices.Equal(*calls, want) {
+		t.Errorf("verified %v (%v), want %v", *calls, err, want)
+	}
+	if !strings.Contains(buf.String(), "smtp login") || strings.Contains(buf.String(), "from-1password") {
+		t.Errorf("log = %q, want a timed SMTP step and no password", buf.String())
+	}
+}
+
+func TestOnboarding_VerifySMTPPasswordErrorSkipsTheCheck(t *testing.T) {
+	calls := stubVerifySMTP(t, nil)
+	want := errors.New("op read failed")
+	o := newOnboarding("", stubResolver{err: want}, nil, slog.New(slog.DiscardHandler))
+
+	err := o.VerifySMTP(context.Background(), config.Account{Name: "A", SMTPHost: "smtp.x.com"}, "")
+
+	if !errors.Is(err, want) || len(*calls) != 0 {
+		t.Errorf("error %v, checks %v; want the resolver's error and no check", err, *calls)
+	}
+}
+
+func TestOnboarding_BlankSMTPHostSavesNoSMTPKeys(t *testing.T) {
+	stubDial(t)
+	calls := stubVerifySMTP(t, errors.New("must not be called"))
+	path := filepath.Join(t.TempDir(), "config.toml")
+	o := newOnboarding(path, stubResolver{}, func(string, string) error { return nil }, slog.New(slog.DiscardHandler))
+
+	conn, err := onboard(o, config.Account{Name: "Work", Email: "me@example.com", IMAPHost: "imap.example.com"}, "pw")
+
+	if err != nil || conn.Mailbox == nil || conn.Sender != nil || len(*calls) != 0 {
+		t.Fatalf("onboard = %+v, %v, SMTP checks %v; want a mailbox, no sender, no check", conn, err, *calls)
+	}
+	if data, _ := os.ReadFile(path); !strings.Contains(string(data), `name = "Work"`) || strings.Contains(string(data), "smtp_") {
+		t.Errorf("config.toml = %q; want the account and no smtp_* keys", data)
+	}
+}
+
+func TestOnboarding_BadSMTPLoginSavesNothing(t *testing.T) {
+	stubDial(t)
+	stubVerifySMTP(t, errors.New(`login to account "Gmail" failed: 535 bad credentials`))
+	path := filepath.Join(t.TempDir(), "config.toml")
+	stored := false
+	o := newOnboarding(path, stubResolver{}, func(string, string) error { stored = true; return nil }, slog.New(slog.DiscardHandler))
+	acct := config.Account{Name: "Gmail", Email: "me@gmail.com", IMAPHost: "imap.gmail.com", SMTPHost: "smtp.gmail.com", SMTPPort: 465, SMTPTLS: config.TLSImplicit}
+
+	conn, err := onboard(o, acct, "hunter2-secret")
+
+	if err == nil || !strings.Contains(err.Error(), "535 bad credentials") || conn != (ui.Conn{}) {
+		t.Errorf("onboard = %+v, %v; want the SMTP error and a zero Conn", conn, err)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) || stored {
+		t.Errorf("config written (%v) or password stored (%v) although SMTP failed", !os.IsNotExist(err), stored)
+	}
+}
+
+func TestOnboarding_GoodSMTPLoginSavesSMTPKeysAndBuildsSender(t *testing.T) {
+	stubDial(t)
+	calls := stubVerifySMTP(t, nil)
+	path := filepath.Join(t.TempDir(), "config.toml")
+	o := newOnboarding(path, stubResolver{}, func(string, string) error { return nil }, slog.New(slog.DiscardHandler))
+	acct := config.Account{Name: "Gmail", Email: "me@gmail.com", IMAPHost: "imap.gmail.com", SMTPHost: "smtp.gmail.com", SMTPPort: 465, SMTPTLS: config.TLSImplicit}
+
+	conn, err := onboard(o, acct, "app-pass")
+
+	if err != nil || conn.Mailbox == nil || conn.Sender == nil {
+		t.Fatalf("onboard = %+v, %v; want a mailbox and a sender", conn, err)
+	}
+	if want := []string{"smtp.gmail.com:465 implicit app-pass"}; !slices.Equal(*calls, want) {
+		t.Errorf("verified %v, want %v", *calls, want)
+	}
+	data, _ := os.ReadFile(path)
+	for _, want := range []string{`smtp_host = "smtp.gmail.com"`, "smtp_port = 465", `smtp_tls = "implicit"`} {
+		if !strings.Contains(string(data), want) {
+			t.Errorf("config.toml missing %q:\n%s", want, data)
+		}
+	}
+	if _, err := config.Load(path); err != nil {
+		t.Errorf("saved config doesn't load: %v", err)
 	}
 }

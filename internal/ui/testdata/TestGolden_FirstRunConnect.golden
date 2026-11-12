@@ -4,7 +4,6 @@
 │                              ││                                                                                                          │
 │                              ││                                                                                                          │
 │                              ││                                                                                                          │
-│                              ││                                                                                                          │
 │                              ││      ╭────────────────────────────────────────────────────────────╮                                      │
 │                              ││      │ Connect account                                 esc close  │                                      │
 │                              ││      │                                                            │                                      │
@@ -17,13 +16,14 @@
 │                              ││      │ Password   ● 1Password   ○ keychain                        │                                      │
 │                              ││      │ Reference  op://Vault/Item/password                        │                                      │
 │                              ││      │            Stored as password_cmd = "op read <reference>"  │                                      │
+│                              ││      │ SMTP host  smtp.gmail.com                                  │                                      │
+│                              ││      │ SMTP port  465                                             │                                      │
+│                              ││      │ SMTP TLS   ● implicit   ○ starttls                         │                                      │
 │                              ││      │                                                            │                                      │
 │                              ││      │ [ Test & save ]                                            │                                      │
 │                              ││      │                                                            │                                      │
 │                              ││      │ tab next · ←→ choose · enter test & save · esc cancel      │                                      │
 │                              ││      ╰────────────────────────────────────────────────────────────╯                                      │
-│                              ││                                                                                                          │
-│                              ││                                                                                                          │
 │                              ││                                                                                                          │
 │                              ││                                                                                                          │
 │                              ││                                                                                                          │
