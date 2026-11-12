@@ -1,7 +1,10 @@
 package imap
 
 import (
+	"context"
+	"errors"
 	"testing"
+	"time"
 
 	goimap "github.com/emersion/go-imap/v2"
 
@@ -138,4 +141,38 @@ func TestNewFolder_FillsFieldsAndToleratesMissingData(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSentFolder(t *testing.T) {
+	t.Run("found", func(t *testing.T) {
+		srv := startServer(t, modeImplicit, capsListStatus)
+		c := srv.newClient(t, modeImplicit)
+
+		name, ok, err := c.SentFolder(timeoutCtx(t, 10*time.Second))
+
+		if err != nil || !ok || name != "Sent" {
+			t.Errorf("SentFolder() = %q, %v, %v; want %q, true, nil", name, ok, err, "Sent")
+		}
+	})
+	t.Run("none", func(t *testing.T) {
+		srv := startServer(t, modeImplicit, capsListStatus)
+		srv.noSentRole.Store(true)
+		c := srv.newClient(t, modeImplicit)
+
+		name, ok, err := c.SentFolder(timeoutCtx(t, 10*time.Second))
+
+		if err != nil || ok || name != "" {
+			t.Errorf("SentFolder() = %q, %v, %v; want empty, false, nil", name, ok, err)
+		}
+	})
+	t.Run("error", func(t *testing.T) {
+		srv := startServer(t, modeImplicit, capsListStatus)
+		c := srv.newClient(t, modeImplicit)
+		ctx, cancel := context.WithCancel(bg)
+		cancel()
+
+		if _, ok, err := c.SentFolder(ctx); ok || !errors.Is(err, context.Canceled) {
+			t.Errorf("SentFolder() = _, %v, %v; want false, context.Canceled", ok, err)
+		}
+	})
 }

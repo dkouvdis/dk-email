@@ -11,8 +11,8 @@ import (
 	"github.com/dkouvdis/dk-email/internal/mail"
 )
 
-// SetFlag adds or removes \Seen or \Flagged on uids with UID STORE, which
-// is safe to repeat if do retries after a dropped connection.
+// SetFlag adds or removes \Seen, \Flagged or \Answered on uids with UID
+// STORE, which is safe to repeat if do retries after a dropped connection.
 func (c *Client) SetFlag(ctx context.Context, folder string, uids []mail.UID, f mail.Flag, on bool) error {
 	if len(uids) == 0 {
 		return nil
@@ -32,6 +32,36 @@ func (c *Client) SetFlag(ctx context.Context, folder string, uids []mail.UID, f 
 		store := &goimap.StoreFlags{Op: op, Silent: true, Flags: []goimap.Flag{flag}}
 		if err := conn.Store(uidSet(uids), store, nil).Close(); err != nil {
 			return fmt.Errorf("store %v on %q: %w", f, folder, err)
+		}
+		return nil
+	})
+}
+
+// Append stores raw as a new message in folder with the given flags (e.g.
+// mail.FlagSeen). The folder doesn't need to be selected, and a missing one
+// returns mail.ErrFolderNotFound. APPEND isn't idempotent: if the connection
+// drops after the server stored the message but before it replied, do's retry
+// stores a second copy.
+func (c *Client) Append(ctx context.Context, folder string, raw []byte, flags ...mail.Flag) error {
+	imapFlags := make([]goimap.Flag, len(flags))
+	for i, f := range flags {
+		flag, err := imapFlag(f)
+		if err != nil {
+			return fmt.Errorf("imap: Append: %w", err)
+		}
+		imapFlags[i] = flag
+	}
+	return c.do(ctx, "Append", func(conn *imapclient.Client) error {
+		cmd := conn.Append(folder, int64(len(raw)), &goimap.AppendOptions{Flags: imapFlags})
+		_, writeErr := cmd.Write(raw)
+		if err := errors.Join(writeErr, cmd.Close()); err != nil {
+			return fmt.Errorf("append to %q: %w", folder, err)
+		}
+		if _, err := cmd.Wait(); err != nil {
+			if isMissingFolder(err) {
+				return fmt.Errorf("append to %q: %w: %w", folder, mail.ErrFolderNotFound, err)
+			}
+			return fmt.Errorf("append to %q: %w", folder, err)
 		}
 		return nil
 	})
@@ -101,11 +131,18 @@ func copyDeleteExpunge(conn *imapclient.Client, pending []goimap.UID, uids []mai
 // destError names the folders, mapping a missing destination to
 // mail.ErrFolderNotFound while keeping the server error for do.
 func destError(from, to string, err error) error {
-	var serverErr *goimap.Error
-	if errors.As(err, &serverErr) && (serverErr.Code == goimap.ResponseCodeTryCreate || serverErr.Code == goimap.ResponseCodeNonExistent) {
+	if isMissingFolder(err) {
 		return fmt.Errorf("move from %q to %q: %w: %w", from, to, mail.ErrFolderNotFound, err)
 	}
 	return fmt.Errorf("move from %q to %q: %w", from, to, err)
+}
+
+// isMissingFolder reports whether the server rejected a command because the
+// destination mailbox doesn't exist.
+func isMissingFolder(err error) bool {
+	var serverErr *goimap.Error
+	return errors.As(err, &serverErr) &&
+		(serverErr.Code == goimap.ResponseCodeTryCreate || serverErr.Code == goimap.ResponseCodeNonExistent)
 }
 
 func imapFlag(f mail.Flag) (goimap.Flag, error) {
@@ -114,6 +151,8 @@ func imapFlag(f mail.Flag) (goimap.Flag, error) {
 		return goimap.FlagSeen, nil
 	case mail.FlagFlagged:
 		return goimap.FlagFlagged, nil
+	case mail.FlagAnswered:
+		return goimap.FlagAnswered, nil
 	}
 	return "", fmt.Errorf("unsupported flag %v", f)
 }

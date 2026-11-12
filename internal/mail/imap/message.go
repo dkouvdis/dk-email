@@ -21,23 +21,10 @@ var wholeMessage = &goimap.FetchItemBodySection{Peek: true}
 func (c *Client) Message(ctx context.Context, folder string, uid mail.UID) (mail.Message, error) {
 	var out mail.Message
 	err := c.do(ctx, "Message", func(conn *imapclient.Client) error {
-		if err := c.openLocked(conn, folder, readOnly, true); err != nil {
+		m, err := c.fetchWholeLocked(conn, folder, uid)
+		if err != nil {
 			return err
 		}
-		opts := &goimap.FetchOptions{
-			UID:          true,
-			Flags:        true,
-			InternalDate: true,
-			BodySection:  []*goimap.FetchItemBodySection{wholeMessage},
-		}
-		msgs, err := conn.Fetch(goimap.UIDSetNum(goimap.UID(uid)), opts).Collect()
-		if err != nil {
-			return fmt.Errorf("fetch UID %d from %q: %w", uid, folder, err)
-		}
-		if len(msgs) == 0 {
-			return finalError{fmt.Errorf("UID %d in %q: %w", uid, folder, mail.ErrMessageNotFound)}
-		}
-		m := msgs[0]
 		parsed, err := render.Parse(bytes.NewReader(m.FindBodySection(wholeMessage)))
 		if err != nil {
 			return finalError{fmt.Errorf("UID %d in %q: %w", uid, folder, err)}
@@ -54,4 +41,44 @@ func (c *Client) Message(ctx context.Context, folder string, uid mail.UID) (mail
 		return mail.Message{}, err
 	}
 	return out, nil
+}
+
+// Raw returns the exact stored RFC 5322 bytes of a message, using BODY.PEEK[]
+// so \Seen is never set. Errors are the same as Message's.
+func (c *Client) Raw(ctx context.Context, folder string, uid mail.UID) ([]byte, error) {
+	var out []byte
+	err := c.do(ctx, "Raw", func(conn *imapclient.Client) error {
+		m, err := c.fetchWholeLocked(conn, folder, uid)
+		if err != nil {
+			return err
+		}
+		out = m.FindBodySection(wholeMessage)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// fetchWholeLocked opens folder read-only and fetches one message's flags,
+// internal date and BODY.PEEK[].
+func (c *Client) fetchWholeLocked(conn *imapclient.Client, folder string, uid mail.UID) (*imapclient.FetchMessageBuffer, error) {
+	if err := c.openLocked(conn, folder, readOnly, true); err != nil {
+		return nil, err
+	}
+	opts := &goimap.FetchOptions{
+		UID:          true,
+		Flags:        true,
+		InternalDate: true,
+		BodySection:  []*goimap.FetchItemBodySection{wholeMessage},
+	}
+	msgs, err := conn.Fetch(goimap.UIDSetNum(goimap.UID(uid)), opts).Collect()
+	if err != nil {
+		return nil, fmt.Errorf("fetch UID %d from %q: %w", uid, folder, err)
+	}
+	if len(msgs) == 0 {
+		return nil, finalError{fmt.Errorf("UID %d in %q: %w", uid, folder, mail.ErrMessageNotFound)}
+	}
+	return msgs[0], nil
 }

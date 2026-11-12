@@ -88,7 +88,9 @@ type testServer struct {
 
 	// hangList makes LIST block until the test ends.
 	hangList atomic.Bool
-	release  chan struct{}
+	// noSentRole makes LIST report "Sent" without its \Sent attribute.
+	noSentRole atomic.Bool
+	release    chan struct{}
 }
 
 // startServer runs an in-memory IMAP server on 127.0.0.1 with the seeded mailboxes.
@@ -223,6 +225,9 @@ func (s *testSession) List(w *imapserver.ListWriter, ref string, patterns []stri
 			continue
 		}
 		data := &goimap.ListData{Mailbox: m.name, Delim: '/', Attrs: m.attrs}
+		if m.name == "Sent" && s.srv.noSentRole.Load() {
+			data.Attrs = nil
+		}
 		if options.ReturnStatus != nil && !m.noselect {
 			status, err := s.user.Status(m.name, options.ReturnStatus)
 			if err != nil {

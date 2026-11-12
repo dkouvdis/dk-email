@@ -25,6 +25,29 @@ func (c *Client) Folders(ctx context.Context) ([]mail.Folder, error) {
 	return folders, nil
 }
 
+// SentFolder returns the name of the folder with mail.RoleSent; ok is false
+// when the account has none.
+func (c *Client) SentFolder(ctx context.Context) (name string, ok bool, err error) {
+	err = c.do(ctx, "SentFolder", func(conn *imapclient.Client) error {
+		folders, err := listFolders(conn)
+		if err != nil {
+			return err
+		}
+		for _, f := range folders {
+			if f.Role == mail.RoleSent {
+				name, ok = f.Name, true
+				return nil
+			}
+		}
+		name, ok = "", false
+		return nil
+	})
+	if err != nil {
+		return "", false, err
+	}
+	return name, ok, nil
+}
+
 var countOptions = goimap.StatusOptions{NumMessages: true, NumUnseen: true}
 
 func listFolders(conn *imapclient.Client) ([]mail.Folder, error) {

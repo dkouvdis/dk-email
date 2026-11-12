@@ -1,12 +1,16 @@
 package imap
 
 import (
+	"bytes"
+	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"testing"
 	"time"
 
 	goimap "github.com/emersion/go-imap/v2"
+	"github.com/emersion/go-imap/v2/imapclient"
 
 	"github.com/dkouvdis/dk-email/internal/mail"
 )
@@ -205,5 +209,155 @@ func TestMove_EdgeCases(t *testing.T) {
 	}
 	if count(t, srv, "INBOX") != 3 {
 		t.Error("a failed move changed the source")
+	}
+}
+
+// serverFlags reads a message's flags over a second connection, so the check
+// doesn't depend on what the client under test reports.
+func serverFlags(t *testing.T, srv *testServer, folder string, uid mail.UID) []goimap.Flag {
+	t.Helper()
+	probe := srv.newClient(t, modeImplicit)
+	var flags []goimap.Flag
+	err := probe.do(timeoutCtx(t, 10*time.Second), "probe", func(conn *imapclient.Client) error {
+		if err := probe.openLocked(conn, folder, readOnly, false); err != nil {
+			return err
+		}
+		msgs, err := conn.Fetch(goimap.UIDSetNum(goimap.UID(uid)), &goimap.FetchOptions{Flags: true}).Collect()
+		if err != nil || len(msgs) != 1 {
+			return fmt.Errorf("fetch UID %d: %d messages, error %v", uid, len(msgs), err)
+		}
+		flags = msgs[0].Flags
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return flags
+}
+
+func TestSetFlag_SetsAndClearsAnswered(t *testing.T) {
+	srv := startServer(t, modeImplicit, capsListStatus)
+	c := srv.newClient(t, modeImplicit)
+	ctx := timeoutCtx(t, 10*time.Second)
+	uid := inboxUIDs(t, c)[1] // unseen
+
+	if err := c.SetFlag(ctx, "INBOX", []mail.UID{uid}, mail.FlagAnswered, true); err != nil {
+		t.Fatalf("SetFlag(answered, true) error = %v", err)
+	}
+	if got := serverFlags(t, srv, "INBOX", uid); !slices.Equal(got, []goimap.Flag{goimap.FlagAnswered}) {
+		t.Errorf("flags after set = %v, want only \\Answered", got)
+	}
+
+	if err := c.SetFlag(ctx, "INBOX", []mail.UID{uid}, mail.FlagAnswered, false); err != nil {
+		t.Fatalf("SetFlag(answered, false) error = %v", err)
+	}
+	if got := serverFlags(t, srv, "INBOX", uid); len(got) != 0 {
+		t.Errorf("flags after clear = %v, want none", got)
+	}
+}
+
+func TestAppend_StoresExactBytesWithFlagsAndListsThem(t *testing.T) {
+	srv := startServer(t, modeImplicit, capsListStatus)
+	c := srv.newClient(t, modeImplicit)
+	ctx := timeoutCtx(t, 10*time.Second)
+	raw := []byte("Message-ID: <sent1@example.com>\r\nSubject: Sent one\r\n\r\nh\xc3\xa9llo\r\n\r\n.\r\nno trailing newline")
+
+	if err := c.Append(ctx, "Sent", raw, mail.FlagSeen); err != nil {
+		t.Fatalf("Append() error = %v", err)
+	}
+
+	sums, err := c.Summaries(ctx, "Sent", 0, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sums) != 2 {
+		t.Fatalf("Sent lists %d messages, want 2", len(sums))
+	}
+	var got mail.Summary
+	for _, s := range sums {
+		if s.Subject == "Sent one" {
+			got = s
+		}
+	}
+	if got.Subject != "Sent one" || !got.Seen {
+		t.Errorf("appended summary = %+v, want subject %q and seen", got, "Sent one")
+	}
+	stored, err := c.Raw(ctx, "Sent", got.UID)
+	if err != nil || !bytes.Equal(stored, raw) {
+		t.Errorf("stored bytes = %q, %v; want %q", stored, err, raw)
+	}
+	if n := srv.ln.accepted(); n != 1 {
+		t.Errorf("accepted %d connections, want 1", n)
+	}
+}
+
+func TestAppend_WithoutFlagsLeavesMessageUnseen(t *testing.T) {
+	srv := startServer(t, modeImplicit, capsListStatus)
+	c := srv.newClient(t, modeImplicit)
+	ctx := timeoutCtx(t, 10*time.Second)
+
+	if err := c.Append(ctx, "Archive", []byte("Subject: x\r\n\r\ny\r\n")); err != nil {
+		t.Fatal(err)
+	}
+
+	if n := count(t, srv, "Archive"); n != 3 {
+		t.Errorf("Archive has %d messages, want 3", n)
+	}
+	if got := serverFlags(t, srv, "Archive", 3); len(got) != 0 {
+		t.Errorf("flags = %v, want none", got)
+	}
+}
+
+func TestAppend_Errors(t *testing.T) {
+	srv := startServer(t, modeImplicit, capsListStatus)
+	c := srv.newClient(t, modeImplicit)
+	ctx := timeoutCtx(t, 10*time.Second)
+
+	if err := c.Append(ctx, "Nope", []byte("Subject: x\r\n\r\n"), mail.FlagSeen); !errors.Is(err, mail.ErrFolderNotFound) {
+		t.Errorf("missing folder: error = %v, want ErrFolderNotFound", err)
+	}
+	if err := c.Append(ctx, "Sent", []byte("Subject: x\r\n\r\n"), mail.Flag(99)); err == nil {
+		t.Error("unknown flag: error = nil")
+	}
+	if n := srv.ln.accepted(); n != 1 {
+		t.Errorf("accepted %d connections, want 1 (a server error must not reconnect)", n)
+	}
+	if n := count(t, srv, "Sent"); n != 1 {
+		t.Errorf("Sent has %d messages, want 1", n)
+	}
+}
+
+func TestAppend_ReconnectsAfterServerDropsConnection(t *testing.T) {
+	srv := startServer(t, modeImplicit, capsListStatus)
+	c := srv.newClient(t, modeImplicit)
+	ctx := timeoutCtx(t, 10*time.Second)
+	if _, err := c.Folders(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	srv.ln.dropAll()
+	err := c.Append(ctx, "Sent", []byte("Subject: again\r\n\r\nx\r\n"), mail.FlagSeen)
+
+	if err != nil {
+		t.Fatalf("Append() after drop error = %v", err)
+	}
+	if n := count(t, srv, "Sent"); n != 2 {
+		t.Errorf("Sent has %d messages, want 2", n)
+	}
+	if n := srv.ln.accepted(); n != 2 {
+		t.Errorf("accepted %d connections, want 2", n)
+	}
+}
+
+func TestAppend_CancelledContextDoesNotConnect(t *testing.T) {
+	srv := startServer(t, modeImplicit, capsListStatus)
+	c := srv.newClient(t, modeImplicit)
+	ctx, cancel := context.WithCancel(bg)
+	cancel()
+
+	err := c.Append(ctx, "Sent", []byte("Subject: x\r\n\r\n"), mail.FlagSeen)
+
+	if !errors.Is(err, context.Canceled) || srv.ln.accepted() != 0 {
+		t.Errorf("error = %v, connections = %d; want context.Canceled and none", err, srv.ln.accepted())
 	}
 }

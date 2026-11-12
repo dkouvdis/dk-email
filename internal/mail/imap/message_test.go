@@ -101,3 +101,58 @@ func TestMessage_UIDValidityChange(t *testing.T) {
 		t.Errorf("error = %v, want mail.ErrFolderChanged naming the folder", err)
 	}
 }
+
+func TestRaw_ReturnsExactBytesWithoutSettingSeen(t *testing.T) {
+	srv := startServer(t, modeImplicit, capsListStatus)
+	srv.createMailbox(t, "Mail")
+	raw := "Message-ID: <r1@example.com>\r\nSubject: Raw\r\nContent-Type: text/plain\r\n\r\nh\xc3\xa9llo\r\n\r\n.\r\nlast line without newline"
+	if _, err := srv.user.Append("Mail", newLiteral(raw), &goimap.AppendOptions{Time: base(1)}); err != nil {
+		t.Fatal(err)
+	}
+	c := srv.newClient(t, modeImplicit)
+	ctx := timeoutCtx(t, 10*time.Second)
+
+	got, err := c.Raw(ctx, "Mail", 1)
+
+	if err != nil {
+		t.Fatalf("Raw() error = %v", err)
+	}
+	if string(got) != raw {
+		t.Errorf("Raw() = %q, want %q", got, raw)
+	}
+	status, err := srv.user.Status("Mail", &goimap.StatusOptions{NumUnseen: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if *status.NumUnseen != 1 {
+		t.Errorf("server unseen = %d after Raw, want 1 (no implicit \\Seen)", *status.NumUnseen)
+	}
+}
+
+func TestRaw_Errors(t *testing.T) {
+	srv := startServer(t, modeImplicit, capsListStatus)
+	srv.seedBulk(t, "Bulk", 2)
+	c := srv.newClient(t, modeImplicit)
+	ctx := timeoutCtx(t, 10*time.Second)
+
+	if _, err := c.Raw(ctx, "INBOX", 9999); !errors.Is(err, mail.ErrMessageNotFound) {
+		t.Errorf("missing UID error = %v, want mail.ErrMessageNotFound", err)
+	}
+	if _, err := c.Raw(ctx, "Nope", 1); !errors.Is(err, mail.ErrFolderNotFound) {
+		t.Errorf("missing folder error = %v, want mail.ErrFolderNotFound", err)
+	}
+	if n := srv.ln.accepted(); n != 1 {
+		t.Errorf("accepted %d connections, want 1 (errors must not reconnect)", n)
+	}
+
+	if _, err := c.Summaries(ctx, "Bulk", 0, 10); err != nil {
+		t.Fatal(err)
+	}
+	if err := srv.user.Delete("Bulk"); err != nil {
+		t.Fatal(err)
+	}
+	srv.seedBulk(t, "Bulk", 2)
+	if _, err := c.Raw(ctx, "Bulk", 1); !errors.Is(err, mail.ErrFolderChanged) {
+		t.Errorf("after UIDVALIDITY change error = %v, want mail.ErrFolderChanged", err)
+	}
+}
