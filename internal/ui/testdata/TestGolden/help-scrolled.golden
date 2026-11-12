@@ -3,11 +3,11 @@
 │ ▶ Inbox                    2 ││  ●    │ Keys                      esc close  │                                 13:30 │
 │   Sent Mail                  ││  ●    │ / press / to filter by key or descr… │                                 Nov 8 │
 │   All Mail                   ││       │                                      │                                       │
-│   Trash                      ││       │   d           delete                 │                                       │
-│   Receipts                 1 ││       │   m           move                   │                                       │
-│                              ││       │   ctrl+r      refresh                │                                       │
-│ Work                         ││       │                                      │                                       │
-│   Inbox                    1 ││       │ Compose                              │                                       │
+│   Trash                      ││       │   ctrl+r      refresh                │                                       │
+│   Receipts                 1 ││       │                                      │                                       │
+│                              ││       │ Compose                              │                                       │
+│ Work                         ││       │   r           reply                  │                                       │
+│   Inbox                    1 ││       │   R           reply all              │                                       │
 │   Archive                    ││       │   c           new message            │                                       │
 │                              ││       │                                      │                                       │
 │                              ││       │ Accounts & view                      │                                       │

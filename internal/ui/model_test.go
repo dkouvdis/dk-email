@@ -179,6 +179,9 @@ func TestModel_HintsFollowFocus(t *testing.T) {
 	if !strings.Contains(hints(), "Archive: e") || strings.Contains(hints(), "Accounts") {
 		t.Errorf("narrow list hints = %q, want triage keys and no account picker", hints())
 	}
+	if !strings.Contains(hints(), "Reply: r | New message: c") {
+		t.Errorf("narrow list hints = %q, want Reply before New message", hints())
+	}
 	m = send(t, m, press("h"))
 	if strings.Contains(hints(), "Archive") {
 		t.Errorf("sidebar hints = %q, want no triage keys", hints())

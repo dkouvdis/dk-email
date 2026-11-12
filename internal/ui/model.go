@@ -216,6 +216,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleEditorDone(msg)
 	case sentMsg:
 		return m.handleSent(msg)
+	case replyFetchedMsg:
+		return m.handleReplyFetched(msg)
 	}
 	return m, nil
 }
@@ -319,6 +321,10 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m.openPicker()
 		case key.Matches(msg, m.keys.Compose):
 			return m.startCompose()
+		case key.Matches(msg, m.keys.Reply):
+			return m.startReply(false)
+		case key.Matches(msg, m.keys.ReplyAll):
+			return m.startReply(true)
 		case m.isTriageKey(msg):
 			return m.triage(msg)
 		}
@@ -349,6 +355,10 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.openConnect()
 	case key.Matches(msg, m.keys.Compose) && m.open.account >= 0:
 		return m.startCompose()
+	case m.focus == PaneList && key.Matches(msg, m.keys.Reply):
+		return m.startReply(false)
+	case m.focus == PaneList && key.Matches(msg, m.keys.ReplyAll):
+		return m.startReply(true)
 	case m.focus == PaneSidebar:
 		var cmd tea.Cmd
 		m.side, cmd = m.side.Update(msg)

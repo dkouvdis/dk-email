@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 	"testing"
 
@@ -147,9 +148,13 @@ func TestKeys_HelpHasComposeSection(t *testing.T) {
 		if s.Title != "Compose" {
 			continue
 		}
-		// r, R and f are bound but not wired yet, so they aren't advertised.
-		if len(s.Keys) != 1 || s.Keys[0].Help().Key != "c" {
-			t.Errorf("Compose section keys = %+v, want just c", s.Keys)
+		// f is bound but not wired yet, so it isn't advertised.
+		var got []string
+		for _, k := range s.Keys {
+			got = append(got, k.Help().Key)
+		}
+		if want := []string{"r", "R", "c"}; !slices.Equal(got, want) {
+			t.Errorf("Compose section keys = %v, want %v", got, want)
 		}
 		return
 	}

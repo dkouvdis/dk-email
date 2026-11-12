@@ -39,6 +39,9 @@ type draftState struct {
 	parsed   mail.Draft
 	parseErr error
 	sendErr  error
+	// loading is set while the message being replied to is fetched, before
+	// any editor has opened. It holds the slot so no other draft starts.
+	loading bool
 }
 
 func (d *draftState) reedit() bool { return d.text != "" }
@@ -51,25 +54,45 @@ type sentMsg struct {
 	took    time.Duration
 }
 
-// startCompose opens an empty message from the open folder's account.
-func (m Model) startCompose() (Model, tea.Cmd) {
+// draftAccount is the account a new draft would be sent from. When none can
+// start, it sets the status that says why, or leaves it alone if there is
+// nothing to say.
+func (m *Model) draftAccount() (int, bool) {
 	switch {
 	case m.sending:
 		m.setStatus(statusSending)
-		return m, nil
+		return 0, false
 	case m.draft != nil:
 		m.setStatus(statusFinishDraft)
-		return m, nil
+		return 0, false
 	case m.open.account < 0:
-		return m, nil
+		return 0, false
 	}
 	account := m.open.account
-	acct := m.accts[account]
 	if m.senders[account] == nil {
-		m.setStatus(fmt.Sprintf("Sending isn't set up for %s: add smtp_host to its config", acct.Name))
+		m.setStatus(fmt.Sprintf("Sending isn't set up for %s: add smtp_host to its config", m.accts[account].Name))
+		return 0, false
+	}
+	return account, true
+}
+
+// identity is the From address of account's messages.
+func (m Model) identity(account int) mail.Address {
+	a := m.accts[account]
+	return mail.Address{Name: a.FromName, Email: a.Email}
+}
+
+// startCompose opens an empty message from the open folder's account.
+func (m Model) startCompose() (Model, tea.Cmd) {
+	account, ok := m.draftAccount()
+	if !ok {
 		return m, nil
 	}
-	base := compose.New(mail.Address{Name: acct.FromName, Email: acct.Email})
+	return m.startDraft(account, compose.New(m.identity(account)))
+}
+
+// startDraft opens base in the editor as the draft being composed.
+func (m Model) startDraft(account int, base mail.Draft) (Model, tea.Cmd) {
 	text := compose.Format(base)
 	m.draft = &draftState{account: account, base: base, orig: text}
 	m, cmd := m.startEditor(text)

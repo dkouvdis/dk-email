@@ -5,6 +5,7 @@
 package reader
 
 import (
+	"cmp"
 	"fmt"
 	"maps"
 	"slices"
@@ -56,6 +57,7 @@ type Model struct {
 	folder   string
 	th       thread.Thread
 	defaults map[mail.UID]bool // expanded when the thread was opened
+	focus    mail.UID          // the message Open was asked to show, or 0
 	expanded map[mail.UID]bool
 	bodies   map[mail.UID]body
 
@@ -99,6 +101,10 @@ func (m Model) Open(account int, folder string, th thread.Thread, focus mail.UID
 	m.offset = 0
 
 	expand := focus
+	m.focus = 0
+	if m.has(focus) {
+		m.focus = focus
+	}
 	if expand == 0 || !m.has(expand) {
 		expand = th.Latest().UID
 		if i := slices.IndexFunc(th.Messages, func(s mail.Summary) bool { return !s.Seen }); i >= 0 {
@@ -166,6 +172,12 @@ func (m Model) SetMessage(uid mail.UID, msg mail.Message, err error) Model {
 	return m
 }
 
+// Message returns the fetched message uid, if the open thread has it loaded.
+func (m Model) Message(uid mail.UID) (mail.Message, bool) {
+	b, ok := m.bodies[uid]
+	return b.msg, ok && b.state == loaded
+}
+
 // SetSeen updates read markers after a flag change.
 func (m Model) SetSeen(uids []mail.UID, seen bool) Model {
 	return m.update(uids, func(s *mail.Summary) { s.Seen = seen })
@@ -198,6 +210,25 @@ func (m Model) Current() mail.UID {
 	return 0
 }
 
+// ReplyTarget is the message a reply answers: the one the thread was opened
+// on, when Open was given one that is still here, else the thread's latest
+// message (newest by date, then highest UID). It's 0 when closed.
+func (m Model) ReplyTarget() mail.UID {
+	if !m.open || len(m.th.Messages) == 0 {
+		return 0
+	}
+	if m.focus != 0 && m.has(m.focus) {
+		return m.focus
+	}
+	latest := slices.MaxFunc(m.th.Messages, func(a, b mail.Summary) int {
+		if c := a.Date.Compare(b.Date); c != 0 {
+			return c
+		}
+		return cmp.Compare(a.UID, b.UID)
+	})
+	return latest.UID
+}
+
 // Remove drops messages that were moved away. If the current message goes,
 // the next one (or the last) becomes current; with none left the reader
 // closes.
@@ -211,6 +242,9 @@ func (m Model) Remove(uids []mail.UID) Model {
 		return m.Close()
 	}
 	m.th = thread.Thread{Messages: msgs}
+	if slices.Contains(uids, m.focus) {
+		m.focus = 0
+	}
 	if m.Current() == 0 {
 		next := msgs[min(max(cur, 0), len(msgs)-1)].UID
 		m.defaults = map[mail.UID]bool{next: true}

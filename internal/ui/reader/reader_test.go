@@ -286,6 +286,33 @@ func TestCurrent(t *testing.T) {
 	}
 }
 
+func TestReplyTarget(t *testing.T) {
+	if got := open(conversation(), 0).ReplyTarget(); got != 3 {
+		t.Errorf("ReplyTarget() = %d, want the latest (3), not the first unread", got)
+	}
+	m := open(conversation(), 1)
+	if got := m.ReplyTarget(); got != 1 {
+		t.Errorf("ReplyTarget() = %d, want the focused message (1)", got)
+	}
+	if got := m.Remove([]mail.UID{2}).ReplyTarget(); got != 1 {
+		t.Errorf("ReplyTarget() = %d after removing another message, want 1", got)
+	}
+	if got := m.Remove([]mail.UID{1}).ReplyTarget(); got != 3 {
+		t.Errorf("ReplyTarget() = %d after removing the focused message, want the latest (3)", got)
+	}
+	if got := open(conversation(), 99).ReplyTarget(); got != 3 {
+		t.Errorf("ReplyTarget() = %d for a focus outside the thread, want the latest (3)", got)
+	}
+	if got := New(theme.Default(), time.Now).ReplyTarget(); got != 0 {
+		t.Errorf("ReplyTarget() on an empty reader = %d, want 0", got)
+	}
+	// Equal dates: the highest UID wins.
+	same := thread.Thread{Messages: []mail.Summary{summary(7, "A", 1, true), summary(9, "B", 1, true), summary(8, "C", 1, true)}}
+	if got := open(same, 0).ReplyTarget(); got != 9 {
+		t.Errorf("ReplyTarget() = %d on a date tie, want the highest UID (9)", got)
+	}
+}
+
 func TestSetFlaggedAndRemove(t *testing.T) {
 	m := open(conversation(), 0).SetFlagged([]mail.UID{1}, true)
 	if !strings.Contains(view(m), "*") {
