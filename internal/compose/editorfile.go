@@ -2,7 +2,6 @@ package compose
 
 import (
 	"fmt"
-	netmail "net/mail"
 	"strings"
 
 	"github.com/dkouvdis/dk-email/internal/mail"
@@ -21,47 +20,6 @@ func Format(d mail.Draft) string {
 	b.WriteString("\n")
 	b.WriteString(d.Body)
 	return b.String()
-}
-
-func formatAddresses(l []mail.Address) string {
-	parts := make([]string, len(l))
-	for i, a := range l {
-		parts[i] = formatAddress(a)
-	}
-	return strings.Join(parts, ", ")
-}
-
-func formatAddress(a mail.Address) string {
-	name := singleLine(a.Name)
-	if name == "" || a.Email == "" {
-		if a.Email != "" {
-			return a.Email
-		}
-		return name
-	}
-	if needsQuotes(name) {
-		name = `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(name) + `"`
-	}
-	return name + " <" + a.Email + ">"
-}
-
-// needsQuotes reports whether a display name must be a quoted-string. Only
-// ASCII is checked: UTF-8 text is a valid atom.
-func needsQuotes(name string) bool {
-	if name != strings.TrimSpace(name) {
-		return true
-	}
-	for _, r := range name {
-		if r < 0x80 && (strings.ContainsRune("()<>[]:;@\\,.\"", r) || r < ' ' || r == 0x7f) {
-			return true
-		}
-	}
-	return false
-}
-
-// singleLine keeps a value on one line so it can't inject extra headers.
-func singleLine(s string) string {
-	return strings.NewReplacer("\r\n", " ", "\r", " ", "\n", " ").Replace(s)
 }
 
 // Parse reads the editor file back into a copy of base, replacing To, Cc, Bcc,
@@ -140,19 +98,4 @@ func Parse(text string, base mail.Draft) (mail.Draft, error) {
 	d.Subject = get("subject")
 	d.Body = body
 	return d, nil
-}
-
-func parseAddresses(header, value string) ([]mail.Address, error) {
-	if value == "" {
-		return nil, nil
-	}
-	list, err := netmail.ParseAddressList(value)
-	if err != nil {
-		return nil, fmt.Errorf("%s: invalid address list %q: %w", header, value, err)
-	}
-	out := make([]mail.Address, len(list))
-	for i, a := range list {
-		out[i] = mail.Address{Name: a.Name, Email: a.Address}
-	}
-	return out, nil
 }
