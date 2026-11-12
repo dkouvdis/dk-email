@@ -10,11 +10,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/emersion/go-message"
+
 	"github.com/dkouvdis/dk-email/internal/compose"
 	"github.com/dkouvdis/dk-email/internal/config"
 	"github.com/dkouvdis/dk-email/internal/mail"
 	"github.com/dkouvdis/dk-email/internal/mail/imap"
 	"github.com/dkouvdis/dk-email/internal/mail/smtp"
+	"github.com/dkouvdis/dk-email/internal/render"
 )
 
 var (
@@ -220,17 +223,116 @@ func TestSend_Forward(t *testing.T) {
 	}
 }
 
-func TestSend_DefaultExtractorRefusesForward(t *testing.T) {
-	r := newRig(acct())
-	r.s.extract = New(acct(), r.t, r.st, nil).extract
-	d := draft()
-	d.ForwardOf = &mail.MessageRef{Folder: "INBOX", UID: 1}
-	err := r.s.Send(context.Background(), d)
-	if err == nil || errors.Is(err, mail.ErrAfterDelivery) {
-		t.Fatalf("err = %v", err)
+// original builds the raw message being forwarded, attachments included.
+func original(t *testing.T, atts ...compose.Attachment) []byte {
+	t.Helper()
+	d := mail.Draft{
+		From:    mail.Address{Email: "alice@example.com"},
+		To:      []mail.Address{{Email: "me@example.com"}},
+		Subject: "Original",
+		Body:    "see attached",
 	}
-	if got := order(r); got != "raw" {
+	raw, err := compose.Build(d, atts, time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), "orig@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return raw
+}
+
+func forwardDraft() mail.Draft {
+	d := draft()
+	d.ForwardOf = &mail.MessageRef{Folder: "Archive", UID: 7}
+	return d
+}
+
+func TestSend_ForwardCopiesEveryAttachmentIntact(t *testing.T) {
+	binary := make([]byte, 5000)
+	for i := range binary {
+		binary[i] = byte(i * 31)
+	}
+	atts := []compose.Attachment{
+		{Filename: "report.pdf", ContentType: "application/pdf", Data: binary},
+		{Filename: "résumé €.txt", ContentType: "text/plain; charset=utf-8", Data: []byte("café\r\nline two\r\n")},
+		{Filename: "logo.png", ContentType: "image/png", Data: []byte("\x89PNG\r\n\x1a\n")},
+	}
+	r := newRig(acct())
+	r.st.raw = original(t, atts...)
+
+	if err := r.s.Send(context.Background(), forwardDraft()); err != nil {
+		t.Fatal(err)
+	}
+
+	if got, want := order(r), "raw,smtp,sentfolder,append"; got != want {
+		t.Fatalf("calls = %s, want %s (raw fetched exactly once, before anything is sent)", got, want)
+	}
+	if r.st.rawFolder != "Archive" || r.st.rawUID != 7 {
+		t.Errorf("Raw(%q, %d)", r.st.rawFolder, r.st.rawUID)
+	}
+	e, err := message.Read(bytes.NewReader(r.t.msg))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mt, _, _ := e.Header.ContentType(); mt != "multipart/mixed" {
+		t.Fatalf("Content-Type = %q, want multipart/mixed", mt)
+	}
+	parts, err := render.Parts(r.t.msg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(parts) != len(atts) {
+		t.Fatalf("sent %d attachments, want %d", len(parts), len(atts))
+	}
+	for i, a := range atts {
+		if p := parts[i]; p.Filename != a.Filename || p.ContentType != a.ContentType || !bytes.Equal(p.Data, a.Data) {
+			t.Errorf("attachment %d = %q %q (%d bytes), want %q %q (%d bytes, identical)", i, p.Filename, p.ContentType, len(p.Data), a.Filename, a.ContentType, len(a.Data))
+		}
+	}
+	sent, err := parseSent(t, r.t.msg)
+	if err != nil || sent.Body != "the launch is on Friday" {
+		t.Errorf("body = %q, %v", sent.Body, err)
+	}
+	if !bytes.Equal(r.st.appended, r.t.msg) {
+		t.Error("appended bytes differ from sent bytes")
+	}
+}
+
+// parseSent reads the message the way the reader would.
+func parseSent(t *testing.T, raw []byte) (mail.Message, error) {
+	t.Helper()
+	return render.Parse(bytes.NewReader(raw))
+}
+
+func TestSend_ForwardWithoutAttachmentsIsPlainText(t *testing.T) {
+	r := newRig(acct())
+	r.st.raw = original(t)
+
+	if err := r.s.Send(context.Background(), forwardDraft()); err != nil {
+		t.Fatal(err)
+	}
+
+	e, err := message.Read(bytes.NewReader(r.t.msg))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mt, _, _ := e.Header.ContentType(); mt != "text/plain" {
+		t.Errorf("Content-Type = %q, want text/plain", mt)
+	}
+	if got := order(r); got != "raw,smtp,sentfolder,append" {
 		t.Errorf("calls = %s", got)
+	}
+}
+
+func TestSend_ForwardOfUnreadableOriginalSendsNothing(t *testing.T) {
+	r := newRig(acct())
+	r.st.raw = []byte("not a header\x00\n")
+
+	err := r.s.Send(context.Background(), forwardDraft())
+
+	if err == nil || errors.Is(err, mail.ErrAfterDelivery) {
+		t.Fatalf("err = %v, want a pre-delivery error", err)
+	}
+	if got := order(r); got != "raw" || r.t.msg != nil || r.st.appended != nil {
+		t.Errorf("calls = %s, sent %q, appended %q; want only the fetch", got, r.t.msg, r.st.appended)
 	}
 }
 

@@ -16,6 +16,7 @@ import (
 	"github.com/dkouvdis/dk-email/internal/compose"
 	"github.com/dkouvdis/dk-email/internal/config"
 	"github.com/dkouvdis/dk-email/internal/mail"
+	"github.com/dkouvdis/dk-email/internal/render"
 )
 
 // Transport delivers raw message bytes; *smtp.Transport satisfies it.
@@ -51,16 +52,28 @@ func New(acct config.Account, t Transport, st Store, log *slog.Logger) *Sender {
 		log = slog.New(slog.NewTextHandler(io.Discard, nil))
 	}
 	return &Sender{
-		acct:  acct,
-		t:     t,
-		st:    st,
-		log:   log,
-		now:   time.Now,
-		newID: compose.MessageID,
-		extract: func([]byte) ([]compose.Attachment, error) {
-			return nil, errors.New("forwarding attachments isn't supported yet")
-		},
+		acct:    acct,
+		t:       t,
+		st:      st,
+		log:     log,
+		now:     time.Now,
+		newID:   compose.MessageID,
+		extract: extractAttachments,
 	}
+}
+
+// extractAttachments copies the attachments of a raw message, with the same
+// rules the reader uses to list them.
+func extractAttachments(raw []byte) ([]compose.Attachment, error) {
+	parts, err := render.Parts(raw)
+	if err != nil {
+		return nil, err
+	}
+	atts := make([]compose.Attachment, len(parts))
+	for i, p := range parts {
+		atts[i] = compose.Attachment{Filename: p.Filename, ContentType: p.ContentType, Data: p.Data}
+	}
+	return atts, nil
 }
 
 // afterDeliveryError reports that the message was delivered but follow-up
