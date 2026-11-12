@@ -277,12 +277,12 @@ Also rebind refresh from `r` to `ctrl+r`, and add `r`/`R`/`f`/`c` to `KeyMap`, u
 
 - [x] `compose` table tests cover every recipient, subject, References and quoting rule in the spec.
 - [x] UI tests: `r` on a collapsed thread drafts a reply to the latest message, `R` includes To and Cc minus me, and on an expanded row the selected message is the target.
-- [ ] Manual: a reply to yourself threads under the original in Gmail's web UI, and the original shows as answered in another client.
+- [x] Manual: a reply to yourself threads under the original in Gmail's web UI, and the original shows as answered in another client.
 
 **Verification:**
 
 - [x] `go test -race ./internal/compose/... ./internal/ui/...` passes.
-- [ ] Manual check above.
+- [x] Manual check above.
 
 **Dependencies:** S8
 
@@ -305,12 +305,12 @@ Also rebind refresh from `r` to `ctrl+r`, and add `r`/`R`/`f`/`c` to `KeyMap`, u
 
 - [x] `render.Parts` returns byte-identical attachment contents for fixtures with base64, quoted-printable and an RFC 2231 filename.
 - [x] `send` with `ForwardOf` set fetches raw once and builds a `multipart/mixed` message carrying every attachment. A failed fetch is a pre-delivery error, so nothing is sent.
-- [ ] Manual: forwarding a message with a PDF to yourself delivers the same bytes (`shasum` matches).
+- [x] Manual: forwarding a message with a PDF to yourself delivers the same bytes (`shasum` matches).
 
 **Verification:**
 
 - [x] `go test -race ./internal/render/... ./internal/compose/... ./internal/send/... ./internal/ui/...` passes.
-- [ ] Manual check above.
+- [x] Manual check above.
 
 **Dependencies:** S9 (shares compose/ui files; logically only S8)
 
@@ -322,9 +322,9 @@ Also rebind refresh from `r` to `ctrl+r`, and add `r`/`R`/`f`/`c` to `KeyMap`, u
 
 ### ✅ Checkpoint 3: All actions
 
-- [ ] Spec success criteria 1–8 pass manually, sending to yourself only.
+- [x] Spec success criteria 1–8 pass manually, sending to yourself only.
 - [x] Coverage targets are met: `compose` ≥ 90%, `send` ≥ 90%, `mail/smtp` ≥ 80%, `mail/imap` ≥ 80%.
-- [ ] You review before Phase 4.
+- [x] You review before Phase 4.
 
 ---
 
@@ -388,18 +388,18 @@ Also rebind refresh from `r` to `ctrl+r`, and add `r`/`R`/`f`/`c` to `KeyMap`, u
 
 ---
 
-### S13: Live verification and `v0.2.0-beta.1`
+### S13: Live verification and `v0.1.0-beta.4`
 
-**Description:** Run the full spec success-criteria list against Gmail and one non-Gmail account, sending to yourself only. Fix anything found. Then, **with your approval**, tag `v0.2.0-beta.1`. The release notes call out the `r` → `ctrl+r` rebind.
+**Description:** Run the full spec success-criteria list against Gmail and one non-Gmail account, sending to yourself only. Fix anything found. Then, **with your approval**, tag `v0.1.0-beta.4` (you chose a beta bump over `v0.2.0-beta.1`). The release notes call out the `r` → `ctrl+r` rebind.
 
 **Acceptance criteria:**
 
-- [ ] Spec success criteria 1–9 are all checked.
-- [ ] You approve and push the `v0.2.0-beta.1` tag, and the GitHub pre-release has four archives and `checksums.txt`.
+- [x] Spec success criteria 1–9 are all checked.
+- [x] You approve and push the `v0.1.0-beta.4` tag, and the GitHub pre-release has four archives and `checksums.txt`.
 
 **Verification:**
 
-- [ ] `goreleaser check` passes. The release workflow is green.
+- [x] The release workflow is green (it runs GoReleaser; `goreleaser check` isn't installed locally).
 
 **Dependencies:** S12
 
@@ -411,5 +411,5 @@ Also rebind refresh from `r` to `ctrl+r`, and add `r`/`R`/`f`/`c` to `KeyMap`, u
 
 ### ✅ Checkpoint 4: v0.2.0
 
-- [ ] All spec success criteria are met.
+- [x] All spec success criteria are met.
 - [ ] You approve tagging `v0.2.0-rc.1`, then `v0.2.0`.

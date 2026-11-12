@@ -63,15 +63,16 @@ The full details are in [smtp-todo.md](smtp-todo.md).
 - [x] S10: Forward (`f`) with original attachments
 
 ### Checkpoint 3: All actions
-- [ ] Success criteria 1–8 from the spec pass manually, sending to yourself.
+- [x] Success criteria 1–8 from the spec pass manually, sending to yourself.
 
 ### Phase 4: Onboarding, docs, release
 - [x] S11: Connect popup SMTP fields + SMTP login test
 - [x] S12: Docs: README, SPEC.md, AGENTS.md and the Copilot mirror
-- [ ] S13: Live verification and `v0.2.0-beta.1` (tag on your approval)
+- [x] S13: Live verification and `v0.1.0-beta.4` (released as a pre-release)
 
 ### Checkpoint 4: v0.2.0
-- [ ] All spec success criteria are met, and you approve the tag.
+- [x] All spec success criteria are met.
+- [ ] You approve tagging `v0.2.0-rc.1`, then `v0.2.0`.
 
 ## Parallelization
 
