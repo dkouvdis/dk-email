@@ -90,7 +90,7 @@ func TestParse_AlternativePrefersPlain(t *testing.T) {
 // Real-world emails (anonymised) whose text/plain parts are junk or that
 // are HTML-only. Update with go test ./internal/render -run Golden -update
 func TestParse_Golden(t *testing.T) {
-	for _, name := range []string{"account-password-reset", "shop-newsletter", "shop-shipping", "news-digest"} {
+	for _, name := range []string{"account-password-reset", "shop-newsletter", "shop-shipping", "news-digest", "community-discussion", "marketplace-newsletter"} {
 		t.Run(name, func(t *testing.T) {
 			m := parseFile(t, name+".eml")
 			if !m.BodyFromHTML {
@@ -114,6 +114,9 @@ func TestPlainIsJunk(t *testing.T) {
 		{"zero-width padding", "Briefing " + strings.Repeat("\u200c ", 12) + "\nHi", true},
 		{"one zero-width char", "Hi\u200cthere", false},
 		{"template code", "%%=redirectTo(concat(\nHi", true},
+		{"generated links", "View comment ( https://example.com/a )\n\nUnsubscribe ( https://example.com/u )", true},
+		{"hubspot links", "View listing (https://example.com/a )\n\nManage preferences (https://example.com/p )", true},
+		{"one spaced link", "See the docs ( https://example.com/a ) for more.", false},
 		{"mostly blank", strings.Repeat("\n", 30) + "Hi", true},
 	}
 	for _, tt := range tests {
@@ -128,7 +131,7 @@ func TestPlainIsJunk(t *testing.T) {
 func TestHTMLToMarkdown_StripsEmailCruft(t *testing.T) {
 	src := `<html><head><title>T</title></head><body>
 <div style="display:none; max-height:0">Preheader&zwnj;&nbsp;&zwnj;</div>
-<span style="mso-hide: all !important">Outlook only</span>
+<a style="mso-hide: all !important" href="https://example.com/c">View comment</a>
 <img src="https://t.example/open.gif" width="1" height="1" alt="pixel">
 <!--[if mso]><p>Conditional</p><![endif]-->
 <table role="presentation"><tr><td><a href="https://example.com/"><img src="logo.png" alt=""></a></td></tr>
@@ -136,12 +139,12 @@ func TestHTMLToMarkdown_StripsEmailCruft(t *testing.T) {
 <table><tr><th>Item</th><th>Price</th></tr><tr><td>Coffee</td><td>£9</td></tr></table>
 </body></html>`
 	got := htmlToMarkdown(src)
-	for _, bad := range []string{"Preheader", "Outlook only", "pixel", "Conditional", "javascript", "logo", "](https://example.com/)", "\u200c", "T\n"} {
+	for _, bad := range []string{"Preheader", "pixel", "Conditional", "javascript", "logo", "](https://example.com/)", "\u200c", "T\n"} {
 		if strings.Contains(got, bad) {
 			t.Errorf("output contains %q:\n%s", bad, got)
 		}
 	}
-	for _, want := range []string{"# Big news", "Body bad [good](https://example.com/x)", "| Item   | Price |", "| Coffee | £9    |"} {
+	for _, want := range []string{"[View comment](https://example.com/c)", "# Big news", "Body bad [good](https://example.com/x)", "| Item   | Price |", "| Coffee | £9    |"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("output missing %q:\n%s", want, got)
 		}

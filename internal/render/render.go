@@ -133,6 +133,10 @@ var (
 	plainEntities = regexp.MustCompile(`&(?:[a-zA-Z]{2,8}|#[0-9]{2,6});`)
 	// Preheader padding: a run of zero-width characters, spaces between.
 	plainPadding = regexp.MustCompile(`(?:[\x{200b}-\x{200d}\x{2060}\x{feff}\x{034f}][ \x{a0}]*){10}`)
+	// Generated links, "label ( https://… )" (html2text) or "label
+	// (https://… )" (HubSpot): a plain part generated from the HTML, whose
+	// links read better from the HTML itself.
+	plainLinks = regexp.MustCompile(`\( ?https?://\S+ \)`)
 )
 
 // plainIsJunk spots text/plain parts machine-generated from the HTML without
@@ -146,7 +150,8 @@ func plainIsJunk(s string) bool {
 	if strings.Contains(s, "%%=") || strings.Contains(s, "%%[") || plainPadding.MatchString(s) {
 		return true
 	}
-	if len(plainTags.FindAllStringIndex(s, 3)) == 3 || len(plainEntities.FindAllStringIndex(s, 3)) == 3 {
+	if len(plainTags.FindAllStringIndex(s, 3)) == 3 || len(plainEntities.FindAllStringIndex(s, 3)) == 3 ||
+		len(plainLinks.FindAllStringIndex(s, 2)) == 2 {
 		return true
 	}
 	lines := strings.Split(s, "\n")

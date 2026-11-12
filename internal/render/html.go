@@ -113,7 +113,8 @@ func dropped(n *html.Node) bool {
 		switch {
 		case prop == "display" && val == "none",
 			prop == "visibility" && val == "hidden",
-			prop == "mso-hide" && val == "all",
+			// Not mso-hide:all: it hides only in Outlook, usually the non-Outlook
+			// twin of a button Outlook gets from a conditional comment.
 			prop == "max-height" && (val == "0" || val == "0px"),
 			prop == "opacity" && val == "0":
 			return true
