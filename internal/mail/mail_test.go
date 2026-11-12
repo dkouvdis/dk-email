@@ -67,7 +67,7 @@ func TestRole_String(t *testing.T) {
 }
 
 func TestFlag_String(t *testing.T) {
-	tests := map[Flag]string{FlagSeen: "seen", FlagFlagged: "flagged", FlagAnswered: "answered", Flag(99): "flag(99)"}
+	tests := map[Flag]string{FlagSeen: "seen", FlagFlagged: "flagged", FlagAnswered: "answered", FlagDraft: "draft", Flag(99): "flag(99)"}
 	for flag, want := range tests {
 		if got := flag.String(); got != want {
 			t.Errorf("Flag(%d).String() = %q, want %q", flag, got, want)

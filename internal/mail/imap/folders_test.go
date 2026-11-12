@@ -176,3 +176,27 @@ func TestSentFolder(t *testing.T) {
 		}
 	})
 }
+
+func TestDraftsFolder(t *testing.T) {
+	t.Run("found", func(t *testing.T) {
+		srv := startServer(t, modeImplicit, capsListStatus)
+		srv.addDrafts(t)
+		c := srv.newClient(t, modeImplicit)
+
+		name, ok, err := c.DraftsFolder(timeoutCtx(t, 10*time.Second))
+
+		if err != nil || !ok || name != "Drafts" {
+			t.Errorf("DraftsFolder() = %q, %v, %v; want %q, true, nil", name, ok, err, "Drafts")
+		}
+	})
+	t.Run("none", func(t *testing.T) {
+		srv := startServer(t, modeImplicit, capsListStatus)
+		c := srv.newClient(t, modeImplicit)
+
+		name, ok, err := c.DraftsFolder(timeoutCtx(t, 10*time.Second))
+
+		if err != nil || ok || name != "" {
+			t.Errorf("DraftsFolder() = %q, %v, %v; want empty, false, nil", name, ok, err)
+		}
+	})
+}

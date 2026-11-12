@@ -28,13 +28,23 @@ func (c *Client) Folders(ctx context.Context) ([]mail.Folder, error) {
 // SentFolder returns the name of the folder with mail.RoleSent; ok is false
 // when the account has none.
 func (c *Client) SentFolder(ctx context.Context) (name string, ok bool, err error) {
-	err = c.do(ctx, "SentFolder", func(conn *imapclient.Client) error {
+	return c.folderByRole(ctx, "SentFolder", mail.RoleSent)
+}
+
+// DraftsFolder returns the name of the folder with mail.RoleDrafts; ok is
+// false when the account has none.
+func (c *Client) DraftsFolder(ctx context.Context) (name string, ok bool, err error) {
+	return c.folderByRole(ctx, "DraftsFolder", mail.RoleDrafts)
+}
+
+func (c *Client) folderByRole(ctx context.Context, op string, role mail.Role) (name string, ok bool, err error) {
+	err = c.do(ctx, op, func(conn *imapclient.Client) error {
 		folders, err := listFolders(conn)
 		if err != nil {
 			return err
 		}
 		for _, f := range folders {
-			if f.Role == mail.RoleSent {
+			if f.Role == role {
 				name, ok = f.Name, true
 				return nil
 			}

@@ -12,6 +12,7 @@ import (
 	"log"
 	"math/big"
 	"net"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -90,6 +91,9 @@ type testServer struct {
 	hangList atomic.Bool
 	// noSentRole makes LIST report "Sent" without its \Sent attribute.
 	noSentRole atomic.Bool
+	// withDrafts makes LIST also report the "Drafts" mailbox, which a test
+	// creates itself with addDrafts, with its \Drafts attribute.
+	withDrafts atomic.Bool
 	release    chan struct{}
 }
 
@@ -167,6 +171,15 @@ func (s *testServer) newClient(t *testing.T, mode string) *Client {
 	return c
 }
 
+// addDrafts creates an empty "Drafts" mailbox and lists it with \Drafts.
+func (s *testServer) addDrafts(t *testing.T) {
+	t.Helper()
+	if err := s.user.Create("Drafts", nil); err != nil {
+		t.Fatalf("create Drafts: %v", err)
+	}
+	s.withDrafts.Store(true)
+}
+
 func seedMailboxes(t *testing.T, user *imapmemserver.User) {
 	t.Helper()
 	for _, m := range seededMailboxes {
@@ -216,7 +229,11 @@ func (s *testSession) List(w *imapserver.ListWriter, ref string, patterns []stri
 	if len(patterns) == 0 {
 		return w.WriteList(&goimap.ListData{Attrs: []goimap.MailboxAttr{goimap.MailboxAttrNoSelect}, Delim: '/'})
 	}
-	for _, m := range seededMailboxes {
+	mailboxes := seededMailboxes
+	if s.srv.withDrafts.Load() {
+		mailboxes = append(slices.Clone(mailboxes), mailboxSpec{name: "Drafts", attrs: []goimap.MailboxAttr{goimap.MailboxAttrDrafts}})
+	}
+	for _, m := range mailboxes {
 		matched := false
 		for _, p := range patterns {
 			matched = matched || imapserver.MatchList(m.name, '/', ref, p)

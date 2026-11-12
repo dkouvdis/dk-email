@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -359,5 +360,89 @@ func TestAppend_CancelledContextDoesNotConnect(t *testing.T) {
 
 	if !errors.Is(err, context.Canceled) || srv.ln.accepted() != 0 {
 		t.Errorf("error = %v, connections = %d; want context.Canceled and none", err, srv.ln.accepted())
+	}
+}
+
+func TestAppend_DraftFlag(t *testing.T) {
+	srv := startServer(t, modeImplicit, capsListStatus)
+	srv.addDrafts(t)
+	c := srv.newClient(t, modeImplicit)
+	ctx := timeoutCtx(t, 10*time.Second)
+
+	if err := c.Append(ctx, "Drafts", []byte("Subject: wip\r\n\r\nbody\r\n"), mail.FlagDraft, mail.FlagSeen); err != nil {
+		t.Fatalf("Append() error = %v", err)
+	}
+
+	got := serverFlags(t, srv, "Drafts", 1)
+	slices.Sort(got)
+	if want := []goimap.Flag{goimap.FlagDraft, goimap.FlagSeen}; !slices.Equal(got, want) {
+		t.Errorf("flags = %v, want %v", got, want)
+	}
+}
+
+func TestDelete(t *testing.T) {
+	for name, caps := range map[string]goimap.CapSet{"IMAP4rev2": capsListStatus, "UIDPLUS": capsUIDPlus} {
+		t.Run(name, func(t *testing.T) {
+			srv := startServer(t, modeImplicit, caps)
+			// Someone else's message already marked \Deleted must survive.
+			srv.appendRaw(t, "INBOX", "Subject: keep me\n\nx\n", base(9), goimap.FlagDeleted)
+			c := srv.newClient(t, modeImplicit)
+			ctx := timeoutCtx(t, 10*time.Second)
+			uids := inboxUIDs(t, c)
+
+			if err := c.Delete(ctx, "INBOX", uids[1:2]); err != nil {
+				t.Fatalf("Delete() error = %v", err)
+			}
+
+			if n := count(t, srv, "INBOX"); n != 3 {
+				t.Errorf("INBOX holds %d messages, want 3 (only the given UID expunged)", n)
+			}
+			if got := inboxUIDs(t, c); !slices.Equal(got, []mail.UID{uids[0], uids[2]}) {
+				t.Errorf("INBOX lists %v, want %v", got, []mail.UID{uids[0], uids[2]})
+			}
+			if got := serverFlags(t, srv, "INBOX", 4); !slices.Equal(got, []goimap.Flag{goimap.FlagDeleted}) {
+				t.Errorf("other message's flags = %v, want it left \\Deleted but present", got)
+			}
+
+			// Repeating (as a retry would) is harmless.
+			if err := c.Delete(ctx, "INBOX", uids[1:2]); err != nil {
+				t.Errorf("repeated Delete() error = %v", err)
+			}
+			if n := count(t, srv, "INBOX"); n != 3 {
+				t.Errorf("INBOX holds %d messages after a repeat, want 3", n)
+			}
+		})
+	}
+}
+
+func TestDelete_WithoutUIDPlusChangesNothing(t *testing.T) {
+	srv := startServer(t, modeImplicit, capsNoUIDPlus)
+	c := srv.newClient(t, modeImplicit)
+	ctx := timeoutCtx(t, 10*time.Second)
+	uids := inboxUIDs(t, c)
+
+	err := c.Delete(ctx, "INBOX", uids[1:2])
+
+	if err == nil || !strings.Contains(err.Error(), "no UIDPLUS") {
+		t.Fatalf("Delete() error = %v, want one mentioning UIDPLUS", err)
+	}
+	if n := count(t, srv, "INBOX"); n != 3 {
+		t.Errorf("INBOX holds %d messages, want 3", n)
+	}
+	if got := serverFlags(t, srv, "INBOX", uids[1]); slices.Contains(got, goimap.FlagDeleted) {
+		t.Errorf("flags = %v, want \\Deleted not set", got)
+	}
+}
+
+func TestDelete_EdgeCases(t *testing.T) {
+	srv := startServer(t, modeImplicit, capsListStatus)
+	c := srv.newClient(t, modeImplicit)
+	ctx := timeoutCtx(t, 10*time.Second)
+
+	if err := c.Delete(ctx, "INBOX", nil); err != nil || srv.ln.accepted() != 0 {
+		t.Errorf("no UIDs: error = %v, connections = %d", err, srv.ln.accepted())
+	}
+	if err := c.Delete(ctx, "Nope", []mail.UID{1}); !errors.Is(err, mail.ErrFolderNotFound) {
+		t.Errorf("unknown folder: error = %v, want ErrFolderNotFound", err)
 	}
 }

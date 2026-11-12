@@ -74,6 +74,7 @@ const (
 	FlagSeen     Flag = iota + 1 // read
 	FlagFlagged                  // starred
 	FlagAnswered                 // set by sending after a reply; the UI doesn't toggle it
+	FlagDraft                    // set on messages saved to Drafts
 )
 
 func (f Flag) String() string {
@@ -84,6 +85,8 @@ func (f Flag) String() string {
 		return "flagged"
 	case FlagAnswered:
 		return "answered"
+	case FlagDraft:
+		return "draft"
 	}
 	return fmt.Sprintf("flag(%d)", int(f))
 }

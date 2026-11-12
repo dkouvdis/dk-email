@@ -11,7 +11,7 @@ import (
 	"github.com/dkouvdis/dk-email/internal/mail"
 )
 
-// SetFlag adds or removes \Seen, \Flagged or \Answered on uids with UID
+// SetFlag adds or removes \Seen, \Flagged, \Answered or \Draft on uids with UID
 // STORE, which is safe to repeat if do retries after a dropped connection.
 func (c *Client) SetFlag(ctx context.Context, folder string, uids []mail.UID, f mail.Flag, on bool) error {
 	if len(uids) == 0 {
@@ -62,6 +62,34 @@ func (c *Client) Append(ctx context.Context, folder string, raw []byte, flags ..
 				return fmt.Errorf("append to %q: %w: %w", folder, mail.ErrFolderNotFound, err)
 			}
 			return fmt.Errorf("append to %q: %w", folder, err)
+		}
+		return nil
+	})
+}
+
+// Delete permanently removes exactly uids from folder: UID STORE \Deleted,
+// then UID EXPUNGE of those UIDs. It needs UIDPLUS (or IMAP4rev2) and fails
+// without touching any flag otherwise, because a plain EXPUNGE would also
+// remove other messages someone marked \Deleted. It's safe to repeat after a
+// dropped connection.
+func (c *Client) Delete(ctx context.Context, folder string, uids []mail.UID) error {
+	if len(uids) == 0 {
+		return nil
+	}
+	return c.do(ctx, "Delete", func(conn *imapclient.Client) error {
+		if !conn.Caps().Has(goimap.CapUIDPlus) {
+			return finalError{errors.New("server can't delete a single message (no UIDPLUS)")}
+		}
+		if err := c.openLocked(conn, folder, readWrite, true); err != nil {
+			return err
+		}
+		set := uidSet(uids)
+		store := &goimap.StoreFlags{Op: goimap.StoreFlagsAdd, Silent: true, Flags: []goimap.Flag{goimap.FlagDeleted}}
+		if err := conn.Store(set, store, nil).Close(); err != nil {
+			return fmt.Errorf("flag as deleted in %q: %w", folder, err)
+		}
+		if err := conn.UIDExpunge(set).Close(); err != nil {
+			return fmt.Errorf("expunge in %q: %w", folder, err)
 		}
 		return nil
 	})
@@ -153,6 +181,8 @@ func imapFlag(f mail.Flag) (goimap.Flag, error) {
 		return goimap.FlagFlagged, nil
 	case mail.FlagAnswered:
 		return goimap.FlagAnswered, nil
+	case mail.FlagDraft:
+		return goimap.FlagDraft, nil
 	}
 	return "", fmt.Errorf("unsupported flag %v", f)
 }
