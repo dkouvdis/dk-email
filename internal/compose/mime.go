@@ -40,10 +40,22 @@ func BodyPart(d mail.Draft) (message.Header, []byte) {
 
 // Build writes d as an RFC 5322 message with CRLF line endings. The Bcc
 // header is never written: Bcc recipients are only passed to the transport.
-// The output is deterministic for the same (d, atts, now, msgID), including the
-// multipart boundary, which is derived from msgID. msgID is a Message-ID
-// without angle brackets, as MessageID returns it.
+// Use BuildDraft for a copy that keeps them. The output is deterministic for
+// the same (d, atts, now, msgID), including the multipart boundary, which is
+// derived from msgID. msgID is a Message-ID without angle brackets, as
+// MessageID returns it.
 func Build(d mail.Draft, atts []Attachment, now time.Time, msgID string) ([]byte, error) {
+	return build(d, atts, now, msgID, false)
+}
+
+// BuildDraft is Build for a message saved to Drafts, which also writes the
+// Bcc header (when d has Bcc recipients) so reopening the draft restores
+// them. Never send its output.
+func BuildDraft(d mail.Draft, atts []Attachment, now time.Time, msgID string) ([]byte, error) {
+	return build(d, atts, now, msgID, true)
+}
+
+func build(d mail.Draft, atts []Attachment, now time.Time, msgID string, withBcc bool) ([]byte, error) {
 	partHeader, body := BodyPart(d)
 
 	// go-message writes header fields in reverse order of insertion.
@@ -55,6 +67,9 @@ func Build(d mail.Draft, atts []Attachment, now time.Time, msgID string) ([]byte
 	add(func(h *gomail.Header) { h.SetAddressList("From", toNet([]mail.Address{d.From})) })
 	add(func(h *gomail.Header) { h.SetAddressList("To", toNet(d.To)) })
 	add(func(h *gomail.Header) { h.SetAddressList("Cc", toNet(d.Cc)) })
+	if withBcc && len(d.Bcc) > 0 {
+		add(func(h *gomail.Header) { h.SetAddressList("Bcc", toNet(d.Bcc)) })
+	}
 	add(func(h *gomail.Header) { h.SetText("Subject", singleLine(d.Subject)) })
 	add(func(h *gomail.Header) { h.SetMsgIDList("In-Reply-To", ids(d.InReplyTo)) })
 	add(func(h *gomail.Header) { h.SetMsgIDList("References", ids(strings.Join(d.References, " "))) })

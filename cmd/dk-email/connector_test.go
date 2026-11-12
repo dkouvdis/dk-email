@@ -166,7 +166,9 @@ func (fakeIMAP) Raw(context.Context, string, mail.UID) ([]byte, error) { return 
 func (fakeIMAP) Append(context.Context, string, []byte, ...mail.Flag) error {
 	return nil
 }
-func (fakeIMAP) SentFolder(context.Context) (string, bool, error) { return "", false, nil }
+func (fakeIMAP) SentFolder(context.Context) (string, bool, error)   { return "", false, nil }
+func (fakeIMAP) DraftsFolder(context.Context) (string, bool, error) { return "", false, nil }
+func (fakeIMAP) Delete(context.Context, string, []mail.UID) error   { return nil }
 func (fakeIMAP) SetFlag(context.Context, string, []mail.UID, mail.Flag, bool) error {
 	return nil
 }

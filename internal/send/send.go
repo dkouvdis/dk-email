@@ -1,7 +1,9 @@
 // Package send implements mail.Sender: it builds a draft into RFC 5322 bytes,
-// delivers them over SMTP, saves a copy to Sent and marks a replied-to
-// message answered. A failure before or during delivery means nothing was
-// sent; a failure afterwards is reported as mail.ErrAfterDelivery.
+// delivers them over SMTP, saves a copy to Sent, marks a replied-to message
+// answered and removes the saved draft it came from. A failure before or
+// during delivery means nothing was sent; a failure afterwards is reported as
+// mail.ErrAfterDelivery. It also implements mail.Drafter: saving a draft to
+// the Drafts folder and reopening it.
 package send
 
 import (
@@ -30,9 +32,14 @@ type Store interface {
 	Append(ctx context.Context, folder string, raw []byte, flags ...mail.Flag) error
 	SentFolder(ctx context.Context) (name string, ok bool, err error)
 	SetFlag(ctx context.Context, folder string, uids []mail.UID, f mail.Flag, on bool) error
+	DraftsFolder(ctx context.Context) (name string, ok bool, err error)
+	Delete(ctx context.Context, folder string, uids []mail.UID) error
 }
 
-var _ mail.Sender = (*Sender)(nil)
+var (
+	_ mail.Sender  = (*Sender)(nil)
+	_ mail.Drafter = (*Sender)(nil)
+)
 
 // Sender implements mail.Sender for one account.
 type Sender struct {
@@ -103,12 +110,25 @@ func (e *afterDeliveryError) add(part string, cause error) {
 	}
 }
 
+// draftSavedError reports that the new draft was saved but the copy it
+// replaces couldn't be removed. It matches mail.ErrDraftSaved and the cause
+// with errors.Is.
+type draftSavedError struct{ cause error }
+
+func (e *draftSavedError) Error() string {
+	return "draft saved, but couldn't remove the old copy: " + e.cause.Error()
+}
+
+func (e *draftSavedError) Unwrap() []error { return []error{mail.ErrDraftSaved, e.cause} }
+
 // Send delivers d. The steps run in order: fetch forwarded attachments, build
 // the message once, send it over SMTP, save it to Sent (when the account
-// keeps copies), and mark the replied-to message answered. Errors from the
-// first three steps mean nothing was sent. Errors from the last two are
-// joined into one error matching mail.ErrAfterDelivery, and the answered flag
-// is still attempted when saving to Sent failed.
+// keeps copies), mark the replied-to message answered, and remove the saved
+// draft d.DraftOf. Errors from the first three steps mean nothing was sent.
+// Errors from the rest are joined into one error matching
+// mail.ErrAfterDelivery, and each later step is still attempted when an
+// earlier one failed. The draft is removed last, after the attachments of a
+// resumed forward (d.ForwardOf is the draft) were fetched.
 //
 // An empty d.From.Email falls back to the account email and from_name.
 func (s *Sender) Send(ctx context.Context, d mail.Draft) error {
@@ -123,17 +143,9 @@ func (s *Sender) Send(ctx context.Context, d mail.Draft) error {
 		d.From = mail.Address{Name: s.acct.FromName, Email: s.acct.Email}
 	}
 
-	var atts []compose.Attachment
-	if d.ForwardOf != nil {
-		done := s.step("fetch-original")
-		raw, err := s.st.Raw(ctx, d.ForwardOf.Folder, d.ForwardOf.UID)
-		done(len(raw), 0)
-		if err != nil {
-			return fmt.Errorf("fetching the original to forward: %w", err)
-		}
-		if atts, err = s.extract(raw); err != nil {
-			return fmt.Errorf("copying attachments from the original: %w", err)
-		}
+	atts, err := s.forwardedAttachments(ctx, d)
+	if err != nil {
+		return err
 	}
 
 	done := s.step("build")
@@ -167,10 +179,119 @@ func (s *Sender) Send(ctx context.Context, d mail.Draft) error {
 			after.add("couldn't mark the original answered", err)
 		}
 	}
+	if d.DraftOf != nil {
+		if err := s.deleteDraft(ctx, *d.DraftOf); err != nil {
+			after.add("couldn't remove the draft", err)
+		}
+	}
 	if len(after.parts) > 0 {
 		return &after
 	}
 	return nil
+}
+
+// forwardedAttachments fetches the message d.ForwardOf points at and copies
+// its attachments; it returns nil when d forwards nothing.
+func (s *Sender) forwardedAttachments(ctx context.Context, d mail.Draft) ([]compose.Attachment, error) {
+	if d.ForwardOf == nil {
+		return nil, nil
+	}
+	done := s.step("fetch-original")
+	raw, err := s.st.Raw(ctx, d.ForwardOf.Folder, d.ForwardOf.UID)
+	done(len(raw), 0)
+	if err != nil {
+		return nil, fmt.Errorf("fetching the original to forward: %w", err)
+	}
+	atts, err := s.extract(raw)
+	if err != nil {
+		return nil, fmt.Errorf("copying attachments from the original: %w", err)
+	}
+	return atts, nil
+}
+
+func (s *Sender) deleteDraft(ctx context.Context, ref mail.MessageRef) error {
+	done := s.step("delete-draft")
+	defer func() { done(0, 0) }()
+	return s.st.Delete(ctx, ref.Folder, []mail.UID{ref.UID})
+}
+
+// SaveDraft stores d in the Drafts folder, flagged \Draft and \Seen, with
+// its Bcc recipients kept. It needs no recipients. The steps run in order:
+// fetch forwarded attachments, build the message, find the Drafts folder,
+// append, and remove the copy d.DraftOf replaces. An error from the first
+// four steps means nothing was saved; a failure to remove the old copy is
+// returned wrapping mail.ErrDraftSaved and its cause.
+//
+// An empty d.From.Email falls back to the account email and from_name.
+func (s *Sender) SaveDraft(ctx context.Context, d mail.Draft) error {
+	if s.st == nil {
+		return errors.New("save draft: saving isn't set up for this account")
+	}
+	if d.From.Email == "" {
+		d.From = mail.Address{Name: s.acct.FromName, Email: s.acct.Email}
+	}
+	atts, err := s.forwardedAttachments(ctx, d)
+	if err != nil {
+		return err
+	}
+
+	done := s.step("build-draft")
+	raw, err := compose.BuildDraft(d, atts, s.now(), s.newID(d.From))
+	done(len(raw), 0)
+	if err != nil {
+		return fmt.Errorf("building the draft: %w", err)
+	}
+
+	done = s.step("save-draft")
+	name, ok, err := s.st.DraftsFolder(ctx)
+	if err == nil && !ok {
+		err = errors.New("no Drafts folder")
+	}
+	if err != nil {
+		done(len(raw), 0)
+		return fmt.Errorf("saving the draft: %w", err)
+	}
+	err = s.st.Append(ctx, name, raw, mail.FlagDraft, mail.FlagSeen)
+	done(len(raw), 0)
+	if err != nil {
+		return fmt.Errorf("saving the draft: %w", err)
+	}
+
+	if d.DraftOf != nil {
+		if err := s.deleteDraft(ctx, *d.DraftOf); err != nil {
+			return &draftSavedError{err}
+		}
+	}
+	return nil
+}
+
+// OpenDraft reads the saved draft at ref for editing. The result's DraftOf is
+// ref, so saving or sending it replaces the stored copy. A draft with
+// attachments also gets ForwardOf = ref, so they are copied back in on save
+// or send; ReplyTo stays unset.
+func (s *Sender) OpenDraft(ctx context.Context, ref mail.MessageRef) (mail.Draft, error) {
+	if s.st == nil {
+		return mail.Draft{}, errors.New("open draft: opening drafts isn't set up for this account")
+	}
+	done := s.step("open-draft")
+	raw, err := s.st.Raw(ctx, ref.Folder, ref.UID)
+	done(len(raw), 0)
+	if err != nil {
+		return mail.Draft{}, fmt.Errorf("opening the draft: %w", err)
+	}
+	d, err := compose.FromRaw(raw)
+	if err != nil {
+		return mail.Draft{}, fmt.Errorf("opening the draft: %w", err)
+	}
+	atts, err := s.extract(raw)
+	if err != nil {
+		return mail.Draft{}, fmt.Errorf("opening the draft: %w", err)
+	}
+	d.DraftOf = &ref
+	if len(atts) > 0 {
+		d.ForwardOf = &ref
+	}
+	return d, nil
 }
 
 type stepError struct {

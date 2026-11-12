@@ -26,6 +26,10 @@ var (
 	// (saving to Sent, marking the original answered) failed. Callers must
 	// treat the message as sent and never retry.
 	ErrAfterDelivery = errors.New("message sent, but a follow-up step failed")
+	// ErrDraftSaved means SaveDraft stored the new draft but a follow-up
+	// step (removing the copy it replaces) failed. Callers must treat the
+	// save as done.
+	ErrDraftSaved = errors.New("draft saved, but a follow-up step failed")
 )
 
 // UID identifies a message within one folder (IMAP UID semantics).
@@ -173,6 +177,7 @@ type Draft struct {
 	References  []string
 	ReplyTo     *MessageRef // marked \Answered after delivery
 	ForwardOf   *MessageRef // attachments are copied from here
+	DraftOf     *MessageRef // the saved draft this one replaces; removed once it is saved again or sent
 }
 
 // Sender delivers drafts for one account. Send returns an error wrapping
@@ -180,6 +185,15 @@ type Draft struct {
 // marking the original answered failed; the caller must not retry then.
 type Sender interface {
 	Send(ctx context.Context, d Draft) error
+}
+
+// Drafter saves drafts to the account's Drafts folder and reopens them.
+// SaveDraft returns an error wrapping ErrDraftSaved when the draft was saved
+// but the copy named by d.DraftOf could not be removed.
+type Drafter interface {
+	SaveDraft(ctx context.Context, d Draft) error
+	// OpenDraft reads a saved draft; the result's DraftOf is ref.
+	OpenDraft(ctx context.Context, ref MessageRef) (Draft, error)
 }
 
 // Mailbox is one account's mail store. Implementations must be safe for
