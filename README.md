@@ -6,9 +6,10 @@ A keyboard-driven terminal email client for triaging several IMAP accounts (Gmai
 - Groups replies into threads, ordered by newest activity.
 - Lets you mark read/unread, star, archive, delete (to Trash) and move mail without leaving the keyboard.
 - Has two layouts: narrow (folders │ threads, the default) and list (threads only), toggled with `v`. List is forced below 80 columns.
+- Replies, reply-alls, forwards and new messages are written in your `$EDITOR` and sent over SMTP. See [Sending mail](#sending-mail).
 - Reads passwords from 1Password (`op read`), any other command, or the OS keychain. They are never stored in a plain-text file.
 
-v0.x is a personal tool: it reads and triages mail but doesn't send it. Nothing is cached on disk.
+v0.x is a personal tool: it reads, triages and sends mail. Nothing is cached on disk.
 
 ## Install
 
@@ -52,9 +53,10 @@ On first run with no accounts, the **connect-account popup** opens. It asks for 
 
 - a name, email and username;
 - the IMAP host, port and TLS mode;
-- a password source: either a 1Password reference, or "enter once → keychain".
+- a password source: either a 1Password reference, or "enter once → keychain";
+- optionally, the SMTP host, port and TLS mode, which turn on [sending](#sending-mail).
 
-Gmail addresses pre-fill `imap.gmail.com:993`. dk-email tests the connection, then appends an `[[account]]` block to `config.toml`, keeping your comments and formatting intact. Press `A` at any time to connect another account.
+Gmail addresses pre-fill `imap.gmail.com:993` and `smtp.gmail.com:465` (implicit TLS). dk-email tests the IMAP connection, and the SMTP login too when an SMTP host is filled in, then appends an `[[account]]` block to `config.toml`, keeping your comments and formatting intact. Press `A` at any time to connect another account.
 
 The config folder lives at `$XDG_CONFIG_HOME/dk-email/` (default `~/.config/dk-email/`) on every OS, macOS included. The folder is `0700`, `config.toml` is `0600`, and a `.gitignore` is written so the folder can be kept in a dotfiles repo safely.
 
@@ -75,11 +77,17 @@ tls          = "implicit"                                   # "implicit" (defaul
 password_cmd = "op read op://Personal/Gmail/app-password"   # omit to use the keychain
 # archive_folder = "[Gmail]/All Mail"                       # optional, overrides the detected archive folder
 # tls_cert       = "~/.config/dk-email/bridge.pem"          # optional, trust this cert instead of the system roots
+# smtp_host      = "smtp.gmail.com"                         # optional, enables sending; omit to disable sending
+# smtp_port      = 465                                      # optional, 465 for implicit, 587 for starttls
+# smtp_tls       = "implicit"                               # optional, "implicit" (default) | "starttls"
+# from_name      = "Your Name"                              # optional, display name on outgoing mail
+# save_sent      = true                                     # optional, save a copy of sent mail to Sent (default: false on Gmail, true elsewhere)
 ```
 
 - Unknown keys are errors, so a typo like `pasword_cmd` can't silently fall back to the keychain. A `password` key is rejected: passwords never go in this file.
 - `archive_folder` defaults to the folder marked `\Archive`, or else `\All` (Gmail's All Mail). If neither exists, archive is disabled for that account.
-- `tls_cert` accepts `~/`. A relative path is resolved from the config file's folder.
+- `tls_cert` accepts `~/`. A relative path is resolved from the config file's folder. It applies to SMTP as well as IMAP.
+- The `smtp_*`, `from_name` and `save_sent` keys are described under [Sending mail](#sending-mail).
 
 ### Colours
 
@@ -159,7 +167,7 @@ secret-tool store --label "dk-email" service dk-email username "Personal"
 
 #### Gmail
 
-Gmail rejects your normal Google password over IMAP when 2-Step Verification is on. Create an **app password** at <https://myaccount.google.com/apppasswords>, then store it in 1Password or the keychain. Google Workspace accounts that don't allow app passwords aren't supported, because they need OAuth.
+Gmail rejects your normal Google password over IMAP when 2-Step Verification is on. Create an **app password** at <https://myaccount.google.com/apppasswords>, then store it in 1Password or the keychain. Google Workspace accounts that don't allow app passwords aren't supported, because they need OAuth. The same app password works for sending (see [Sending mail](#sending-mail)).
 
 #### Proton Mail Bridge
 
@@ -180,6 +188,65 @@ Why this is needed: macOS rejects Bridge's 20-year self-signed certificate as "n
 
 The Bridge password (from Bridge's mailbox details, not your Proton password) goes in `password_cmd` or the keychain like any other.
 
+## Sending mail
+
+Sending is opt-in per account: an account sends only when it has an `smtp_host`. Without one, `r`, `R`, `f` and `c` show `Sending isn't set up for <account>: add smtp_host to its config`, and everything else works as before.
+
+```toml
+[[account]]
+name         = "Personal"
+email        = "me@gmail.com"
+imap_host    = "imap.gmail.com"
+password_cmd = "op read op://Personal/Gmail/app-password"
+smtp_host    = "smtp.gmail.com"    # enables sending
+smtp_port    = 465                 # optional, 465 for implicit, 587 for starttls
+smtp_tls     = "implicit"          # optional, "implicit" (default) | "starttls"
+from_name    = "Your Name"         # optional, display name on outgoing mail; default: the address only
+save_sent    = false               # optional, save a copy to Sent; default: false on Gmail, true elsewhere
+```
+
+- **Credentials:** SMTP logs in with the account's `username` and the same password as IMAP (`password_cmd` or the keychain). There's no separate SMTP password. For Gmail, the same app password works for IMAP and SMTP.
+- **TLS:** the connection is always encrypted, and dk-email never falls back to plaintext. With `smtp_tls = "starttls"`, STARTTLS is mandatory. `tls_cert` applies to SMTP too, so Proton Mail Bridge works for both.
+- **`smtp_port`** defaults to 465 for `implicit` and 587 for `starttls`. `smtp_tls` defaults to `implicit`.
+- **`save_sent`:** dk-email saves a copy of each sent message to the account's Sent folder over IMAP. Gmail already files mail sent through its SMTP server in Sent, so the default is `false` for `imap.gmail.com` to avoid duplicates, and `true` everywhere else. Set `save_sent = false` for any other provider that files SMTP-sent mail in Sent itself. If the account has no Sent folder, the message is still sent and the status warns.
+- `smtp_port`, `smtp_tls`, `from_name` and `save_sent` without `smtp_host` are config errors.
+- **Microsoft 365 and Outlook.com** aren't supported yet. They no longer accept password logins and need OAuth, which dk-email doesn't have.
+
+### Writing a message
+
+- `r` replies, `R` replies to everyone, `f` forwards and `c` starts a new message from the current account.
+- **Target:** on a collapsed thread and in the reader, `r`, `R` and `f` use the thread's latest message. On an expanded row, they use the selected message.
+- dk-email opens `$VISUAL`, else `$EDITOR`, else `vi`. Values with arguments, such as `code --wait`, work. The message is a temporary file, deleted after the editor exits.
+- The file starts with a header block, then a blank line, then the body:
+
+  ```
+  To: Alice <alice@example.com>
+  Cc:
+  Bcc:
+  Subject: Re: Lunch on Friday
+
+  On Tue, 10 Nov 2026 at 12:00, Alice <alice@example.com> wrote:
+  > Shall we try the new place?
+  ```
+
+  Only `To`, `Cc`, `Bcc` and `Subject` are read, with addresses separated by commas. An unknown header, such as a `Too:` typo, is an error. `From` isn't in the file: it's always the account's address (and `from_name`).
+- If you quit the editor without changing the file, or with an empty one, the draft is discarded and nothing is asked.
+- Otherwise a **confirm popup** shows From, To, Cc, Bcc, Subject, any attachments and the start of the body: `y` sends, `e` reopens the editor, and `d` discards. `esc` and `q` do nothing there, so a draft is only ever discarded on purpose. Header or address errors show in the popup, and `y` is disabled until you fix them with `e`.
+- Sending happens in the background (`Sending…`). If it fails, the confirm popup reopens with the same draft and the error, so `y` retries and your text is never lost. `q` won't quit while a draft is open or a send is in flight. `ctrl+c` still quits at once.
+- If the message was delivered but saving the Sent copy or marking the original answered failed, the status says so. dk-email never retries then, so nothing is sent twice.
+
+### Reply, reply all and forward
+
+- **Reply** goes to the message's `Reply-To`, else its sender. If the message is from you, it goes to its original recipients. The subject gets `Re: `, and `In-Reply-To` and `References` are set so the reply threads correctly. Only the target message is quoted. After sending, the original is marked answered.
+- **Reply all** also includes the original's To and Cc, minus your own address, with duplicates removed.
+- **Forward** starts with an empty `To` and the subject `Fwd: …`. The original's attachments are re-attached with their original names and types, and listed in the confirm popup. They can't be removed in this version.
+- Outgoing mail is plain text.
+- `Bcc` recipients get the message, but the `Bcc` header is never written.
+
+### Connect popup
+
+The connect-account popup has optional **SMTP host**, **SMTP port** and **SMTP TLS** fields. Gmail addresses pre-fill `smtp.gmail.com:465` with implicit TLS. When an SMTP host is filled in, the popup tests the SMTP login (connect and sign in, nothing is sent) before saving, and writes the `smtp_*` keys to the new `[[account]]` block. Leave the host empty if the account shouldn't send. Existing accounts are edited by hand in `config.toml`.
+
 ## Keys
 
 | Key | Action | Key | Action |
@@ -189,13 +256,16 @@ The Bridge password (from Bridge's mailbox details, not your Proton password) go
 | `space` | expand / collapse thread | `g` / `G` | top / bottom |
 | `u` | toggle read / unread | `s` | toggle star |
 | `e` | archive | `d` | delete (moves to Trash) |
-| `m` | move to folder | `r` | refresh |
+| `m` | move to folder | `ctrl+r` | refresh |
+| `r` | reply | `R` | reply all |
+| `f` | forward | `c` | new message |
 | `a` | focus folders (narrow) / folder picker (list) | `A` | connect account |
-| `v` | toggle split ↔ list + popup | `?` | key help |
-| `esc` | close popup / back | `q` | close the open popup, otherwise quit |
-| `ctrl+c` | quit, even with a popup open | | |
+| `/` | filter folders | `v` | toggle split ↔ list + popup |
+| `?` | key help | `esc` | close popup / back |
+| `q` | close the open popup, otherwise quit | `ctrl+c` | quit, even with a popup open |
 
 - Actions on a collapsed thread apply to every message in it. On an expanded row, or in the reader, they apply to the selected message. Opening a message marks it read.
+- `r`, `R` and `f` work on the thread list and in the reader. `c` works anywhere a folder is open. See [Sending mail](#sending-mail).
 - `enter` opens the conversation in a popup, and `esc` closes it. In the reader, `pgup`/`pgdn` (or `ctrl+u`/`ctrl+d`) scroll by a page, and `space` expands or collapses every message.
 - **Mouse:** clicking a folder opens it. Clicking a thread selects it, and clicking it again opens it. The scroll wheel moves the selection (or scrolls the open popup) but never opens anything. Links in a message are underlined; cmd+click (ctrl+click on Linux) opens them while the reader popup is open, in terminals that support hyperlinks. To select text in the terminal, hold shift (or option on macOS) while dragging.
 - In the `?` help popup, `/` filters keys by key or description.

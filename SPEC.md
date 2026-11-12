@@ -4,7 +4,7 @@ Status: **Approved; v1 built, with `v0.1.0-beta.1` released on 2026-11-10.** Sou
 
 ## Objective
 
-A keyboard-driven terminal email client for **triaging several IMAP accounts** (Gmail included), using a Thunderbird-style layout and lazygit-style single-key actions. v1 is a personal tool. Its code is structured so that it can go public, and gain sending, without a rewrite.
+A keyboard-driven terminal email client for **triaging several IMAP accounts** (Gmail included), using a Thunderbird-style layout and lazygit-style single-key actions. v1 is a personal tool. Its code is structured so that it can go public without a rewrite. Sending (reply, reply-all, forward and new message over SMTP) was added in v0.2.0; see [tasks/smtp-spec.md](tasks/smtp-spec.md).
 
 ### User stories
 
@@ -53,7 +53,7 @@ Messages in the conversation are stacked oldest to newest. The latest (or first 
 3. **Threading happens per folder** (Thunderbird's default; confirmed): client-side, from `Message-ID` / `In-Reply-To` / `References`, falling back to normalized subject only for replies (`Re:`/`Fwd:`) that carry no references, so unrelated mails with a generic subject never merge. There's no cross-folder threading, so replies sitting in Sent won't appear inside Inbox threads.
 4. **v1 caches nothing on disk.** Headers and bodies are kept in memory for the session. `~/.cache/dk-email/` is reserved for the future cache and holds only the debug log.
 5. **Each folder loads its newest 200 messages**, and more are fetched when scrolling reaches the end.
-6. **Refresh:** `r` refreshes manually, and the selected folder plus all folders' unread counts are polled every `refresh_interval` (default 120s; confirmed). No IMAP IDLE in v1.
+6. **Refresh:** `ctrl+r` refreshes manually, and the selected folder plus all folders' unread counts are polled every `refresh_interval` (default 120s; confirmed). No IMAP IDLE in v1.
 7. **Delete moves mail to the Trash folder** without asking for confirmation, the way Gmail does. It's never a permanent expunge.
 8. **Archive moves mail to the account's archive folder.** That's the folder with IMAP's special-use marker `\Archive`, or else `\All` (Gmail's All Mail), unless `archive_folder` overrides it in config. If none of these exist, archive is disabled for that account and a message explains why.
 9. **Keybindings and themes are fixed in v1.** `keys.toml` and `themes/` are reserved names (and whitelisted in the config `.gitignore`) but aren't read yet.
@@ -71,6 +71,7 @@ Messages in the conversation are stacked oldest to newest. The latest (or first 
 | IMAP client | `github.com/emersion/go-imap/v2` (`imapclient`) | v2.0.0-beta.8 |
 | IMAP test server | `github.com/emersion/go-imap/v2/imapserver/imapmemserver` | same |
 | MIME parsing | `github.com/emersion/go-message` | v0.18.x |
+| SMTP client | `github.com/emersion/go-smtp` | v0.25.x |
 | HTML → markdown | `github.com/JohannesKaufmann/html-to-markdown/v2` + `golang.org/x/net/html` | v2.5.x |
 | Markdown → terminal | `charm.land/glamour/v2` (HTML-derived bodies only) | v2.0.x |
 | Keychain | `github.com/zalando/go-keyring` | v0.2.x |
@@ -120,6 +121,9 @@ internal/config/       → paths (XDG), load/validate/append-account, writes con
 internal/secret/       → password resolution: password_cmd runner, keychain get/set
 internal/mail/         → provider-agnostic domain types + Mailbox interface (no IMAP imports)
 internal/mail/imap/    → go-imap v2 implementation of mail.Mailbox
+internal/mail/smtp/    → go-smtp transport (implicit TLS / STARTTLS, AUTH PLAIN)
+internal/compose/      → pure: reply / reply-all / forward / new drafts, editor-file format and parse, MIME build
+internal/send/         → implements mail.Sender: forward attachments, SMTP, Sent copy, \Answered
 internal/thread/       → builds threads from message summaries (pure, no I/O)
 internal/render/       → MIME → displayable text (plain preferred, HTML→text, attachment list)
 internal/ui/           → root Bubble Tea model, layout calculation, keymap, styles
@@ -148,7 +152,7 @@ type Mailbox interface {
 }
 ```
 
-`Summary` carries UID, From, To, Subject, Date, Flags, Message-ID, In-Reply-To and References, which is all that threading needs. **Sending is a separate, future `Sender` interface** (SMTP), so `Mailbox` never has to change to add reply/compose.
+`Summary` carries UID, From, To, Subject, Date, Flags, Message-ID, In-Reply-To and References, which is all that threading needs. **Sending is implemented behind a separate `mail.Sender` interface** (SMTP), so `Mailbox` never had to change to add reply/compose. See [tasks/smtp-spec.md](tasks/smtp-spec.md) for the sending design.
 
 There's **one IMAP connection per account**, opened lazily and serialized behind a mutex. All network calls run inside `tea.Cmd`s with a context timeout, so the UI never blocks.
 
@@ -171,6 +175,11 @@ tls          = "implicit"                                   # "implicit" | "star
 password_cmd = "op read op://Personal/Gmail/app-password"   # omit to use the keychain
 # archive_folder = "[Gmail]/All Mail"                       # optional override
 # tls_cert       = "~/.config/dk-email/bridge.pem"          # optional: trust this cert instead of the system roots
+# smtp_host      = "smtp.gmail.com"                         # optional: enables sending (smtp_port, smtp_tls, from_name and save_sent need it)
+# smtp_port      = 465                                      # optional: 465 for implicit, 587 for starttls
+# smtp_tls       = "implicit"                               # optional: "implicit" | "starttls"
+# from_name      = "Your Name"                              # optional: display name on outgoing mail
+# save_sent      = true                                     # optional: default false on imap.gmail.com, true elsewhere
 ```
 
 - **Defaults and validation:**
@@ -180,6 +189,7 @@ password_cmd = "op read op://Personal/Gmail/app-password"   # omit to use the ke
   - All problems in a file are reported together.
   - The config dir and its `.gitignore` are only created for the default location, never next to a custom `--config` path.
   - `tls_cert` (optional) is a PEM file of certificates trusted for that account **instead of** the system roots. It's for local bridges with self-signed certificates, such as Proton Mail Bridge, whose 20-year certificate macOS rejects as "not standards compliant" even when trusted in Keychain. The host name and expiry are still verified. `~/` is expanded, and a relative path is resolved from the config file's folder. A missing file, or one with no PEM certificate, fails at load. Added 2026-11-09 with your approval.
+- **Sending keys** (`smtp_host`, `smtp_port`, `smtp_tls`, `from_name`, `save_sent`) are specified in [tasks/smtp-spec.md](tasks/smtp-spec.md#configuration). Existing configs keep working, with sending disabled until `smtp_host` is set.
 - **Password resolution:** if `password_cmd` is set, run it with `sh -c` and use the **first line** of stdout with only the line ending removed. Spaces inside the password are kept, and extra lines (as `pass show` prints) are ignored. The command inherits the user's environment but gets no stdin, and on timeout (60s) its whole process group is killed. Errors include the command's stderr (control characters stripped, length capped) but never its stdout. If `op` isn't on the inherited `PATH`, use its absolute path. Otherwise read from the keychain (service `dk-email`, key = account `name`). If neither yields a password, the account is shown as "needs password", and pressing `A` opens the connect popup to supply one (stored in the keychain).
 - **The connect-account popup appends** a new `[[account]]` block to the file as text, so the user's comments and formatting are preserved. It never re-encodes the whole file. When the address ends in `@gmail.com` / `@googlemail.com`, the popup pre-fills `imap.gmail.com:993 implicit`. Its password source is either a 1Password reference (stored as `password_cmd = "op read <ref>"`) or "enter once → keychain".
 - **Config-dir `.gitignore`**, written on first run if missing:
@@ -192,7 +202,7 @@ password_cmd = "op read op://Personal/Gmail/app-password"   # omit to use the ke
   !themes/**
   ```
 
-## Keybindings (v1, fixed)
+## Keybindings (fixed)
 
 | Key | Action | Key | Action |
 |---|---|---|---|
@@ -201,11 +211,13 @@ password_cmd = "op read op://Personal/Gmail/app-password"   # omit to use the ke
 | `space` | expand/collapse thread | `g` / `G` | top / bottom |
 | `u` | toggle read/unread | `s` | toggle star/flag |
 | `e` | archive | `d` | delete (→ Trash) |
-| `m` | move to folder (picker) | `r` | refresh |
+| `m` | move to folder (picker) | `ctrl+r` | refresh |
+| `r` | reply | `R` | reply all |
+| `f` | forward | `c` | new message |
 | `a` | focus folders (narrow) / folder picker (list) | `A` | connect account |
-| `v` | toggle split ↔ list + popup | `?` | full key help |
-| `esc` | close popup / back | `q` | close the open popup, otherwise quit |
-| `ctrl+c` | quit, even with a popup open | | |
+| `/` | filter folders | `v` | toggle split ↔ list + popup |
+| `?` | full key help | `esc` | close popup / back |
+| `q` | close the open popup, otherwise quit | `ctrl+c` | quit, even with a popup open |
 
 Actions on a **collapsed thread** apply to every message in it. On an expanded row, or in the reader, they apply to the selected message. Opening a message marks it read.
 
@@ -324,8 +336,9 @@ The repo `.gitignore` will cover `bin/`, `dist/`, `coverage.out`, `*.db`, `debug
 
 ## Out of Scope (v1)
 
+Sending was originally out of scope; it's now specified in [tasks/smtp-spec.md](tasks/smtp-spec.md), which also lists what it leaves out.
+
 - OAuth
-- Reply, compose and SMTP (only the `Sender` interface slot is reserved)
 - Unified inbox
 - Tags and labels
 - Search

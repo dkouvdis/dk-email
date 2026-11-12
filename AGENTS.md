@@ -29,12 +29,13 @@ goreleaser check
 
 ## High-level architecture
 
-`cmd/dk-email` is composition/root wiring: it parses flags, loads config, builds secret/mail connectors, and starts Bubble Tea.
+`cmd/dk-email` is composition/root wiring: it parses flags, loads config, builds secret/mail connectors (plus a `mail.Sender` per account when `smtp_host` is set), and starts Bubble Tea.
 
 Core boundaries:
 
 - `internal/mail` defines provider-agnostic domain types plus the `mail.Mailbox` interface. UI code depends on this interface only.
 - `internal/mail/imap` is the concrete IMAP adapter (`go-imap/v2`) implementing `mail.Mailbox`.
+- `internal/mail/smtp` is the concrete SMTP transport (`go-smtp`): implicit TLS or STARTTLS, AUTH PLAIN, and `Verify` for the onboarding login test.
 - `internal/ui` is a single root Bubble Tea model coordinating sidebar, thread list, popups, and reader.
 
 Data/control flow:
@@ -43,17 +44,22 @@ Data/control flow:
 2. UI `Init` schedules asynchronous `tea.Cmd` work (connect, fetch folders/summaries/messages, flag/move).
 3. Background work returns typed messages (e.g., `accountMsg`, `summariesMsg`, `messageMsg`) to `Model.Update`.
 4. UI never talks directly to IMAP internals; all network I/O is behind `mail.Mailbox`.
+5. Sending goes through `mail.Sender` (nil when the account has no `smtp_host`), also inside a `tea.Cmd`. The editor runs via `tea.ExecProcess`, then a confirm popup (`y`/`e`/`d`) decides whether to send.
 
 Supporting modules:
 
 - `internal/thread`: pure threading logic (union-find over Message-ID / References with constrained subject fallback).
-- `internal/render`: MIME parsing + HTML-to-markdown rendering (email cruft stripped first; junk text/plain parts fall back to HTML) + Glamour styling of HTML-derived bodies (plain text is only wrapped) + attachment extraction.
+- `internal/render`: MIME parsing + HTML-to-markdown rendering (email cruft stripped first; junk text/plain parts fall back to HTML) + Glamour styling of HTML-derived bodies (plain text is only wrapped) + attachment extraction (it also exposes attachment `Parts` with bytes for forwarding).
+- `internal/compose`: pure drafting logic: reply/reply-all/forward/new drafts, editor-file format and parse, and MIME build.
+- `internal/send`: send orchestration implementing `mail.Sender`: forward attachment fetch, build the message once, SMTP, Sent `APPEND`, then `\Answered`.
 - `internal/secret`: password resolution from `password_cmd` or OS keychain.
 - `internal/config`: strict TOML load/validate/defaults and append-account persistence.
 
 ## Key repository-specific conventions
 
 - Config is intentionally strict: unknown keys fail validation; `password` key is rejected; credentials must come from `password_cmd` or keychain.
+- An account sends only when `smtp_host` is set; SMTP reuses the account's IMAP credentials and `tls_cert`.
+- Outgoing mail is plain text. The Markdown seam is `compose.BodyPart`; a later HTML mode replaces it without touching reply, forward or transport code.
 - Config updates preserve user formatting/comments: adding an account appends a TOML block instead of re-encoding the file.
 - Bubble Tea pattern is consistent: perform I/O in `tea.Cmd`, return typed messages, keep `Update` as the state transition point.
 - `internal/mail` stays provider-agnostic and standard-library-only; IMAP-specific behavior belongs in `internal/mail/imap`.
