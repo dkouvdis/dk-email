@@ -351,3 +351,112 @@ func TestAccount_WithDefaults(t *testing.T) {
 		t.Errorf("WithDefaults() = %+v (original %+v)", got, a)
 	}
 }
+
+const smtpBase = "[[account]]\nname = \"A\"\nemail = \"a@x.com\"\nimap_host = \"h\"\n"
+
+func TestLoad_NoSMTPKeysLeavesSendingDisabled(t *testing.T) {
+	cfg, err := Load(writeConfig(t, smtpBase))
+
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	got := cfg.Accounts[0]
+	if got.SMTPHost != "" || got.SMTPPort != 0 || got.SMTPTLS != "" || got.FromName != "" || got.SaveSent != nil {
+		t.Errorf("SMTP fields set on an account without smtp keys: %+v", got)
+	}
+}
+
+func TestLoad_SMTPDefaults(t *testing.T) {
+	tests := []struct {
+		name     string
+		keys     string
+		wantPort int
+		wantTLS  string
+	}{
+		{"implicit by default on 465", `smtp_host = "s"`, 465, "implicit"},
+		{"explicit implicit on 465", "smtp_host = \"s\"\nsmtp_tls = \"implicit\"", 465, "implicit"},
+		{"starttls on 587", "smtp_host = \"s\"\nsmtp_tls = \"starttls\"", 587, "starttls"},
+		{"explicit port kept", "smtp_host = \"s\"\nsmtp_tls = \"starttls\"\nsmtp_port = 2525", 2525, "starttls"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg, err := Load(writeConfig(t, smtpBase+tt.keys+"\n"))
+
+			if err != nil {
+				t.Fatalf("Load() error = %v", err)
+			}
+			got := cfg.Accounts[0]
+			if got.SMTPHost != "s" || got.SMTPPort != tt.wantPort || got.SMTPTLS != tt.wantTLS {
+				t.Errorf("got host=%q port=%d tls=%q, want port=%d tls=%q", got.SMTPHost, got.SMTPPort, got.SMTPTLS, tt.wantPort, tt.wantTLS)
+			}
+		})
+	}
+}
+
+func TestAccount_WithDefaultsSMTP(t *testing.T) {
+	if got := (Account{SMTPHost: "s"}).WithDefaults(); got.SMTPPort != 465 || got.SMTPTLS != TLSImplicit {
+		t.Errorf("with smtp_host: port=%d tls=%q, want 465 implicit", got.SMTPPort, got.SMTPTLS)
+	}
+	if got := (Account{}).WithDefaults(); got.SMTPPort != 0 || got.SMTPTLS != "" {
+		t.Errorf("without smtp_host: port=%d tls=%q, want none", got.SMTPPort, got.SMTPTLS)
+	}
+}
+
+func TestAccount_SaveSentCopy(t *testing.T) {
+	yes, no := true, false
+	tests := []struct {
+		name string
+		acct Account
+		want bool
+	}{
+		{"gmail defaults to false", Account{IMAPHost: "imap.gmail.com"}, false},
+		{"gmail host ignores case and spaces", Account{IMAPHost: " IMAP.Gmail.com "}, false},
+		{"other host defaults to true", Account{IMAPHost: "imap.example.com"}, true},
+		{"explicit true wins on gmail", Account{IMAPHost: "imap.gmail.com", SaveSent: &yes}, true},
+		{"explicit false wins elsewhere", Account{IMAPHost: "imap.example.com", SaveSent: &no}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.acct.SaveSentCopy(); got != tt.want {
+				t.Errorf("SaveSentCopy() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLoad_SMTPValidationErrors(t *testing.T) {
+	tests := []struct {
+		name string
+		keys string
+		want []string
+	}{
+		{"port without host", "smtp_port = 465", []string{`account "A": smtp_port is set but smtp_host is empty`}},
+		{"tls without host", `smtp_tls = "implicit"`, []string{`account "A": smtp_tls is set but smtp_host is empty`}},
+		{"from_name without host", `from_name = "Me"`, []string{`account "A": from_name is set but smtp_host is empty`}},
+		{"save_sent without host", "save_sent = false", []string{`account "A": save_sent is set but smtp_host is empty`}},
+		{"every orphan key reported", "smtp_port = 465\nsmtp_tls = \"bogus\"\nfrom_name = \"Me\"\nsave_sent = true", []string{
+			"smtp_port is set but smtp_host is empty", "smtp_tls is set but smtp_host is empty",
+			"from_name is set but smtp_host is empty", "save_sent is set but smtp_host is empty"}},
+		{"unknown smtp_tls", "smtp_host = \"s\"\nsmtp_tls = \"ssl\"", []string{`account "A": smtp_tls must be "implicit" or "starttls", got "ssl"`}},
+		{"port too high", "smtp_host = \"s\"\nsmtp_port = 70000", []string{`account "A": smtp_port must be between 1 and 65535, got 70000`}},
+		{"negative port", "smtp_host = \"s\"\nsmtp_port = -1", []string{"smtp_port must be between 1 and 65535, got -1"}},
+		{"tls and port together", "smtp_host = \"s\"\nsmtp_tls = \"ssl\"\nsmtp_port = 99999", []string{
+			`smtp_tls must be "implicit" or "starttls", got "ssl"`, "smtp_port must be between 1 and 65535, got 99999"}},
+		{"smtp errors join imap errors", "smtp_host = \"s\"\nsmtp_port = 99999\ntls = \"ssl\"", []string{
+			`tls must be "implicit" or "starttls"`, "smtp_port must be between 1 and 65535, got 99999"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := Load(writeConfig(t, smtpBase+tt.keys+"\n"))
+
+			if err == nil {
+				t.Fatalf("Load() error = nil, want %q", tt.want)
+			}
+			for _, want := range tt.want {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("error = %q, want it to contain %q", err, want)
+				}
+			}
+		})
+	}
+}

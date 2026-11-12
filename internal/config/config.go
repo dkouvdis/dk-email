@@ -52,6 +52,33 @@ type Account struct {
 	// makes it absolute: "~/" is expanded and a relative path is resolved
 	// from the config file's folder.
 	TLSCert string `toml:"tls_cert"`
+
+	// SMTPHost enables sending for the account; empty keeps it read-only.
+	// SMTPPort and SMTPTLS default (to 465/587 and "implicit") only when it
+	// is set, and FromName and SaveSent need it.
+	SMTPHost string `toml:"smtp_host"`
+	SMTPPort int    `toml:"smtp_port"`
+	SMTPTLS  string `toml:"smtp_tls"`
+	// FromName is the display name on outgoing mail; empty means address only.
+	FromName string `toml:"from_name"`
+	// SaveSent overrides whether a copy of sent mail is appended to the Sent
+	// folder; nil means use the SaveSentCopy default.
+	SaveSent *bool `toml:"save_sent"`
+}
+
+// SaveSentCopy reports whether sent mail should be appended to the Sent
+// folder over IMAP. An explicit save_sent wins; otherwise it is false for
+// imap.gmail.com, because Gmail already files SMTP-submitted mail in Sent,
+// and true everywhere else.
+func (a Account) SaveSentCopy() bool {
+	if a.SaveSent != nil {
+		return *a.SaveSent
+	}
+	return !strings.EqualFold(strings.TrimSpace(a.IMAPHost), "imap.gmail.com")
+}
+
+func (a Account) smtpEnabled() bool {
+	return strings.TrimSpace(a.SMTPHost) != ""
 }
 
 // Duration reads TOML strings such as "120s" or "2m".
@@ -131,8 +158,8 @@ func checkUndecoded(keys []toml.Key) error {
 }
 
 // WithDefaults returns a with the defaults Load applies: implicit TLS, the
-// port for the TLS mode, and username = email. Used to dial an account
-// before it's saved.
+// port for the TLS mode, and username = email, plus the SMTP TLS mode and
+// port when smtp_host is set. Used to dial an account before it's saved.
 func (a Account) WithDefaults() Account {
 	a.applyDefaults()
 	return a
@@ -152,6 +179,20 @@ func (a *Account) applyDefaults() {
 	}
 	if a.Username == "" {
 		a.Username = a.Email
+	}
+	if !a.smtpEnabled() {
+		return
+	}
+	if a.SMTPTLS == "" {
+		a.SMTPTLS = TLSImplicit
+	}
+	if a.SMTPPort == 0 {
+		switch a.SMTPTLS {
+		case TLSImplicit:
+			a.SMTPPort = 465
+		case TLSStartTLS:
+			a.SMTPPort = 587
+		}
 	}
 }
 
@@ -205,10 +246,40 @@ func (a Account) validate() []error {
 	if a.IMAPPort < 1 || a.IMAPPort > 65535 {
 		errs = append(errs, fmt.Errorf("imap_port must be between 1 and 65535, got %d", a.IMAPPort))
 	}
+	errs = append(errs, a.validateSMTP()...)
 	if a.TLSCert != "" {
 		if _, err := CertPool(a.TLSCert); err != nil {
 			errs = append(errs, fmt.Errorf("tls_cert: %w", err))
 		}
+	}
+	return errs
+}
+
+func (a Account) validateSMTP() []error {
+	var errs []error
+	if !a.smtpEnabled() {
+		for _, k := range []struct {
+			key string
+			set bool
+		}{
+			{"smtp_port", a.SMTPPort != 0},
+			{"smtp_tls", a.SMTPTLS != ""},
+			{"from_name", a.FromName != ""},
+			{"save_sent", a.SaveSent != nil},
+		} {
+			if k.set {
+				errs = append(errs, fmt.Errorf("%s is set but smtp_host is empty", k.key))
+			}
+		}
+		return errs
+	}
+	switch a.SMTPTLS {
+	case TLSImplicit, TLSStartTLS:
+	default:
+		errs = append(errs, fmt.Errorf("smtp_tls must be %q or %q, got %q", TLSImplicit, TLSStartTLS, a.SMTPTLS))
+	}
+	if a.SMTPPort < 1 || a.SMTPPort > 65535 {
+		errs = append(errs, fmt.Errorf("smtp_port must be between 1 and 65535, got %d", a.SMTPPort))
 	}
 	return errs
 }

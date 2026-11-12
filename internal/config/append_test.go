@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 	"testing"
@@ -141,6 +142,59 @@ func TestAppendAccount_WritesOptionalFieldsOnlyWhenSet(t *testing.T) {
 	}
 	if got, _ := os.ReadFile(path2); strings.Contains(string(got), "username") {
 		t.Errorf("username equal to email (the default) was written:\n%s", got)
+	}
+}
+
+func TestAppendAccount_SMTPKeys(t *testing.T) {
+	no := false
+	hostOnly := work()
+	hostOnly.SMTPHost = "smtp.example.com"
+	all := work()
+	all.SMTPHost, all.SMTPPort, all.SMTPTLS, all.FromName, all.SaveSent = "smtp.example.com", 587, TLSStartTLS, `Me "Q" Example`, &no
+	tests := []struct {
+		name string
+		acct Account
+		want []string
+		not  []string
+	}{
+		{"none set", work(), nil, []string{"smtp_", "from_name", "save_sent"}},
+		{"host only", hostOnly, []string{`smtp_host = "smtp.example.com"`}, []string{"smtp_port", "smtp_tls", "from_name", "save_sent"}},
+		{"all set", all, []string{`smtp_host = "smtp.example.com"`, "smtp_port = 587", `smtp_tls = "starttls"`, `from_name = "Me \"Q\" Example"`, "save_sent = false"}, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			path, _ := copyFixture(t, "empty.toml")
+
+			if err := AppendAccount(path, tt.acct); err != nil {
+				t.Fatalf("AppendAccount() error = %v", err)
+			}
+
+			data, _ := os.ReadFile(path)
+			got := string(data)
+			last := -1
+			for _, w := range tt.want {
+				i := strings.Index(got, w+"\n")
+				if i < 0 {
+					t.Fatalf("file missing %q:\n%s", w, got)
+				}
+				if i < last {
+					t.Errorf("%q written out of order:\n%s", w, got)
+				}
+				last = i
+			}
+			for _, n := range tt.not {
+				if strings.Contains(got, n) {
+					t.Errorf("unset key %q written:\n%s", n, got)
+				}
+			}
+			cfg, err := Load(path)
+			if err != nil {
+				t.Fatalf("re-load error = %v", err)
+			}
+			if want := tt.acct.WithDefaults(); !reflect.DeepEqual(cfg.Accounts[0], want) {
+				t.Errorf("re-loaded %+v, want %+v", cfg.Accounts[0], want)
+			}
+		})
 	}
 }
 

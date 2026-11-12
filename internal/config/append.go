@@ -95,6 +95,15 @@ func accountBlock(a Account) string {
 	str("password_cmd", a.PasswordCmd)
 	str("archive_folder", a.ArchiveFolder)
 	str("tls_cert", a.TLSCert)
+	str("smtp_host", a.SMTPHost)
+	if a.SMTPPort != 0 {
+		fmt.Fprintf(&b, "smtp_port = %d\n", a.SMTPPort)
+	}
+	str("smtp_tls", a.SMTPTLS)
+	str("from_name", a.FromName)
+	if a.SaveSent != nil {
+		fmt.Fprintf(&b, "save_sent = %t\n", *a.SaveSent)
+	}
 	return b.String()
 }
 
