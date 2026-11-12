@@ -275,13 +275,13 @@ Also rebind refresh from `r` to `ctrl+r`, and add `r`/`R`/`f`/`c` to `KeyMap`, u
 
 **Acceptance criteria:**
 
-- [ ] `compose` table tests cover every recipient, subject, References and quoting rule in the spec.
-- [ ] UI tests: `r` on a collapsed thread drafts a reply to the latest message, `R` includes To and Cc minus me, and on an expanded row the selected message is the target.
+- [x] `compose` table tests cover every recipient, subject, References and quoting rule in the spec.
+- [x] UI tests: `r` on a collapsed thread drafts a reply to the latest message, `R` includes To and Cc minus me, and on an expanded row the selected message is the target.
 - [ ] Manual: a reply to yourself threads under the original in Gmail's web UI, and the original shows as answered in another client.
 
 **Verification:**
 
-- [ ] `go test -race ./internal/compose/... ./internal/ui/...` passes.
+- [x] `go test -race ./internal/compose/... ./internal/ui/...` passes.
 - [ ] Manual check above.
 
 **Dependencies:** S8
@@ -303,13 +303,13 @@ Also rebind refresh from `r` to `ctrl+r`, and add `r`/`R`/`f`/`c` to `KeyMap`, u
 
 **Acceptance criteria:**
 
-- [ ] `render.Parts` returns byte-identical attachment contents for fixtures with base64, quoted-printable and an RFC 2231 filename.
-- [ ] `send` with `ForwardOf` set fetches raw once and builds a `multipart/mixed` message carrying every attachment. A failed fetch is a pre-delivery error, so nothing is sent.
+- [x] `render.Parts` returns byte-identical attachment contents for fixtures with base64, quoted-printable and an RFC 2231 filename.
+- [x] `send` with `ForwardOf` set fetches raw once and builds a `multipart/mixed` message carrying every attachment. A failed fetch is a pre-delivery error, so nothing is sent.
 - [ ] Manual: forwarding a message with a PDF to yourself delivers the same bytes (`shasum` matches).
 
 **Verification:**
 
-- [ ] `go test -race ./internal/render/... ./internal/compose/... ./internal/send/... ./internal/ui/...` passes.
+- [x] `go test -race ./internal/render/... ./internal/compose/... ./internal/send/... ./internal/ui/...` passes.
 - [ ] Manual check above.
 
 **Dependencies:** S9 (shares compose/ui files; logically only S8)
@@ -323,7 +323,7 @@ Also rebind refresh from `r` to `ctrl+r`, and add `r`/`R`/`f`/`c` to `KeyMap`, u
 ### ✅ Checkpoint 3: All actions
 
 - [ ] Spec success criteria 1–8 pass manually, sending to yourself only.
-- [ ] Coverage targets are met: `compose` ≥ 90%, `send` ≥ 90%, `mail/smtp` ≥ 80%, `mail/imap` ≥ 80%.
+- [x] Coverage targets are met: `compose` ≥ 90%, `send` ≥ 90%, `mail/smtp` ≥ 80%, `mail/imap` ≥ 80%.
 - [ ] You review before Phase 4.
 
 ---

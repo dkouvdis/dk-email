@@ -59,8 +59,8 @@ The full details are in [smtp-todo.md](smtp-todo.md).
 - [x] `c` sends to yourself on Gmail (one copy in Sent) and on a non-Gmail account (APPENDed copy in Sent). A network-off failure retries cleanly.
 
 ### Phase 3: Reply and forward
-- [ ] S9: Reply and reply-all (`r`, `R`) with threading and `\Answered`
-- [ ] S10: Forward (`f`) with original attachments
+- [x] S9: Reply and reply-all (`r`, `R`) with threading and `\Answered`
+- [x] S10: Forward (`f`) with original attachments
 
 ### Checkpoint 3: All actions
 - [ ] Success criteria 1–8 from the spec pass manually, sending to yourself.
