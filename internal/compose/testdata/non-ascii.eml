@@ -1,0 +1,12 @@
+Mime-Version: 1.0
+Date: Thu, 12 Nov 2026 14:53:00 +0100
+Message-Id: <00112233445566778899aabbccddeeff@example.com>
+From: =?utf-8?q?Zo=C3=AB_M=C3=BCller?= <zoe@example.com>
+To: =?utf-8?b?Sm9zw6kgw4FsdmFyZXosIEpyLg==?= <jose@example.es>
+Subject: =?utf-8?q?Caf=C3=A9_=E2=98=95_=E2=80=94_r=C3=A9union_=C3=A0_10h?=
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: quoted-printable
+
+Bonjour =E2=80=94 =C3=A7a va ?
+Trailing space=20
+no final newline

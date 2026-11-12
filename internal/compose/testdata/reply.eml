@@ -1,0 +1,14 @@
+Mime-Version: 1.0
+Date: Thu, 12 Nov 2026 14:53:00 +0100
+Message-Id: <00112233445566778899aabbccddeeff@example.com>
+From: "Alice Example" <alice@example.com>
+To: "Bob" <bob@example.org>
+Subject: Re: Lunch on Friday
+In-Reply-To: <msg2@example.org>
+References: <msg1@example.org> <msg2@example.org>
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: quoted-printable
+
+Sounds good.
+
+> Shall we?

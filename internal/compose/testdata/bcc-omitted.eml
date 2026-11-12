@@ -1,0 +1,10 @@
+Mime-Version: 1.0
+Date: Thu, 12 Nov 2026 14:53:00 +0100
+Message-Id: <00112233445566778899aabbccddeeff@example.com>
+From: "Alice Example" <alice@example.com>
+To: "Bob" <bob@example.org>
+Subject: Quiet copy
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: quoted-printable
+
+Nobody sees the Bcc.

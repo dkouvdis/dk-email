@@ -1,0 +1,32 @@
+Mime-Version: 1.0
+Date: Thu, 12 Nov 2026 14:53:00 +0100
+Message-Id: <00112233445566778899aabbccddeeff@example.com>
+From: "Alice Example" <alice@example.com>
+To: "Bob" <bob@example.org>
+Subject: Files
+Content-Type: multipart/mixed;
+ boundary="=_dk-email-1a0e4181d24d747625f2208f"
+
+--=_dk-email-1a0e4181d24d747625f2208f
+Content-Transfer-Encoding: quoted-printable
+Content-Type: text/plain; charset=utf-8
+
+See attached.
+
+--=_dk-email-1a0e4181d24d747625f2208f
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename=notes.txt
+Content-Type: text/plain; charset=utf-8
+
+bGluZSBvbmUKbGluZSB0d28K
+--=_dk-email-1a0e4181d24d747625f2208f
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename*=utf-8''r%C3%A9sum%C3%A9.pdf
+Content-Type: application/octet-stream
+
+AAEC+v9BAAEC+v9BAAEC+v9BAAEC+v9BAAEC+v9BAAEC+v9BAAEC+v9BAAEC+v9BAAEC+v9BAAEC
++v9BAAEC+v9BAAEC+v9BAAEC+v9BAAEC+v9BAAEC+v9BAAEC+v9BAAEC+v9BAAEC+v9BAAEC+v9B
+AAEC+v9BAAEC+v9BAAEC+v9BAAEC+v9BAAEC+v9BAAEC+v9BAAEC+v9BAAEC+v9BAAEC+v9BAAEC
++v9BAAEC+v9BAAEC+v9BAAEC+v9BAAEC+v9BAAEC+v9BAAEC+v9BAAEC+v9BAAEC+v9BAAEC+v9B
+AAEC+v9BAAEC+v9B
+--=_dk-email-1a0e4181d24d747625f2208f--
