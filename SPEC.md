@@ -88,7 +88,7 @@ go build -o bin/dk-email ./cmd/dk-email
 
 # Run (dev)
 go run ./cmd/dk-email
-go run ./cmd/dk-email --config ./tmp/config.toml   # use an alternate config file
+go run ./cmd/dk-email --config ./.local/config.toml   # use an alternate config file
 
 # Test
 go test -race ./...
@@ -308,7 +308,7 @@ Naming: identifiers are lowercase, short and descriptive. Bubble Tea message typ
   - Permanently expunge mail in v1.
   - Re-encode the whole user config file.
 
-The repo `.gitignore` will cover `bin/`, `dist/`, `coverage.out`, `*.db`, `debug.log`, `tmp/`, and any `*.eml` outside `testdata/`.
+The repo `.gitignore` will cover `bin/`, `dist/`, `coverage.out`, `*.db`, `debug.log`, `.local/`, and any `*.eml` outside `testdata/`.
 
 ## Success Criteria
 
