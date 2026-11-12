@@ -340,13 +340,13 @@ Also rebind refresh from `r` to `ctrl+r`, and add `r`/`R`/`f`/`c` to `KeyMap`, u
 
 **Acceptance criteria:**
 
-- [ ] A Gmail address pre-fills the SMTP fields. A blank SMTP host saves the account with no `smtp_*` keys.
-- [ ] A bad SMTP password shows the error in the popup and saves nothing. A valid one appends the account with `smtp_host`/`smtp_port`/`smtp_tls`.
-- [ ] The transport gains a `Check(ctx)` (connect + auth only), tested against the in-process server.
+- [x] A Gmail address pre-fills the SMTP fields. A blank SMTP host saves the account with no `smtp_*` keys.
+- [x] A bad SMTP password shows the error in the popup and saves nothing. A valid one appends the account with `smtp_host`/`smtp_port`/`smtp_tls`.
+- [x] The transport gains a `Check(ctx)` (connect + auth only), tested against the in-process server. (Done as the existing `Verify(ctx)`.)
 
 **Verification:**
 
-- [ ] `go test -race ./internal/ui/... ./internal/mail/smtp/... ./cmd/dk-email/...` passes.
+- [x] `go test -race ./internal/ui/... ./internal/mail/smtp/... ./cmd/dk-email/...` passes.
 
 **Dependencies:** S1, S3
 
