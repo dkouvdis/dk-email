@@ -84,12 +84,12 @@ Every task also meets the standing bar before it counts as done:
 
 - [x] Against an in-process go-smtp server with a self-signed cert, these pass: implicit TLS send, STARTTLS send, auth failure, rejected recipient (error names the address), and context cancellation.
 - [x] A server that doesn't offer STARTTLS on `smtp_tls = "starttls"` fails rather than sending in plaintext.
-- [ ] A live, opt-in test (`DK_EMAIL_LIVE=1`, same pattern as `imap/live_test.go`) sends a one-line message from your Gmail account **to itself**.
+- [x] A live, opt-in test (`DK_EMAIL_LIVE=1`, same pattern as `imap/live_test.go`) sends a one-line message from your Gmail account **to itself**.
 
 **Verification:**
 
 - [x] `go test -race ./internal/mail/smtp/...` passes with ≥ 80% coverage.
-- [ ] Manual: the live test delivers to your own inbox.
+- [x] Manual: the live test delivers to your own inbox.
 
 **Dependencies:** None (uses `config.Account`; the S1 fields can be stubbed in tests until S1 lands)
 
@@ -114,12 +114,12 @@ Also rebind refresh from `r` to `ctrl+r`, and add `r`/`R`/`f`/`c` to `KeyMap`, u
 
 - [x] With a stub editor command, `c` produces an `ExecProcess` cmd. The return message carries the file contents, and the temp file no longer exists afterwards, on success, on editor error, and on quit.
 - [x] `ctrl+r` refreshes, and `r` no longer does. The help popup and hint bar show `ctrl+r`.
-- [ ] Manual: in a real terminal, `c` opens your editor. On quitting it the TUI redraws correctly, with alt screen, mouse behaviour and layout intact.
+- [x] Manual: in a real terminal, `c` opens your editor. On quitting it the TUI redraws correctly, with alt screen, mouse behaviour and layout intact.
 
 **Verification:**
 
 - [x] `go test -race ./internal/ui/...` passes.
-- [ ] Manual check above in your usual terminal.
+- [x] Manual check above in your usual terminal.
 
 **Dependencies:** None
 
@@ -132,9 +132,9 @@ Also rebind refresh from `r` to `ctrl+r`, and add `r`/`R`/`f`/`c` to `KeyMap`, u
 ### ✅ Checkpoint 1: Foundation
 
 - [x] Tests, vet and gofmt are clean.
-- [ ] A live SMTP send to yourself works on Gmail.
-- [ ] The editor round-trip works in a real terminal.
-- [ ] You review before Phase 2.
+- [x] A live SMTP send to yourself works on Gmail.
+- [x] The editor round-trip works in a real terminal.
+- [x] You review before Phase 2.
 
 ---
 

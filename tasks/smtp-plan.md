@@ -43,11 +43,11 @@ The full details are in [smtp-todo.md](smtp-todo.md).
 ### Phase 1: Foundation and de-risking
 - [x] S1: SMTP config keys, defaults, validation and append
 - [x] S2: Mail types for sending, plus `Reply-To` parsing
-- [ ] S3: SMTP transport on go-smtp (memserver tests + live send-to-self)
-- [ ] S4: Editor hand-off: `c` opens `$EDITOR` and discards; refresh moves to `ctrl+r`
+- [x] S3: SMTP transport on go-smtp (memserver tests + live send-to-self)
+- [x] S4: Editor hand-off: `c` opens `$EDITOR` and discards; refresh moves to `ctrl+r`
 
 ### Checkpoint 1: Foundation
-- [ ] Tests, vet and gofmt are clean. A live SMTP send to yourself works on Gmail. The editor round-trip works in a real terminal.
+- [x] Tests, vet and gofmt are clean. A live SMTP send to yourself works on Gmail. The editor round-trip works in a real terminal.
 
 ### Phase 2: First slice, new message
 - [ ] S5: Compose: new-message template, editor-file parse, plain-text MIME build
