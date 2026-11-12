@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"sync"
 	"testing"
 	"time"
 
@@ -369,5 +370,98 @@ func TestFake_IsSafeForConcurrentUse(t *testing.T) {
 	}
 	for range 8 {
 		<-done
+	}
+}
+
+func TestSetFlag_AnsweredIsAcceptedWithoutChangingOtherFlags(t *testing.T) {
+	f := inbox()
+	uid := f.AddMessage("INBOX", msg("a", false))
+
+	if err := f.SetFlag(ctx, "INBOX", []mail.UID{uid}, mail.FlagAnswered, true); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := f.Messages("INBOX")[0]; got.Seen || got.Flagged {
+		t.Errorf("message = seen:%v flagged:%v, want both false", got.Seen, got.Flagged)
+	}
+	calls := f.Calls()
+	if last := calls[len(calls)-1]; last.Flag != mail.FlagAnswered || !last.On {
+		t.Errorf("last call = %+v, want FlagAnswered on", last)
+	}
+}
+
+func TestSender_RecordsDraftsInOrder(t *testing.T) {
+	s := &Sender{}
+	to := []mail.Address{{Email: "a@example.com"}}
+	ref := &mail.MessageRef{Folder: "INBOX", UID: 7}
+
+	if err := s.Send(ctx, mail.Draft{Subject: "one", To: to, ReplyTo: ref}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Send(ctx, mail.Draft{Subject: "two"}); err != nil {
+		t.Fatal(err)
+	}
+	to[0].Email = "mutated@example.com"
+	ref.UID = 99
+
+	got := s.Sent()
+	if len(got) != 2 || got[0].Subject != "one" || got[1].Subject != "two" {
+		t.Fatalf("Sent() = %+v, want drafts one, two", got)
+	}
+	if got[0].To[0].Email != "a@example.com" || got[0].ReplyTo.UID != 7 {
+		t.Errorf("recorded draft aliases caller data: %+v", got[0])
+	}
+	got[0].To[0].Email = "x"
+	if s.Sent()[0].To[0].Email != "a@example.com" {
+		t.Error("Sent() returned aliased data")
+	}
+}
+
+func TestSender_ScriptedErrorsPerCall(t *testing.T) {
+	errA := errors.New("a")
+	s := &Sender{}
+	s.FailWith(nil, errA, nil)
+
+	var got []error
+	for range 4 {
+		got = append(got, s.Send(ctx, mail.Draft{}))
+	}
+
+	want := []error{nil, errA, nil, nil}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("call %d error = %v, want %v", i, got[i], want[i])
+		}
+	}
+	if n := len(s.Sent()); n != 4 {
+		t.Errorf("recorded %d drafts, want 4 (failed sends are recorded)", n)
+	}
+}
+
+func TestSender_HonoursContextCancellation(t *testing.T) {
+	s := &Sender{}
+	c, cancel := context.WithCancel(ctx)
+	cancel()
+
+	if err := s.Send(c, mail.Draft{}); !errors.Is(err, context.Canceled) {
+		t.Errorf("Send() error = %v, want context.Canceled", err)
+	}
+}
+
+func TestSender_IsSafeForConcurrentUse(t *testing.T) {
+	s := &Sender{}
+	var wg sync.WaitGroup
+	for range 20 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_ = s.Send(ctx, mail.Draft{})
+			_ = s.Sent()
+		}()
+	}
+	wg.Wait()
+
+	if n := len(s.Sent()); n != 20 {
+		t.Errorf("recorded %d drafts, want 20", n)
 	}
 }

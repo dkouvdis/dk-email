@@ -246,6 +246,29 @@ func TestParse_MalformedKeepsWhatItCanRead(t *testing.T) {
 	}
 }
 
+func TestParse_ReplyTo(t *testing.T) {
+	tests := []struct {
+		name   string
+		header string
+		want   []mail.Address
+	}{
+		{"absent", "", nil},
+		{"one", "Reply-To: Support <help@example.com>\r\n", []mail.Address{{Name: "Support", Email: "help@example.com"}}},
+		{"two", "Reply-To: a@example.com, \"B, Bee\" <b@example.com>\r\n", []mail.Address{{Email: "a@example.com"}, {Name: "B, Bee", Email: "b@example.com"}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m, err := Parse(strings.NewReader("From: x@example.com\r\n" + tt.header + "Subject: Hi\r\n\r\nbody\r\n"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !slices.Equal(m.ReplyTo, tt.want) || (tt.want == nil) != (m.ReplyTo == nil) {
+				t.Errorf("ReplyTo = %#v, want %#v", m.ReplyTo, tt.want)
+			}
+		})
+	}
+}
+
 func TestParse_UnreadableHeaderFails(t *testing.T) {
 	if _, err := Parse(strings.NewReader("this is not\x00 a header\n")); err == nil {
 		t.Error("Parse() error = nil, want an error for garbage headers")

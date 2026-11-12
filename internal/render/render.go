@@ -31,7 +31,7 @@ func Parse(r io.Reader) (mail.Message, error) {
 	}
 
 	h := gomail.Header{Header: e.Header}
-	msg := mail.Message{Summary: headerSummary(h), Cc: addresses(h, "Cc")}
+	msg := mail.Message{Summary: headerSummary(h), Cc: addresses(h, "Cc"), ReplyTo: addresses(h, "Reply-To")}
 
 	var plain, html string
 	var havePlain, haveHTML bool

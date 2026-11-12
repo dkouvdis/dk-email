@@ -2,8 +2,8 @@
 // that is the only boundary between the UI and the network. It must import
 // nothing outside the standard library.
 //
-// Sending (reply/compose) will be a separate Sender interface, so adding it
-// never changes Mailbox.
+// Sending (reply/compose) is the separate Sender interface, so it never
+// changes Mailbox.
 package mail
 
 import (
@@ -22,6 +22,10 @@ var (
 	// (IMAP UIDVALIDITY changed), so UIDs from earlier calls are invalid and
 	// the caller must reload from the newest message.
 	ErrFolderChanged = errors.New("folder changed on server; reload it")
+	// ErrAfterDelivery means the message was delivered but a later step
+	// (saving to Sent, marking the original answered) failed. Callers must
+	// treat the message as sent and never retry.
+	ErrAfterDelivery = errors.New("message sent, but a follow-up step failed")
 )
 
 // UID identifies a message within one folder (IMAP UID semantics).
@@ -67,8 +71,9 @@ func (r Role) String() string {
 type Flag int
 
 const (
-	FlagSeen    Flag = iota + 1 // read
-	FlagFlagged                 // starred
+	FlagSeen     Flag = iota + 1 // read
+	FlagFlagged                  // starred
+	FlagAnswered                 // set by sending after a reply; the UI doesn't toggle it
 )
 
 func (f Flag) String() string {
@@ -77,6 +82,8 @@ func (f Flag) String() string {
 		return "seen"
 	case FlagFlagged:
 		return "flagged"
+	case FlagAnswered:
+		return "answered"
 	}
 	return fmt.Sprintf("flag(%d)", int(f))
 }
@@ -134,7 +141,8 @@ type Summary struct {
 type Message struct {
 	Summary
 	Cc           []Address
-	Body         string // display text; HTML-only mail is converted to text
+	ReplyTo      []Address // the Reply-To header, if any
+	Body         string    // display text; HTML-only mail is converted to text
 	BodyFromHTML bool
 	Attachments  []Attachment
 }
@@ -143,6 +151,32 @@ type Attachment struct {
 	Name        string
 	ContentType string
 	Size        int64
+}
+
+// MessageRef points at a stored message.
+type MessageRef struct {
+	Folder string
+	UID    UID
+}
+
+// Draft is an outgoing message as the user wrote it. Addresses are already
+// parsed; Body is plain text.
+type Draft struct {
+	From        Address
+	To, Cc, Bcc []Address
+	Subject     string
+	Body        string
+	InReplyTo   string // Message-ID being replied to, or ""
+	References  []string
+	ReplyTo     *MessageRef // marked \Answered after delivery
+	ForwardOf   *MessageRef // attachments are copied from here
+}
+
+// Sender delivers drafts for one account. Send returns an error wrapping
+// ErrAfterDelivery when the message was delivered but saving to Sent or
+// marking the original answered failed; the caller must not retry then.
+type Sender interface {
+	Send(ctx context.Context, d Draft) error
 }
 
 // Mailbox is one account's mail store. Implementations must be safe for

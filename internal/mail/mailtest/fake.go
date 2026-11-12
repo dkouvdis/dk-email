@@ -1,4 +1,5 @@
-// Package mailtest provides an in-memory mail.Mailbox for tests.
+// Package mailtest provides an in-memory mail.Mailbox and a recording
+// mail.Sender for tests.
 package mailtest
 
 import (
@@ -193,7 +194,7 @@ func (f *Fake) SetFlag(ctx context.Context, name string, uids []mail.UID, flag m
 	if err != nil {
 		return err
 	}
-	if flag != mail.FlagSeen && flag != mail.FlagFlagged {
+	if flag != mail.FlagSeen && flag != mail.FlagFlagged && flag != mail.FlagAnswered {
 		return fmt.Errorf("unsupported flag %s", flag)
 	}
 	for i := range fl.messages {
@@ -201,9 +202,11 @@ func (f *Fake) SetFlag(ctx context.Context, name string, uids []mail.UID, flag m
 		if !slices.Contains(uids, m.UID) {
 			continue
 		}
-		if flag == mail.FlagSeen {
+		// Messages don't model \Answered; the call is only recorded.
+		switch flag {
+		case mail.FlagSeen:
 			m.Seen = on
-		} else {
+		case mail.FlagFlagged:
 			m.Flagged = on
 		}
 	}
@@ -299,4 +302,68 @@ func cloneMessage(m mail.Message) mail.Message {
 	m.Cc = slices.Clone(m.Cc)
 	m.Attachments = slices.Clone(m.Attachments)
 	return m
+}
+
+// Sender is a fake mail.Sender that records drafts. It is safe for concurrent use.
+type Sender struct {
+	mu    sync.Mutex
+	sent  []mail.Draft
+	calls int
+	errs  []error
+}
+
+var _ mail.Sender = (*Sender)(nil)
+
+// FailWith scripts errors by call number: call n returns errs[n] (0-based,
+// counted from the first call ever made). A nil or missing entry succeeds.
+// It replaces any earlier script.
+func (s *Sender) FailWith(errs ...error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.errs = slices.Clone(errs)
+}
+
+// Sent returns a copy of every draft passed to Send, in order, including
+// ones that were answered with an error.
+func (s *Sender) Sent() []mail.Draft {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]mail.Draft, len(s.sent))
+	for i, d := range s.sent {
+		out[i] = cloneDraft(d)
+	}
+	return out
+}
+
+// Send records d, then returns ctx.Err() if ctx is done, else the scripted
+// error for this call.
+func (s *Sender) Send(ctx context.Context, d mail.Draft) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.sent = append(s.sent, cloneDraft(d))
+	n := s.calls
+	s.calls++
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if n < len(s.errs) {
+		return s.errs[n]
+	}
+	return nil
+}
+
+func cloneDraft(d mail.Draft) mail.Draft {
+	d.To = slices.Clone(d.To)
+	d.Cc = slices.Clone(d.Cc)
+	d.Bcc = slices.Clone(d.Bcc)
+	d.References = slices.Clone(d.References)
+	if d.ReplyTo != nil {
+		ref := *d.ReplyTo
+		d.ReplyTo = &ref
+	}
+	if d.ForwardOf != nil {
+		ref := *d.ForwardOf
+		d.ForwardOf = &ref
+	}
+	return d
 }
