@@ -28,6 +28,12 @@ func Center(w, h int, pop string) (x, y int) {
 // Frame puts content in a bordered box of exactly w × h cells, cutting it
 // to fit. It returns "" when the box has no room inside.
 func Frame(th theme.Theme, content string, w, h int) string {
+	return FrameTitled(th, "", content, w, h)
+}
+
+// FrameTitled is Frame with title drawn into the top border, cut with … to
+// keep the border its full width. An empty title gives a plain Frame.
+func FrameTitled(th theme.Theme, title, content string, w, h int) string {
 	box := frameBox(th)
 	innerW, innerH := w-box.GetHorizontalFrameSize(), h-box.GetVerticalFrameSize()
 	if innerW < 1 || innerH < 1 {
@@ -38,7 +44,22 @@ func Frame(th theme.Theme, content string, w, h int) string {
 	for i, l := range lines {
 		lines[i] = ansi.Truncate(l, innerW, "")
 	}
-	return box.Width(w).Height(h).Render(strings.Join(lines, "\n"))
+	out := box.Width(w).Height(h).Render(strings.Join(lines, "\n"))
+	title = strings.TrimSpace(strings.NewReplacer("\r", " ", "\n", " ").Replace(title))
+	if title == "" {
+		return out
+	}
+	// "╭─ " + title + " " + dashes + "╮"
+	title = ansi.Truncate(title, w-5, "…")
+	if title == "" {
+		return out
+	}
+	b := lipgloss.RoundedBorder()
+	edge := lipgloss.NewStyle().Foreground(th.AccentColor)
+	dashes := strings.Repeat(b.Top, max(w-5-ansi.StringWidth(title), 0))
+	top := edge.Render(b.TopLeft+b.Top+" ") + th.Accent.Bold(true).Inline(true).Render(title) + edge.Render(" "+dashes+b.TopRight)
+	_, rest, _ := strings.Cut(out, "\n")
+	return top + "\n" + rest
 }
 
 // FrameInner is the content size inside a Frame of w × h.

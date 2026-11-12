@@ -43,3 +43,41 @@ func TestFrame(t *testing.T) {
 		t.Error("a frame too small for content should render nothing")
 	}
 }
+
+func TestFrameTitled(t *testing.T) {
+	th := theme.Default()
+	check := func(title string, w, h int) []string {
+		t.Helper()
+		lines := strings.Split(ansi.Strip(FrameTitled(th, title, "body", w, h)), "\n")
+		if len(lines) != h {
+			t.Fatalf("title %q: %d lines, want %d", title, len(lines), h)
+		}
+		for i, l := range lines {
+			if got := ansi.StringWidth(l); got != w {
+				t.Errorf("title %q: line %d is %d wide, want %d: %q", title, i, got, w, l)
+			}
+		}
+		return lines
+	}
+
+	if top := check("Reply · Re: Lunch?", 30, 4)[0]; top != "╭─ Reply · Re: Lunch? ───────╮" {
+		t.Errorf("top = %q", top)
+	}
+	if top := check("Reply · Re: Lunch? · me@example.com", 20, 4)[0]; top != "╭─ Reply · Re: Lu… ╮" {
+		t.Errorf("truncated top = %q", top)
+	}
+	if top := check("日本語のタイトルです", 17, 4)[0]; !strings.Contains(top, "…") {
+		t.Errorf("wide title not truncated: %q", top)
+	}
+	check("日本語", 20, 4)
+	check("日本語日本語日本語日本語", 21, 4)
+	check("title", 5, 3)
+	check("title", 6, 3)
+
+	if got, want := FrameTitled(th, "", "x\ny", 12, 5), Frame(th, "x\ny", 12, 5); got != want {
+		t.Errorf("empty title differs from Frame:\n%s\n%s", got, want)
+	}
+	if FrameTitled(th, "title", "x", 3, 2) != "" {
+		t.Error("a frame with no room inside should render nothing")
+	}
+}
