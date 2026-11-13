@@ -61,10 +61,8 @@ from the IMAP Drafts folder ([compose-plan.md](compose-plan.md)).
   [SMTP AUTH deprecation timeline](https://techcommunity.microsoft.com/blog/exchange/updated-exchange-online-smtp-auth-basic-authentication-deprecation-timeline/4489835).
 
 
+### To be planned
 
-
-
-
-
-
-
+- Signautre
+- Edit Account
+- Settings config
