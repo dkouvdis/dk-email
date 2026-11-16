@@ -40,7 +40,7 @@ must keep possible.
   account. Aliases (`{email, name}`) are listed in config or entered when
   connecting an account; the composer gets a From field, and replies start
   from the address the original was sent to. See
-  [docs/ideas/send-as-aliases.md](../docs/ideas/send-as-aliases.md).
+  [tasks/aliases-spec.md](aliases-spec.md).
 - **Edit accounts**: change an existing account from the app, including adding
   `smtp_host` to an account that can't send yet. Config updates must keep
   preserving the user's formatting and comments.
