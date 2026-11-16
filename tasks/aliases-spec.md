@@ -20,11 +20,11 @@ which Gmail, Fastmail and iCloud all expect.
 
 ## Key Assumptions to Validate
 
-- [ ] Gmail sends from a verified alias over `smtp.gmail.com` with the
+- [x] Gmail sends from a verified alias over `smtp.gmail.com` with the
       account's app password. Test with a real send and check the headers.
-- [ ] Fastmail and iCloud accept a custom-domain From with the main login.
+- [x] Fastmail and iCloud accept a custom-domain From with the main login.
       Test one send on each.
-- [ ] To and Cc find the right alias for most replies. Check against a
+- [x] To and Cc find the right alias for most replies. Check against a
       real inbox.
 
 ## MVP Scope

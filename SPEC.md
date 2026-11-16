@@ -192,7 +192,7 @@ password_cmd = "op read op://Personal/Gmail/app-password"   # omit to use the ke
   - All problems in a file are reported together.
   - The config dir and its `.gitignore` are only created for the default location, never next to a custom `--config` path.
   - `tls_cert` (optional) is a PEM file of certificates trusted for that account **instead of** the system roots. It's for local bridges with self-signed certificates, such as Proton Mail Bridge, whose 20-year certificate macOS rejects as "not standards compliant" even when trusted in Keychain. The host name and expiry are still verified. `~/` is expanded, and a relative path is resolved from the config file's folder. A missing file, or one with no PEM certificate, fails at load. Added 2026-11-09 with your approval.
-- **Sending keys** (`smtp_host`, `smtp_port`, `smtp_tls`, `from_name`, `save_sent`) are specified in [tasks/smtp-spec.md](tasks/smtp-spec.md#configuration). Existing configs keep working, with sending disabled until `smtp_host` is set.
+- **Sending keys** (`smtp_host`, `smtp_port`, `smtp_tls`, `from_name`, `save_sent`) are specified in [tasks/smtp-spec.md](tasks/smtp-spec.md#configuration). `aliases` (other From addresses sent through the same SMTP login, also needing `smtp_host`) is specified in [tasks/aliases-spec.md](tasks/aliases-spec.md) and documented for users in [docs/send-as.md](docs/send-as.md). Existing configs keep working, with sending disabled until `smtp_host` is set.
 - **Password resolution:** if `password_cmd` is set, run it with `sh -c` and use the **first line** of stdout with only the line ending removed. Spaces inside the password are kept, and extra lines (as `pass show` prints) are ignored. The command inherits the user's environment but gets no stdin, and on timeout (60s) its whole process group is killed. Errors include the command's stderr (control characters stripped, length capped) but never its stdout. If `op` isn't on the inherited `PATH`, use its absolute path. Otherwise read from the keychain (service `dk-email`, key = account `name`). If neither yields a password, the account is shown as "needs password", and pressing `A` opens the connect popup to supply one (stored in the keychain).
 - **The connect-account popup appends** a new `[[account]]` block to the file as text, so the user's comments and formatting are preserved. It never re-encodes the whole file. When the address ends in `@gmail.com` / `@googlemail.com`, the popup pre-fills `imap.gmail.com:993 implicit`. Its password source is either a 1Password reference (stored as `password_cmd = "op read <ref>"`) or "enter once → keychain".
 - **Config-dir `.gitignore`**, written on first run if missing:
@@ -224,16 +224,18 @@ password_cmd = "op read op://Personal/Gmail/app-password"   # omit to use the ke
 
 Actions on a **collapsed thread** apply to every message in it. On an expanded row, or in the reader, they apply to the selected message. Opening a message marks it read.
 
-**Composer:** `c`, `r`, `R` and `f` open a built-in plain-text composer in the ~90% popup, titled with the action, the subject and the account's address. The terminal is never handed to another program. It has To, Cc, Bcc, Subject and body fields:
+**Composer:** `c`, `r`, `R` and `f` open a built-in plain-text composer in the ~90% popup, titled with the action, the subject and the selected From address. The terminal is never handed to another program. It has To, Cc, Bcc, Subject and body fields, plus a From row above To when the account has `aliases`:
 
 | Key | Action |
 |---|---|
 | `ctrl+s` | send |
 | `tab` / `shift+tab` | next / previous field |
-| `enter` | in a header field, next field (in the body, a new line) |
+| `enter` | in a header field, next field (in the body, a new line); on From, open the address list |
+| `←` / `→` or `space` | on From, previous / next address |
 | `esc` | close at once if nothing changed, otherwise ask: `s` save to Drafts · `d` discard · `e` keep editing · `esc` save & close |
 | `ctrl+c` | quit, even while composing |
 
+- **From:** chosen from the account address and its aliases, never typed. The list opens below the row with a border and dims the rest of the composer; `↑`/`↓` or `k`/`j` move, `enter` picks, `esc` closes it. Replies and forwards start from the address you sent it from (for your own message), else the first of yours in To, then Cc, else the account address. Reply-all drops every one of your addresses. A reopened draft keeps its From even if it's no longer configured.
 - Replies start in the body above the quote. New messages and forwards start in To. The body is sent exactly as typed, soft-wrapped on screen only, with tabs becoming 4 spaces. A forward's attachments are still sent, but aren't listed.
 - A parse or send error shows in the composer's footer row (the keys themselves are in the hint bar), and `ctrl+s` retries. If the message was delivered but a follow-up (Sent copy, `\Answered`, removing the draft) failed, the composer closes with the error in the status bar and the message is never resent.
 - **Drafts:** saving stores the message in the account's Drafts-role folder flagged `\Draft` and `\Seen`. It needs no recipients, and keeps Bcc, threading headers and forwarded attachments. `enter` (or a click to open) on a message in the Drafts folder reopens it in the composer. Saving again replaces the old copy, and sending removes it. `esc` while saving cancels the save. Removing one message needs the IMAP UIDPLUS extension; without it the old copy is kept and the status says so. A resumed reply still threads, but doesn't mark the original `\Answered`.

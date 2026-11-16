@@ -117,16 +117,16 @@ assumptions with real sends.
       replies choose From, and setup per provider (Gmail "Send mail as"
       verification, Fastmail, iCloud), plus what isn't supported. Linked from
       the README.
-- [ ] README: the `aliases` key, the From row, how replies choose From,
+- [x] README: the `aliases` key, the From row, how replies choose From,
       Gmail's "Send mail as" verification warning, and that a domain needing its own
       SMTP login is a separate account.
-- [ ] SPEC config block and composer table updated; `aliases-spec.md`
+- [x] SPEC config block and composer table updated; `aliases-spec.md`
       assumptions ticked or noted as failing.
-- [ ] Sends from an alias checked on Gmail, Fastmail and iCloud (the From
+- [x] Sends from an alias checked on Gmail, Fastmail and iCloud (the From
       header at the recipient).
 
 **Verification:**
-- [ ] Manual sends as listed
+- [x] Manual sends as listed
 
 **Dependencies:** Tasks 1–4
 
