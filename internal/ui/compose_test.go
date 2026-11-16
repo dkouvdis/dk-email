@@ -110,6 +110,34 @@ func TestCompose_COpensTheComposerInTo(t *testing.T) {
 	}
 }
 
+func TestCompose_NewMessageUsesTheActiveAccount(t *testing.T) {
+	f := newFixture()
+	f.personalSender = &mailtest.DraftSender{}
+	f.workSender = &mailtest.DraftSender{}
+	m := started(t, f, 160, 30)
+	m.accts[0].Email = "me@example.com"
+	m.accts[1].Email = "work@example.com"
+	m = send(t, m, press("h"))
+	for i := 0; i < 20; i++ {
+		if account, _ := m.side.Cursor(); account == 1 {
+			break
+		}
+		m = send(t, m, press("j"))
+	}
+	if account, _ := m.side.Cursor(); account != 1 || m.open.account != 0 {
+		t.Fatalf("cursor account %d, open account %d; want cursor in Work (1) with Personal (0) open", account, m.open.account)
+	}
+
+	m, _ = keyCmd(t, m, "c")
+
+	if !m.composing() {
+		t.Fatalf("c didn't open the composer (status %q)", m.status)
+	}
+	if view := plain(m); !strings.Contains(view, "New message · work@example.com") {
+		t.Errorf("composer isn't from the active account:\n%s", view)
+	}
+}
+
 func TestCompose_HintsRowShowsComposerKeys(t *testing.T) {
 	m, _ := composeFixture(t)
 	m, _ = keyCmd(t, m, "c")

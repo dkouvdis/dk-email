@@ -95,7 +95,7 @@ func (m Model) startForward() (Model, tea.Cmd) {
 // from the reader when it already has it, and fetched otherwise; the draft
 // slot is held meanwhile.
 func (m Model) startFromTarget(kind composeKind) (Model, tea.Cmd) {
-	account, ok := m.draftAccount()
+	account, ok := m.draftAccount(m.open.account)
 	if !ok {
 		return m, nil
 	}

@@ -32,7 +32,7 @@ func fetchDraft(dr mail.Drafter, account int, ref mail.MessageRef) tea.Cmd {
 // openDraft reads the saved draft uid in the open folder and, when it
 // arrives, opens it in the composer. The draft slot is held meanwhile.
 func (m Model) openDraft(uid mail.UID) (Model, tea.Cmd) {
-	account, ok := m.draftAccount()
+	account, ok := m.draftAccount(m.open.account)
 	if !ok {
 		return m, nil
 	}

@@ -68,10 +68,10 @@ func (m Model) drafter(account int) (mail.Drafter, bool) {
 	return d, ok
 }
 
-// draftAccount is the account a new draft would be sent from. When none can
-// start, it sets the status that says why, or leaves it alone if there is
-// nothing to say.
-func (m *Model) draftAccount() (int, bool) {
+// draftAccount checks a new draft can start from account and returns it.
+// When it can't, it sets the status that says why, or leaves it alone if
+// there is nothing to say.
+func (m *Model) draftAccount(account int) (int, bool) {
 	switch {
 	case m.sending:
 		m.setStatus(statusSending)
@@ -82,10 +82,9 @@ func (m *Model) draftAccount() (int, bool) {
 	case m.draft != nil:
 		m.setStatus(statusFinishDraft)
 		return 0, false
-	case m.open.account < 0:
+	case account < 0:
 		return 0, false
 	}
-	account := m.open.account
 	if m.senders[account] == nil {
 		m.setStatus(fmt.Sprintf("Sending isn't set up for %s: add smtp_host to its config", m.accts[account].Name))
 		return 0, false
@@ -99,9 +98,19 @@ func (m Model) identity(account int) mail.Address {
 	return mail.Address{Name: a.FromName, Email: a.Email}
 }
 
-// startCompose opens an empty message from the open folder's account.
+// activeAccount is the account the sidebar cursor is in, the one the
+// sidebar shows undimmed, or the open folder's account when the cursor is
+// on no folder.
+func (m Model) activeAccount() int {
+	if account, _ := m.side.Cursor(); account >= 0 {
+		return account
+	}
+	return m.open.account
+}
+
+// startCompose opens an empty message from the active account.
 func (m Model) startCompose() (Model, tea.Cmd) {
-	account, ok := m.draftAccount()
+	account, ok := m.draftAccount(m.activeAccount())
 	if !ok {
 		return m, nil
 	}

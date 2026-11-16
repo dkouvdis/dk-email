@@ -214,7 +214,7 @@ save_sent    = false               # optional, save a copy to Sent; default: fal
 
 ### Writing a message
 
-- `r` replies, `R` replies to everyone, `f` forwards and `c` starts a new message from the current account.
+- `r` replies, `R` replies to everyone, `f` forwards and `c` starts a new message from the account under the sidebar cursor (the undimmed one).
 - **Target:** on a collapsed thread and in the reader, `r`, `R` and `f` use the thread's latest message. On an expanded row, they use the selected message.
 - The composer opens in a popup, with **To**, **Cc**, **Bcc**, **Subject** and the body as plain-text fields. Its title shows the action, the subject and the account's address. dk-email never hands the terminal to another program.
 - Replies start in the body, above the quote. New messages and forwards start in `To`. `From` isn't editable: it's always the account's address (and `from_name`).
