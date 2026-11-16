@@ -210,7 +210,8 @@ save_sent    = false               # optional, save a copy to Sent; default: fal
 - **TLS:** the connection is always encrypted, and dk-email never falls back to plaintext. With `smtp_tls = "starttls"`, STARTTLS is mandatory. `tls_cert` applies to SMTP too, so Proton Mail Bridge works for both.
 - **`smtp_port`** defaults to 465 for `implicit` and 587 for `starttls`. `smtp_tls` defaults to `implicit`.
 - **`save_sent`:** dk-email saves a copy of each sent message to the account's Sent folder over IMAP. Gmail already files mail sent through its SMTP server in Sent, so the default is `false` for `imap.gmail.com` to avoid duplicates, and `true` everywhere else. Set `save_sent = false` for any other provider that files SMTP-sent mail in Sent itself. If the account has no Sent folder, the message is still sent and the status warns.
-- `smtp_port`, `smtp_tls`, `from_name` and `save_sent` without `smtp_host` are config errors.
+- **`aliases`:** other addresses this account can send as, such as a custom domain. Gmail needs each one verified under "Send mail as" first, or it silently rewrites From. An address with its own SMTP login is a separate account. See [Sending from aliases](docs/send-as.md).
+- `smtp_port`, `smtp_tls`, `from_name`, `aliases` and `save_sent` without `smtp_host` are config errors.
 - **Microsoft 365 and Outlook.com** aren't supported yet. They no longer accept password logins and need OAuth, which dk-email doesn't have.
 
 ### Writing a message
@@ -218,7 +219,7 @@ save_sent    = false               # optional, save a copy to Sent; default: fal
 - `r` replies, `R` replies to everyone, `f` forwards and `c` starts a new message from the account under the sidebar cursor (the undimmed one).
 - **Target:** on a collapsed thread and in the reader, `r`, `R` and `f` use the thread's latest message. On an expanded row, they use the selected message.
 - The composer opens in a popup, with **To**, **Cc**, **Bcc**, **Subject** and the body as plain-text fields. Its title shows the action, the subject and the account's address. dk-email never hands the terminal to another program.
-- Replies start in the body, above the quote. New messages and forwards start in `To`. `From` isn't editable: it's always the account's address (and `from_name`).
+- Replies start in the body, above the quote. New messages and forwards start in `To`. With `aliases`, a **From** row above `To` picks the sending address, and replies start from the address the message was sent to. See [Sending from aliases](docs/send-as.md).
 - Addresses are separated by commas, as in `Alice <alice@example.com>, bob@example.com`.
 - The body is sent exactly as typed. Long lines are only wrapped on screen, and tabs become 4 spaces.
 

@@ -112,7 +112,7 @@ when an SMTP host is set.
 assumptions with real sends.
 
 **Acceptance criteria:**
-- [ ] `docs/send-as.md`: a user guide to sending from aliases, covering what an
+- [x] `docs/send-as.md`: a user guide to sending from aliases, covering what an
       alias is, setting one up in config or the connect popup, the From row, how
       replies choose From, and setup per provider (Gmail "Send mail as"
       verification, Fastmail, iCloud), plus what isn't supported. Linked from
