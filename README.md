@@ -56,7 +56,7 @@ On first run with no accounts, the **connect-account popup** opens. It asks for 
 - a password source: either a 1Password reference, or "enter once → keychain";
 - optionally, the SMTP host, port and TLS mode, which turn on [sending](#sending-mail).
 
-Gmail addresses pre-fill `imap.gmail.com:993` and `smtp.gmail.com:465` (implicit TLS). dk-email tests the IMAP connection, and the SMTP login too when an SMTP host is filled in, then appends an `[[account]]` block to `config.toml`, keeping your comments and formatting intact. Press `A` at any time to connect another account.
+Gmail addresses pre-fill `imap.gmail.com:993` and `smtp.gmail.com:465` (implicit TLS). dk-email tests the IMAP connection, and the SMTP login too when an SMTP host is filled in, then appends an `[[account]]` block to `config.toml`, keeping your comments and formatting intact. Press `A` at any time to connect another account, and `E` to edit or delete one ([guide](docs/accounts.md)).
 
 The config folder lives at `$XDG_CONFIG_HOME/dk-email/` (default `~/.config/dk-email/`) on every OS, macOS included. The folder is `0700`, `config.toml` is `0600`, and a `.gitignore` is written so the folder can be kept in a dotfiles repo safely.
 
@@ -254,7 +254,7 @@ save_sent    = false               # optional, save a copy to Sent; default: fal
 
 ### Connect popup
 
-The connect-account popup has optional **SMTP host**, **SMTP port** and **SMTP TLS** fields. Gmail addresses pre-fill `smtp.gmail.com:465` with implicit TLS. When an SMTP host is filled in, the popup tests the SMTP login (connect and sign in, nothing is sent) before saving, and writes the `smtp_*` keys to the new `[[account]]` block. Leave the host empty if the account shouldn't send. Existing accounts are edited by hand in `config.toml`.
+The connect-account popup has optional **SMTP host**, **SMTP port** and **SMTP TLS** fields. Gmail addresses pre-fill `smtp.gmail.com:465` with implicit TLS. When an SMTP host is filled in, the popup tests the SMTP login (connect and sign in, nothing is sent) before saving, and writes the `smtp_*` keys to the new `[[account]]` block. Leave the host empty if the account shouldn't send. Press `E` to edit or delete an existing account; see [Editing and deleting accounts](docs/accounts.md).
 
 ## Keys
 
@@ -269,6 +269,7 @@ The connect-account popup has optional **SMTP host**, **SMTP port** and **SMTP T
 | `r` | reply | `R` | reply all |
 | `f` | forward | `c` | new message |
 | `a` | focus folders (narrow) / folder picker (list) | `A` | connect account |
+| `E` | edit or delete account | | |
 | `/` | filter folders | `v` | toggle split ↔ list + popup |
 | `?` | key help | `esc` | close popup / back |
 | `q` | close the open popup, otherwise quit | `ctrl+c` | quit, even with a popup open |

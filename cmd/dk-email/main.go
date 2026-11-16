@@ -138,6 +138,12 @@ var verifySMTP = func(ctx context.Context, acct config.Account, password string)
 	return smtp.New(acct, password).Verify(ctx)
 }
 
+// deleteSecret and copySecret change the OS keychain; tests replace them.
+var (
+	deleteSecret = secret.Delete
+	copySecret   = secret.Copy
+)
+
 // newOnboarding lets the connect popup test and save accounts. A new
 // account's keychain password is stored before the account is appended to
 // configPath, so a saved account always has its password. VerifySMTP tests a
@@ -176,6 +182,52 @@ func newOnboarding(configPath string, pw passwordResolver, store func(account, p
 			return config.AppendAccount(configPath, acct)
 		},
 		StorePassword: store,
+		UpdateAccount: func(index int, oldName string, edit func(config.Account) config.Account, password string) error {
+			// Learn the new name and password source up front: the keychain
+			// entry is written before the config, so a saved account always
+			// has its password.
+			cfg, err := config.Load(configPath)
+			if err != nil {
+				return err
+			}
+			if index < 0 || index >= len(cfg.Accounts) || cfg.Accounts[index].Name != oldName {
+				return fmt.Errorf("config changed on disk: account %q not found", oldName)
+			}
+			edited := edit(cfg.Accounts[index])
+			renamed := edited.Name != oldName
+			keychain := renamed && edited.PasswordCmd == ""
+			switch {
+			case password != "":
+				if err := store(edited.Name, password); err != nil {
+					return err
+				}
+			case keychain:
+				// Copy first, so the config is only written once the new
+				// name has its password; the old entry goes afterwards.
+				if err := copySecret(oldName, edited.Name); err != nil {
+					return err
+				}
+			}
+			if err := config.ReplaceAccount(configPath, index, oldName, edit); err != nil {
+				if renamed && (password != "" || keychain) {
+					_ = deleteSecret(edited.Name) // best effort: don't leave an orphan
+				}
+				return err
+			}
+			if keychain {
+				_ = deleteSecret(oldName) // the old entry is just left over
+			}
+			return nil
+		},
+		RemoveAccount: func(index int, acct config.Account, deletePassword bool) error {
+			if err := config.RemoveAccount(configPath, index, acct.Name); err != nil {
+				return err
+			}
+			if deletePassword && acct.PasswordCmd == "" {
+				return deleteSecret(acct.Name)
+			}
+			return nil
+		},
 	}
 }
 

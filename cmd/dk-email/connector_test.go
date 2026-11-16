@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -375,5 +376,197 @@ func TestOnboarding_GoodSMTPLoginSavesSMTPKeysAndBuildsSender(t *testing.T) {
 	}
 	if _, err := config.Load(path); err != nil {
 		t.Errorf("saved config doesn't load: %v", err)
+	}
+}
+
+// keychainCalls records the keychain changes Onboarding makes.
+type keychainCalls struct{ calls []string }
+
+func stubKeychain(t *testing.T, copyErr error) *keychainCalls {
+	t.Helper()
+	k := &keychainCalls{}
+	oldDelete, oldCopy := deleteSecret, copySecret
+	deleteSecret = func(account string) error { k.calls = append(k.calls, "delete "+account); return nil }
+	copySecret = func(from, to string) error { k.calls = append(k.calls, "copy "+from+"->"+to); return copyErr }
+	t.Cleanup(func() { deleteSecret, copySecret = oldDelete, oldCopy })
+	return k
+}
+
+const editConfig = `[[account]]
+name = "Work"
+email = "me@example.com"
+imap_host = "imap.example.com"
+
+[[account]]
+name = "Home"
+email = "me@home.org"
+imap_host = "imap.home.org"
+password_cmd = "op read op://V/I/p"
+`
+
+func writeEditConfig(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte(editConfig), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func rename(name string) func(config.Account) config.Account {
+	return func(a config.Account) config.Account { a.Name = name; return a }
+}
+
+func TestOnboarding_UpdateAccountRenameCopiesThenDropsOldKeychainPassword(t *testing.T) {
+	path := writeEditConfig(t)
+	k := stubKeychain(t, nil)
+	o := newOnboarding(path, stubResolver{}, func(string, string) error { t.Error("password stored"); return nil }, slog.New(slog.DiscardHandler))
+
+	if err := o.UpdateAccount(0, "Work", rename("Job"), ""); err != nil {
+		t.Fatal(err)
+	}
+
+	if want := []string{"copy Work->Job", "delete Work"}; !reflect.DeepEqual(k.calls, want) {
+		t.Errorf("keychain = %v, want %v", k.calls, want)
+	}
+	cfg, err := config.Load(path)
+	if err != nil || cfg.Accounts[0].Name != "Job" || cfg.Accounts[1].Name != "Home" {
+		t.Errorf("config = %+v, %v", cfg, err)
+	}
+}
+
+func TestOnboarding_UpdateAccountNewPasswordStoresUnderNewNameAndDropsOld(t *testing.T) {
+	path := writeEditConfig(t)
+	k := stubKeychain(t, nil)
+	stored := map[string]string{}
+	o := newOnboarding(path, stubResolver{}, func(a, p string) error { stored[a] = p; return nil }, slog.New(slog.DiscardHandler))
+
+	if err := o.UpdateAccount(0, "Work", rename("Job"), "secret"); err != nil {
+		t.Fatal(err)
+	}
+
+	if stored["Job"] != "secret" {
+		t.Errorf("stored = %v", stored)
+	}
+	if want := []string{"delete Work"}; !reflect.DeepEqual(k.calls, want) {
+		t.Errorf("keychain = %v, want %v", k.calls, want)
+	}
+}
+
+func TestOnboarding_UpdateAccountPasswordCmdAccountLeavesKeychainAlone(t *testing.T) {
+	path := writeEditConfig(t)
+	k := stubKeychain(t, nil)
+	o := newOnboarding(path, stubResolver{}, nil, slog.New(slog.DiscardHandler))
+
+	if err := o.UpdateAccount(1, "Home", rename("House"), ""); err != nil {
+		t.Fatal(err)
+	}
+	if len(k.calls) != 0 {
+		t.Errorf("keychain touched: %v", k.calls)
+	}
+}
+
+func TestOnboarding_UpdateAccountFailedWriteCleansUpAndKeepsConfig(t *testing.T) {
+	path := writeEditConfig(t)
+	k := stubKeychain(t, nil)
+	o := newOnboarding(path, stubResolver{}, func(string, string) error { return nil }, slog.New(slog.DiscardHandler))
+
+	// "Home" is a duplicate name, so the config write is refused.
+	err := o.UpdateAccount(0, "Work", rename("Home"), "secret")
+
+	if err == nil {
+		t.Fatal("want an error")
+	}
+	if want := []string{"delete Home"}; !reflect.DeepEqual(k.calls, want) {
+		t.Errorf("keychain = %v, want %v", k.calls, want)
+	}
+	if got, _ := os.ReadFile(path); string(got) != editConfig {
+		t.Errorf("config changed: %s", got)
+	}
+}
+
+func TestOnboarding_UpdateAccountFailedWriteRemovesTheCopy(t *testing.T) {
+	path := writeEditConfig(t)
+	k := stubKeychain(t, nil)
+	o := newOnboarding(path, stubResolver{}, nil, slog.New(slog.DiscardHandler))
+
+	if err := o.UpdateAccount(0, "Work", rename("Home"), ""); err == nil {
+		t.Fatal("want an error")
+	}
+	if want := []string{"copy Work->Home", "delete Home"}; !reflect.DeepEqual(k.calls, want) {
+		t.Errorf("keychain = %v, want %v", k.calls, want)
+	}
+}
+
+func TestOnboarding_UpdateAccountStaleNameWritesNothing(t *testing.T) {
+	path := writeEditConfig(t)
+	k := stubKeychain(t, nil)
+	o := newOnboarding(path, stubResolver{}, func(string, string) error { t.Error("password stored"); return nil }, slog.New(slog.DiscardHandler))
+
+	err := o.UpdateAccount(0, "Other", rename("Job"), "secret")
+
+	if err == nil || !strings.Contains(err.Error(), "config changed on disk") || len(k.calls) != 0 {
+		t.Errorf("error = %v, keychain = %v", err, k.calls)
+	}
+}
+
+func TestOnboarding_UpdateAccountCopyFailureLeavesConfigUntouched(t *testing.T) {
+	path := writeEditConfig(t)
+	k := stubKeychain(t, errors.New("keychain locked"))
+	o := newOnboarding(path, stubResolver{}, nil, slog.New(slog.DiscardHandler))
+
+	err := o.UpdateAccount(0, "Work", rename("Job"), "")
+
+	if err == nil || !strings.Contains(err.Error(), "keychain locked") {
+		t.Errorf("error = %v", err)
+	}
+	if got, _ := os.ReadFile(path); string(got) != editConfig {
+		t.Errorf("config changed: %s", got)
+	}
+	if want := []string{"copy Work->Job"}; !reflect.DeepEqual(k.calls, want) {
+		t.Errorf("keychain = %v, want %v", k.calls, want)
+	}
+}
+
+func TestOnboarding_RemoveAccount(t *testing.T) {
+	tests := []struct {
+		name     string
+		index    int
+		acct     config.Account
+		deletePW bool
+		want     []string
+	}{
+		{"keychain account, delete password", 0, config.Account{Name: "Work"}, true, []string{"delete Work"}},
+		{"keychain account, keep password", 0, config.Account{Name: "Work"}, false, nil},
+		{"password_cmd account", 1, config.Account{Name: "Home", PasswordCmd: "op read x"}, true, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			path := writeEditConfig(t)
+			k := stubKeychain(t, nil)
+			o := newOnboarding(path, stubResolver{}, nil, slog.New(slog.DiscardHandler))
+
+			if err := o.RemoveAccount(tt.index, tt.acct, tt.deletePW); err != nil {
+				t.Fatal(err)
+			}
+
+			if !reflect.DeepEqual(k.calls, tt.want) {
+				t.Errorf("keychain = %v, want %v", k.calls, tt.want)
+			}
+			cfg, err := config.Load(path)
+			if err != nil || len(cfg.Accounts) != 1 || cfg.Accounts[0].Name == tt.acct.Name {
+				t.Errorf("config = %+v, %v", cfg, err)
+			}
+		})
+	}
+}
+
+func TestOnboarding_RemoveAccountStaleKeepsPassword(t *testing.T) {
+	path := writeEditConfig(t)
+	k := stubKeychain(t, nil)
+	o := newOnboarding(path, stubResolver{}, nil, slog.New(slog.DiscardHandler))
+
+	if err := o.RemoveAccount(0, config.Account{Name: "Gone"}, true); err == nil || len(k.calls) != 0 {
+		t.Errorf("error = %v, keychain = %v", err, k.calls)
 	}
 }

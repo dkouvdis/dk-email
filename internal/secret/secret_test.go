@@ -237,3 +237,58 @@ func TestStore_ErrorDoesNotLeakPassword(t *testing.T) {
 		t.Errorf("error leaks the password: %q", err)
 	}
 }
+
+func TestDelete_RemovesEntryAndIgnoresMissing(t *testing.T) {
+	keyring.MockInit()
+	if err := Store("Work", testPassword); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := Delete("Work"); err != nil {
+		t.Fatalf("Delete() error = %v", err)
+	}
+	if _, err := New().Resolve(context.Background(), config.Account{Name: "Work"}); !errors.Is(err, ErrNoPassword) {
+		t.Errorf("entry still there: %v", err)
+	}
+	if err := Delete("Work"); err != nil {
+		t.Errorf("Delete() of a missing entry error = %v", err)
+	}
+}
+
+func TestDelete_KeychainFailureIsAnError(t *testing.T) {
+	keyring.MockInitWithError(errors.New("keychain locked"))
+	t.Cleanup(keyring.MockInit)
+
+	if err := Delete("Work"); err == nil || !strings.Contains(err.Error(), "keychain locked") {
+		t.Errorf("Delete() error = %v", err)
+	}
+}
+
+func TestCopy_StoresUnderNewNameAndKeepsOld(t *testing.T) {
+	keyring.MockInit()
+	if err := Store("Old", testPassword); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := Copy("Old", "New"); err != nil {
+		t.Fatalf("Copy() error = %v", err)
+	}
+
+	r := New()
+	for _, name := range []string{"Old", "New"} {
+		if got, err := r.Resolve(context.Background(), config.Account{Name: name}); err != nil || got != testPassword {
+			t.Errorf("entry %s = %q, %v", name, got, err)
+		}
+	}
+}
+
+func TestCopy_NothingToCopyIsNotAnError(t *testing.T) {
+	keyring.MockInit()
+
+	if err := Copy("Old", "New"); err != nil {
+		t.Errorf("Copy() error = %v", err)
+	}
+	if _, err := New().Resolve(context.Background(), config.Account{Name: "New"}); !errors.Is(err, ErrNoPassword) {
+		t.Errorf("an entry appeared: %v", err)
+	}
+}

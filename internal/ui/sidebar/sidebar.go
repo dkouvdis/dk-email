@@ -231,6 +231,77 @@ func (m Model) SetFolders(i int, folders []mail.Folder, err error) Model {
 	return m
 }
 
+// Rename changes an account's name, as after editing it.
+func (m Model) Rename(i int, name string) Model {
+	if i < 0 || i >= len(m.accounts) {
+		return m
+	}
+	m.accounts = slices.Clone(m.accounts)
+	m.accounts[i].name = name
+	return m
+}
+
+// SetConnecting shows an account as connecting again, as after saving an
+// edit that is about to be reconnected.
+func (m Model) SetConnecting(i int) Model {
+	if i < 0 || i >= len(m.accounts) {
+		return m
+	}
+	m.accounts = slices.Clone(m.accounts)
+	m.accounts[i] = account{name: m.accounts[i].name, state: connecting}
+	if !slices.Contains(m.selectable(), m.cursor) {
+		m.cursor = noRef
+		if sel := m.selectable(); len(sel) > 0 {
+			m.cursor = sel[0]
+		}
+	}
+	m.ensureVisible()
+	return m
+}
+
+// Failed reports whether the account's connection failed.
+func (m Model) Failed(i int) bool {
+	return i >= 0 && i < len(m.accounts) && m.accounts[i].state == failed
+}
+
+// RemoveAccount drops an account. The cursor moves to the account now in
+// its place (or the previous one if it was last), the open folder follows
+// its account, and refs to the removed account are cleared.
+func (m Model) RemoveAccount(i int) Model {
+	if i < 0 || i >= len(m.accounts) {
+		return m
+	}
+	m.accounts = slices.Delete(slices.Clone(m.accounts), i, i+1)
+	shift := func(r ref) ref {
+		switch {
+		case r == noRef || r.account == i:
+			return noRef
+		case r.account > i:
+			r.account--
+		}
+		return r
+	}
+	wasCursor := m.cursor.account == i
+	m.open, m.cursor = shift(m.open), shift(m.cursor)
+	if wasCursor || m.cursor == noRef {
+		m.cursor = noRef
+		target := min(i, len(m.accounts)-1)
+		sel := m.selectable()
+		for _, r := range sel {
+			if r.account == target {
+				m.cursor = r
+				break
+			}
+		}
+		if m.cursor == noRef && len(sel) > 0 {
+			m.cursor = sel[0]
+		}
+	}
+	m.offset = 0
+	m.ensureVisible()
+	return m
+}
+
 // SetOpen marks the folder whose threads are shown and moves the cursor to it.
 func (m Model) SetOpen(account int, folder string) Model {
 	m.open = ref{account, folder}
@@ -276,6 +347,9 @@ func (m Model) Click(line int) (Model, tea.Cmd) {
 		m.clearFilter()
 	}
 	m.ensureVisible()
+	if c.folder == "" {
+		return m, nil
+	}
 	return m, func() tea.Msg { return SelectedMsg{Account: c.account, Folder: c.folder} }
 }
 
@@ -391,6 +465,9 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		i = len(sel) - 1
 	case key.Matches(msg, m.keys.open):
 		c := m.cursor
+		if c.folder == "" {
+			return m, nil
+		}
 		return m, func() tea.Msg { return SelectedMsg{Account: c.account, Folder: c.folder} }
 	default:
 		return m, nil
@@ -400,10 +477,15 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-// selectable lists the folders the cursor can be on: those matching the filter.
+// selectable lists the folders the cursor can be on: those matching the
+// filter. Without a filter, an account that failed to connect is selectable
+// too, as its name (an empty folder), so it can be picked to edit.
 func (m Model) selectable() []ref {
 	var out []ref
 	for i, a := range m.accounts {
+		if a.state == failed && m.query() == "" {
+			out = append(out, ref{i, ""})
+		}
 		for _, e := range a.tree {
 			if m.matches(e) {
 				out = append(out, ref{i, e.Name})
@@ -433,7 +515,14 @@ func (m Model) rows(width int) []row {
 			rows = append(rows, row{ref: noRef})
 		}
 		start := len(rows)
-		rows = append(rows, row{text: m.st.header.Render(ansi.Truncate(a.name, width, "…")), ref: noRef, header: true})
+		header := row{text: m.st.header.Render(ansi.Truncate(a.name, width, "…")), ref: noRef, header: true}
+		if a.state == failed {
+			header.ref = ref{i, ""}
+			if header.ref == m.cursor {
+				header.text = m.st.cursor.Bold(true).Render(ansi.Truncate(a.name, width, "…"))
+			}
+		}
+		rows = append(rows, header)
 		switch a.state {
 		case connecting:
 			rows = append(rows, row{text: "  " + m.spinner.View() + m.st.dim.Render(" connecting…"), ref: noRef})

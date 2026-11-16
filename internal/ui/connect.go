@@ -33,6 +33,14 @@ type Onboarding struct {
 	AddAccount func(acct config.Account, password string) error
 	// StorePassword saves a saved account's password to the keychain.
 	StorePassword func(account, password string) error
+	// UpdateAccount saves an edited account in place. edit maps the account
+	// as written in config.toml to the new one. A non-empty password goes to
+	// the keychain under the new name first; a keychain password that isn't
+	// replaced follows a rename. Nil disables editing.
+	UpdateAccount func(index int, oldName string, edit func(config.Account) config.Account, password string) error
+	// RemoveAccount deletes an account from config.toml and, with
+	// deletePassword, its keychain password. Nil disables deleting.
+	RemoveAccount func(index int, acct config.Account, deletePassword bool) error
 }
 
 func (o Onboarding) ready() bool {
@@ -70,7 +78,7 @@ func (m Model) openConnect() (Model, tea.Cmd) {
 		m.setStatus("Adding accounts isn't available.")
 		return m, nil
 	}
-	m.connectFor = -1
+	m.connectFor, m.editFor = -1, -1
 	for i := range m.accts {
 		if m.needsPassword[i] {
 			m.connectFor = i
@@ -98,10 +106,13 @@ func (m Model) handleConnectKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	m.connectPop, r = m.connectPop.Update(msg)
 	switch r {
 	case popup.ConnectCancelled:
-		m.showConnect = false
+		m.showConnect, m.editFor = false, -1
 		m.connectGen++ // a test still running is ignored when it finishes
 		m.log.Debug("popup closed", "popup", "connect")
-	case popup.ConnectSubmitted:
+	case popup.ConnectSubmitted, popup.ConnectSaveAnyway, popup.ConnectDelete:
+		if m.editFor >= 0 {
+			return m.handleEditResult(r)
+		}
 		m.connectPop.SetBusy(true)
 		m.connectGen++
 		return m, testAndSave(m.onboard, m.connectGen, m.connectFor, m.connectPop.Request())
@@ -177,6 +188,7 @@ func (m Model) handleConnected(msg connectedMsg) (Model, tea.Cmd) {
 		m.accts = append(m.accts, msg.acct.WithDefaults())
 		m.boxes = append(m.boxes, nil)
 		m.senders = append(m.senders, nil)
+		m.ids = append(m.ids, m.newID())
 		m.side, index = m.side.AddAccount(msg.acct.Name, nil)
 	} else {
 		delete(m.needsPassword, index)
@@ -184,7 +196,7 @@ func (m Model) handleConnected(msg connectedMsg) (Model, tea.Cmd) {
 			_ = old.Close()
 		}
 	}
-	m, cmd := m.handleAccount(accountMsg{index: index, conn: msg.conn, folders: msg.folders, took: msg.took})
+	m, cmd := m.handleAccount(accountMsg{index: index, id: m.ids[index], conn: msg.conn, folders: msg.folders, took: msg.took})
 	done := fmt.Sprintf("Connected %s.", m.accts[index].Name)
 	if m.open.account == index && m.open.loading {
 		m.open.notice = done // shown once its Inbox has loaded

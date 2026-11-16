@@ -98,6 +98,10 @@ func (m *Model) draftAccount(account int) (int, bool) {
 	case account < 0:
 		return 0, false
 	}
+	if m.boxes[account] == nil {
+		m.setStatus(fmt.Sprintf("%s isn't connected.", m.accts[account].Name))
+		return 0, false
+	}
 	if m.senders[account] == nil {
 		m.setStatus(fmt.Sprintf("Sending isn't set up for %s: add smtp_host to its config", m.accts[account].Name))
 		return 0, false

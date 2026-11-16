@@ -195,6 +195,7 @@ password_cmd = "op read op://Personal/Gmail/app-password"   # omit to use the ke
 - **Sending keys** (`smtp_host`, `smtp_port`, `smtp_tls`, `from_name`, `save_sent`) are specified in [tasks/smtp-spec.md](tasks/smtp-spec.md#configuration). `aliases` (other From addresses sent through the same SMTP login, also needing `smtp_host`) is specified in [tasks/aliases-spec.md](tasks/aliases-spec.md) and documented for users in [docs/send-as.md](docs/send-as.md). Existing configs keep working, with sending disabled until `smtp_host` is set.
 - **Password resolution:** if `password_cmd` is set, run it with `sh -c` and use the **first line** of stdout with only the line ending removed. Spaces inside the password are kept, and extra lines (as `pass show` prints) are ignored. The command inherits the user's environment but gets no stdin, and on timeout (60s) its whole process group is killed. Errors include the command's stderr (control characters stripped, length capped) but never its stdout. If `op` isn't on the inherited `PATH`, use its absolute path. Otherwise read from the keychain (service `dk-email`, key = account `name`). If neither yields a password, the account is shown as "needs password", and pressing `A` opens the connect popup to supply one (stored in the keychain).
 - **The connect-account popup appends** a new `[[account]]` block to the file as text, so the user's comments and formatting are preserved. It never re-encodes the whole file. When the address ends in `@gmail.com` / `@googlemail.com`, the popup pre-fills `imap.gmail.com:993 implicit`. Its password source is either a 1Password reference (stored as `password_cmd = "op read <ref>"`) or "enter once → keychain".
+- **Editing accounts:** `E` on the sidebar account opens the same form prefilled (spec: [tasks/edit-accounts-spec.md](tasks/edit-accounts-spec.md), user guide: [docs/accounts.md](docs/accounts.md)). Its password source starts on **Keep current**. Submit tests the login like connect, then replaces that account's `[[account]]` block in place: everything outside the block is kept byte for byte, and keys the form doesn't show are carried over from the account as written. After a failed test, `ctrl+s` saves anyway (config validation still runs). A rename moves a keychain password to the new name. A **Delete account** row after Submit removes the block after a confirmation (`y` delete, `k` keep the keychain password, `n`/`esc` cancel). A stale config (the account isn't at its index with its name) writes nothing.
 - **Config-dir `.gitignore`**, written on first run if missing:
   ```
   *
@@ -218,6 +219,7 @@ password_cmd = "op read op://Personal/Gmail/app-password"   # omit to use the ke
 | `r` | reply | `R` | reply all |
 | `f` | forward | `c` | new message |
 | `a` | focus folders (narrow) / folder picker (list) | `A` | connect account |
+| `E` | edit or delete account | | |
 | `/` | filter folders | `v` | toggle split ↔ list + popup |
 | `?` | full key help | `esc` | close popup / back |
 | `q` | close the open popup, otherwise quit | `ctrl+c` | quit, even with a popup open |

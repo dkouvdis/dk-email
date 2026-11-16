@@ -3,19 +3,19 @@
 │ ▶ Inbox                    2 ││  ● │ Keys                                       │                              13:30 │
 │   Sent Mail                  ││  ● │ / press / to filter by key or description  │                              Nov 8 │
 │   All Mail                   ││    │                                            │                                    │
-│   Trash                      ││    │ Composer                                   │                                    │
-│   Receipts                 1 ││    │   ctrl+s        send                       │                                    │
-│                              ││    │   tab           next field                 │                                    │
-│ Work                         ││    │   shift+tab     previous field             │                                    │
-│   Inbox                    1 ││    │   enter / ←/→   choose From                │                                    │
-│   Archive                    ││    │   enter         next field (in a header)   │                                    │
-│                              ││    │   esc           close, or save / discard   │                                    │
+│   Trash                      ││    │   ctrl+s        send                       │                                    │
+│   Receipts                 1 ││    │   tab           next field                 │                                    │
+│                              ││    │   shift+tab     previous field             │                                    │
+│ Work                         ││    │   enter / ←/→   choose From                │                                    │
+│   Inbox                    1 ││    │   enter         next field (in a header)   │                                    │
+│   Archive                    ││    │   esc           close, or save / discard   │                                    │
 │                              ││    │   ctrl+c        quit now                   │                                    │
 │                              ││    │                                            │                                    │
 │                              ││    │ Accounts & view                            │                                    │
 │                              ││    │   a             accounts                   │                                    │
 │                              ││    │   /             filter folders             │                                    │
-│                              ││    │   A             connect account          ┃ │                                    │
+│                              ││    │   A             connect account            │                                    │
+│                              ││    │   E             edit account             ┃ │                                    │
 │                              ││    │   v             split/list               ┃ │                                    │
 │                              ││    │                                          ┃ │                                    │
 │                              ││    │ General                                  ┃ │                                    │

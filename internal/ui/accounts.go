@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -34,7 +35,9 @@ type Conn struct {
 type Connector func(ctx context.Context, acct config.Account) (Conn, error)
 
 type accountMsg struct {
-	index   int
+	index int
+	// id is the account's Model.ids entry; when set it wins over index.
+	id      int
 	conn    Conn
 	folders []mail.Folder
 	err     error
@@ -61,7 +64,7 @@ type openFolder struct {
 	notice string
 }
 
-func connectAccount(connect Connector, index int, acct config.Account) tea.Cmd {
+func connectAccount(connect Connector, index, id int, acct config.Account) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), connectTimeout)
 		defer cancel()
@@ -72,10 +75,10 @@ func connectAccount(connect Connector, index int, acct config.Account) tea.Cmd {
 			err = errors.New("connector returned no mailbox")
 		}
 		if err != nil {
-			return accountMsg{index: index, err: err, took: time.Since(start)}
+			return accountMsg{index: index, id: id, err: err, took: time.Since(start)}
 		}
 		folders, err := conn.Mailbox.Folders(ctx)
-		return accountMsg{index: index, conn: conn, folders: folders, err: err, took: time.Since(start)}
+		return accountMsg{index: index, id: id, conn: conn, folders: folders, err: err, took: time.Since(start)}
 	}
 }
 
@@ -89,7 +92,12 @@ func loadSummaries(mb mail.Mailbox, account int, folder string, before mail.UID)
 }
 
 func (m Model) handleAccount(msg accountMsg) (Model, tea.Cmd) {
-	if msg.index < 0 || msg.index >= len(m.accts) {
+	var ok bool
+	if msg.index, ok = m.accountIndex(msg.index, msg.id); !ok {
+		// The account was deleted or replaced while this was connecting.
+		if msg.conn.Mailbox != nil {
+			_ = msg.conn.Mailbox.Close()
+		}
 		return m, nil
 	}
 	name := m.accts[msg.index].Name
@@ -105,7 +113,11 @@ func (m Model) handleAccount(msg accountMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 	if msg.err != nil {
-		m.setError(fmt.Errorf("%s: %w", name, msg.err))
+		text := fmt.Sprintf("%s: %v", name, msg.err)
+		if m.onboard.UpdateAccount != nil {
+			text = strings.TrimSuffix(text, ".") + ". Press E to edit it."
+		}
+		m.setError(errors.New(text))
 		return m, nil
 	}
 	if m.open.account < 0 {
@@ -119,7 +131,7 @@ func (m Model) handleAccount(msg accountMsg) (Model, tea.Cmd) {
 }
 
 func (m Model) openFolder(account int, folder string) (Model, tea.Cmd) {
-	if account < 0 || account >= len(m.boxes) || m.boxes[account] == nil {
+	if folder == "" || account < 0 || account >= len(m.boxes) || m.boxes[account] == nil {
 		return m, nil
 	}
 	label, role := folder, mail.RoleNone

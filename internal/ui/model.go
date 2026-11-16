@@ -85,11 +85,18 @@ type Model struct {
 	picker      popup.Picker[pick]
 	// The connect popup: connectFor is the account a password is being
 	// entered for, or -1 for a new account.
-	onboard       Onboarding
-	showConnect   bool
-	connectPop    popup.Connect
-	connectFor    int
-	connectGen    int
+	onboard     Onboarding
+	showConnect bool
+	connectPop  popup.Connect
+	connectFor  int
+	connectGen  int
+	// editFor is the account the connect popup is editing, or -1.
+	editFor int
+	// ids gives each account a number that never changes or repeats, so a
+	// slow connect or refresh result still finds its account after another
+	// one was deleted (indexes shift) or this one was edited.
+	ids           []int
+	nextID        int
 	needsPassword map[int]bool
 	// moveTargets is set while the picker chooses where to move them.
 	moveTargets []mail.Summary
@@ -132,6 +139,7 @@ func New(cfg config.Config, connect Connector, log *slog.Logger) Model {
 		every:         tick,
 		needsPassword: map[int]bool{},
 		connectFor:    -1,
+		editFor:       -1,
 		list:          threadlist.New(th, time.Now),
 		read:          reader.New(th, time.Now),
 		log:           log,
@@ -141,6 +149,9 @@ func New(cfg config.Config, connect Connector, log *slog.Logger) Model {
 		helpPop:       popup.NewHelp(th, keys.HelpSections()),
 		mode:          mode,
 		focus:         PaneList,
+	}
+	for range names {
+		m.ids = append(m.ids, m.newID())
 	}
 	if len(names) == 0 {
 		m.status = "No accounts configured yet."
@@ -157,7 +168,7 @@ func (m Model) Init() tea.Cmd {
 	cmds := []tea.Cmd{m.side.Tick(), m.every(m.ui.RefreshInterval.Duration)}
 	for i, a := range m.accts {
 		m.log.Debug("connecting", "account", a.Name)
-		cmds = append(cmds, connectAccount(m.connect, i, a))
+		cmds = append(cmds, connectAccount(m.connect, i, m.ids[i], a))
 	}
 	return tea.Batch(cmds...)
 }
@@ -209,6 +220,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleRefresh(msg)
 	case connectedMsg:
 		return m.handleConnected(msg)
+	case editedMsg:
+		return m.handleEdited(msg)
+	case removedMsg:
+		return m.handleRemoved(msg)
 	case sentMsg:
 		return m.handleSent(msg)
 	case draftSavedMsg:
@@ -353,6 +368,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.startRefresh(true)
 	case key.Matches(msg, m.keys.Connect):
 		return m.openConnect()
+	case key.Matches(msg, m.keys.EditAccount):
+		return m.openEdit()
 	case key.Matches(msg, m.keys.Compose) && m.open.account >= 0:
 		return m.startCompose()
 	case m.focus == PaneList && key.Matches(msg, m.keys.Reply):

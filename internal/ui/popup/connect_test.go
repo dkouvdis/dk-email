@@ -513,3 +513,369 @@ func TestConnect_PasteIntoAliases(t *testing.T) {
 		t.Errorf("pasted = %q", got)
 	}
 }
+
+func editAccount() config.Account {
+	return config.Account{
+		Name: "Work", Email: "me@example.com", Username: "login", IMAPHost: "imap.example.com",
+		IMAPPort: 993, TLS: config.TLSImplicit, ArchiveFolder: "Done", TLSCert: "/certs/a.pem",
+		SMTPHost: "smtp.example.com", SMTPPort: 465, SMTPTLS: config.TLSImplicit, FromName: "Me",
+		Aliases: []config.Alias{{Email: "Hi@Example.com", Name: "Hi there"}, {Email: "b@example.com"}},
+	}
+}
+
+func newEdit(a config.Account) Connect {
+	c := NewEditAccount(theme.Default(), a, []string{"Home"})
+	c.SetSize(100, 40)
+	return c
+}
+
+func TestEditAccount_PrefillsFields(t *testing.T) {
+	c := newEdit(editAccount())
+
+	for f, want := range map[int]string{
+		fName: "Work", fEmail: "me@example.com", fUser: "login", fHost: "imap.example.com", fPort: "993",
+		fSMTPHost: "smtp.example.com", fSMTPPort: "465", fAliases: "Hi@Example.com, b@example.com",
+	} {
+		if got := c.inputs[f].Value(); got != want {
+			t.Errorf("field %d = %q, want %q", f, got, want)
+		}
+	}
+	if c.source != sourceKeep || c.autoHost || c.autoSMTP || !c.smtpTouched {
+		t.Errorf("source %d autoHost %v autoSMTP %v smtpTouched %v", c.source, c.autoHost, c.autoSMTP, c.smtpTouched)
+	}
+	v := ansi.Strip(c.View())
+	for _, want := range []string{"Edit account", "keep current", "Current", "keychain", "Delete account"} {
+		if !strings.Contains(v, want) {
+			t.Errorf("view lacks %q:\n%s", want, v)
+		}
+	}
+}
+
+func TestEditAccount_UsernameEmptyWhenEmailAndNoSMTPPort(t *testing.T) {
+	a := config.Account{Name: "W", Email: "me@example.com", Username: "me@example.com", IMAPHost: "h", IMAPPort: 143, TLS: config.TLSStartTLS}
+	c := newEdit(a)
+
+	if c.inputs[fUser].Value() != "" || c.inputs[fSMTPHost].Value() != "" || c.inputs[fSMTPPort].Value() != "" || c.inputs[fAliases].Value() != "" {
+		t.Error("username or SMTP fields prefilled")
+	}
+	if c.tls != config.TLSStartTLS || c.inputs[fPort].Placeholder != "143" {
+		t.Errorf("tls %q placeholder %q", c.tls, c.inputs[fPort].Placeholder)
+	}
+}
+
+func TestEditAccount_GmailAddressDoesNotOverwrite(t *testing.T) {
+	c := newEdit(editAccount())
+	c, _ = keys(c, "tab") // email
+	c = typeIn(c, "x@gmail.com")
+	if c.inputs[fHost].Value() != "imap.example.com" || c.inputs[fSMTPHost].Value() != "smtp.example.com" {
+		t.Errorf("hosts overwritten: %q %q", c.inputs[fHost].Value(), c.inputs[fSMTPHost].Value())
+	}
+}
+
+func TestEditAccount_PasswordSourceCycleAndFocus(t *testing.T) {
+	a := editAccount()
+	a.PasswordCmd = "op read 'op://My Vault/Item/pw'"
+	c := newEdit(a)
+	for range 6 {
+		c, _ = keys(c, "tab") // name..source
+	}
+	if c.focus != fSource {
+		t.Fatalf("focus = %d", c.focus)
+	}
+	c, _ = keys(c, "tab")
+	if c.focus != fSMTPHost {
+		t.Errorf("focus = %d, want the secret row skipped under keep current", c.focus)
+	}
+	c, _ = keys(c, "shift+tab")
+
+	c, _ = keys(c, "right")
+	if c.source != sourceOnePassword || c.inputs[fSecret].Value() != "op://My Vault/Item/pw" {
+		t.Errorf("source %d ref %q, want 1Password with the saved reference", c.source, c.inputs[fSecret].Value())
+	}
+	c, _ = keys(c, "tab")
+	if c.focus != fSecret {
+		t.Errorf("focus = %d, want the reference row", c.focus)
+	}
+	c, _ = keys(c, "shift+tab", "right")
+	if c.source != sourceKeychain || c.inputs[fSecret].Value() != "" {
+		t.Errorf("source %d, want keychain with an empty password", c.source)
+	}
+	c, r := keys(c, "tab", "enter")
+	if r != ConnectPending || !strings.Contains(c.err, "Password is required") {
+		t.Errorf("result %v err %q", r, c.err)
+	}
+	c, _ = keys(c, "shift+tab", "right")
+	if c.source != sourceKeep {
+		t.Errorf("source %d, want it back at keep current", c.source)
+	}
+	if v := ansi.Strip(c.View()); !strings.Contains(v, "password_cmd") {
+		t.Errorf("view doesn't say password_cmd:\n%s", v)
+	}
+}
+
+func TestEditAccount_SubmitKeepsPassword(t *testing.T) {
+	c := newEdit(editAccount())
+	c, _ = keys(c, "tab", "tab", "tab", "tab", "tab", "tab", "tab", "tab", "tab", "tab", "tab") // ... submit
+	if c.focus != fSubmit {
+		t.Fatalf("focus = %d", c.focus)
+	}
+
+	c, r := keys(c, "enter")
+
+	req := c.EditRequest()
+	if r != ConnectSubmitted || !req.KeepPassword || req.Password != "" {
+		t.Errorf("result %v, request %+v", r, req)
+	}
+	if req.Account.Name != "Work" || req.Account.Username != "login" || len(req.Account.Aliases) != 2 {
+		t.Errorf("account = %+v", req.Account)
+	}
+}
+
+func TestEditAccount_DuplicateNameRejectedOwnNameAllowed(t *testing.T) {
+	c := newEdit(editAccount())
+	if c.validate() != "" {
+		t.Errorf("own name rejected: %q", c.validate())
+	}
+	c = typeIn(c, "") // keep focus on name
+	for range len("Work") {
+		c, _ = keys(c, "backspace")
+	}
+	c = typeIn(c, "home")
+	if got := c.validate(); !strings.Contains(got, "already exists") {
+		t.Errorf("validate() = %q", got)
+	}
+}
+
+func TestEditAccount_DeleteRowIsLastAndOnlyInEditMode(t *testing.T) {
+	c := newEdit(editAccount())
+	c, _ = keys(c, "shift+tab")
+	if c.focus != fDelete {
+		t.Errorf("focus = %d, want the Delete row to follow Submit", c.focus)
+	}
+	n := newConnect()
+	n, _ = keys(n, "shift+tab")
+	if n.focus != fSubmit {
+		t.Errorf("new account focus = %d, want Submit last", n.focus)
+	}
+	if strings.Contains(ansi.Strip(n.View()), "Delete account") {
+		t.Error("Delete row shown for a new account")
+	}
+}
+
+func TestEditAccount_DeleteConfirmKeychain(t *testing.T) {
+	open := func() Connect {
+		c := newEdit(editAccount())
+		c, _ = keys(c, "shift+tab") // Delete row
+		c, r := keys(c, "enter")
+		if r != ConnectPending || !c.confirming {
+			t.Fatalf("result %v confirming %v", r, c.confirming)
+		}
+		return c
+	}
+	c := open()
+	if v := ansi.Strip(c.View()); !strings.Contains(v, "Delete Work?") {
+		t.Errorf("no prompt:\n%s", v)
+	}
+	var hints []string
+	for _, h := range c.Hints() {
+		hints = append(hints, h.Help().Key)
+	}
+	if !reflect.DeepEqual(hints, []string{"y", "k", "n"}) {
+		t.Errorf("hints = %v", hints)
+	}
+
+	// Fields are out of reach.
+	c2, r := keys(c, "x", "tab")
+	if r != ConnectPending || c2.inputs[fName].Value() != "Work" || !c2.confirming {
+		t.Error("a key reached the form while confirming")
+	}
+
+	if _, r := keys(open(), "y"); r != ConnectDelete {
+		t.Errorf("y: result %v", r)
+	}
+	c, r = keys(open(), "y")
+	if !c.DeletePassword() {
+		t.Error("y should delete the password too")
+	}
+	c, r = keys(open(), "k")
+	if r != ConnectDelete || c.DeletePassword() {
+		t.Errorf("k: result %v, deletePassword %v", r, c.DeletePassword())
+	}
+	for _, k := range []string{"n", "esc"} {
+		c, r = keys(open(), k)
+		if r != ConnectPending || c.confirming {
+			t.Errorf("%s: result %v confirming %v", k, r, c.confirming)
+		}
+	}
+}
+
+func TestEditAccount_DeleteConfirmPasswordCmdHasNoKeepOption(t *testing.T) {
+	a := editAccount()
+	a.PasswordCmd = "op read x"
+	c := newEdit(a)
+	c, _ = keys(c, "shift+tab", "enter")
+
+	if c2, r := keys(c, "k"); r != ConnectPending || !c2.confirming {
+		t.Errorf("k: result %v", r)
+	}
+	c, r := keys(c, "y")
+	if r != ConnectDelete || c.DeletePassword() {
+		t.Errorf("y: result %v deletePassword %v", r, c.DeletePassword())
+	}
+}
+
+func TestEditAccount_SaveAnyway(t *testing.T) {
+	c := newEdit(editAccount())
+	if _, r := keys(c, "ctrl+s"); r != ConnectPending {
+		t.Error("ctrl+s saved without a failed test")
+	}
+	hasHint := func(c Connect) bool {
+		for _, h := range c.Hints() {
+			if h.Help().Key == "ctrl+s" {
+				return true
+			}
+		}
+		return false
+	}
+
+	c.SetTestFailed("dial: no route")
+	if !hasHint(c) {
+		t.Error("no save anyway hint after a failed test")
+	}
+	if _, r := keys(c, "ctrl+s"); r != ConnectSaveAnyway {
+		t.Errorf("ctrl+s result = %v", r)
+	}
+
+	c = typeIn(c, "x")
+	if hasHint(c) {
+		t.Error("save anyway still offered after an edit")
+	}
+	if _, r := keys(c, "ctrl+s"); r != ConnectPending {
+		t.Error("ctrl+s saved after the flag was cleared")
+	}
+
+	// Config-level validation still applies.
+	c.SetTestFailed("boom")
+	c.inputs[fHost].SetValue("")
+	if c, r := keys(c, "ctrl+s"); r != ConnectPending || !strings.Contains(c.err, "IMAP host is required") {
+		t.Errorf("result %v err %q", r, c.err)
+	}
+}
+
+func TestSaveAnyway_NotOfferedForNewAccountOrPasswordPrompt(t *testing.T) {
+	c := fill(newConnect(), "Work", "me@example.com", "", "h", "")
+	c, _ = keys(c, "tab", "tab")
+	c = typeIn(c, "op://V/I/p")
+	c.SetTestFailed("nope")
+	if _, r := keys(c, "ctrl+s"); r != ConnectPending {
+		t.Error("new account offered save anyway")
+	}
+	p := NewPasswordPrompt(theme.Default(), editAccount())
+	p.SetTestFailed("nope")
+	if _, r := keys(p, "ctrl+s"); r != ConnectPending {
+		t.Error("password prompt offered save anyway")
+	}
+}
+
+func TestApplyEdit(t *testing.T) {
+	// formOf is what the form submits for old, with change applied to the
+	// prefilled fields.
+	formOf := func(old config.Account, change func(*Connect)) EditRequest {
+		c := newEdit(old.WithDefaults())
+		if change != nil {
+			change(&c)
+		}
+		return c.EditRequest()
+	}
+	raw := config.Account{
+		Name: "Work", Email: "me@example.com", IMAPHost: "imap.example.com", TLSCert: "certs/a.pem",
+		ArchiveFolder: "Done", PasswordCmd: "op read x", SMTPHost: "smtp.example.com", FromName: "Me",
+		Aliases: []config.Alias{{Email: "hi@example.com", Name: "Hi"}},
+	}
+
+	t.Run("no change keeps raw values", func(t *testing.T) {
+		if got := ApplyEdit(raw, formOf(raw, nil)); !reflect.DeepEqual(got, raw) {
+			t.Errorf("got %+v\nwant %+v", got, raw)
+		}
+	})
+	t.Run("rename and alias names follow the email case-insensitively", func(t *testing.T) {
+		req := formOf(raw, func(c *Connect) {
+			c.inputs[fName].SetValue("Job")
+			c.inputs[fAliases].SetValue("HI@example.com, new@example.com")
+		})
+		got := ApplyEdit(raw, req)
+		want := raw
+		want.Name = "Job"
+		want.Aliases = []config.Alias{{Email: "HI@example.com", Name: "Hi"}, {Email: "new@example.com"}}
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("got %+v\nwant %+v", got, want)
+		}
+	})
+	t.Run("explicit non default port stays, tls change writes tls", func(t *testing.T) {
+		req := formOf(raw, func(c *Connect) {
+			c.inputs[fPort].SetValue("1143")
+			c.tls = config.TLSStartTLS
+		})
+		got := ApplyEdit(raw, req)
+		if got.IMAPPort != 1143 || got.TLS != config.TLSStartTLS {
+			t.Errorf("port %d tls %q", got.IMAPPort, got.TLS)
+		}
+	})
+	t.Run("explicit default port stays when it was written", func(t *testing.T) {
+		old := raw
+		old.IMAPPort, old.TLS, old.SMTPPort, old.SMTPTLS = 993, config.TLSImplicit, 465, config.TLSImplicit
+		if got := ApplyEdit(old, formOf(old, nil)); !reflect.DeepEqual(got, old) {
+			t.Errorf("got %+v", got)
+		}
+	})
+	t.Run("removing SMTP host clears the sending keys", func(t *testing.T) {
+		yes := true
+		old := raw
+		old.SaveSent = &yes
+		req := formOf(old, func(c *Connect) {
+			c.inputs[fSMTPHost].SetValue("")
+			c.inputs[fSMTPPort].SetValue("")
+		})
+		got := ApplyEdit(old, req)
+		if got.SMTPHost != "" || got.SMTPPort != 0 || got.SMTPTLS != "" || got.FromName != "" || got.Aliases != nil || got.SaveSent != nil {
+			t.Errorf("sending keys left: %+v", got)
+		}
+		if got.ArchiveFolder != "Done" || got.TLSCert != "certs/a.pem" {
+			t.Errorf("other keys lost: %+v", got)
+		}
+	})
+	t.Run("adding SMTP host with default port writes none", func(t *testing.T) {
+		old := raw
+		old.SMTPHost, old.FromName, old.Aliases = "", "", nil
+		req := formOf(old, func(c *Connect) {
+			c.inputs[fSMTPHost].SetValue("smtp.new.com")
+			c.inputs[fSMTPPort].SetValue("465")
+		})
+		got := ApplyEdit(old, req)
+		if got.SMTPHost != "smtp.new.com" || got.SMTPPort != 0 || got.SMTPTLS != "" {
+			t.Errorf("got %+v", got)
+		}
+	})
+	t.Run("username equal to email is dropped", func(t *testing.T) {
+		req := formOf(raw, func(c *Connect) { c.inputs[fUser].SetValue("me@example.com") })
+		if got := ApplyEdit(raw, req); got.Username != "" {
+			t.Errorf("username = %q", got.Username)
+		}
+	})
+	t.Run("1Password and keychain sources", func(t *testing.T) {
+		req := formOf(raw, func(c *Connect) {
+			c.source = sourceOnePassword
+			c.inputs[fSecret].SetValue("op://V/I/p")
+		})
+		if got := ApplyEdit(raw, req); got.PasswordCmd != "op read op://V/I/p" {
+			t.Errorf("PasswordCmd = %q", got.PasswordCmd)
+		}
+		req = formOf(raw, func(c *Connect) {
+			c.source = sourceKeychain
+			c.inputs[fSecret].SetValue("pw")
+		})
+		if got := ApplyEdit(raw, req); got.PasswordCmd != "" || req.Password != "pw" {
+			t.Errorf("PasswordCmd = %q password %q", got.PasswordCmd, req.Password)
+		}
+	})
+}

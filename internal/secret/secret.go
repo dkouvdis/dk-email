@@ -123,6 +123,33 @@ func Store(account, password string) error {
 	return nil
 }
 
+// Delete removes the account's password from the OS keychain. An entry that
+// doesn't exist is not an error.
+func Delete(account string) error {
+	err := keyring.Delete(keychainService, account)
+	if err != nil && !errors.Is(err, keyring.ErrNotFound) {
+		return fmt.Errorf("delete keychain password for account %q: %w", account, err)
+	}
+	return nil
+}
+
+// Copy stores the keychain password kept under oldName also under newName,
+// leaving the old entry in place, for a renamed account. With no old entry
+// there is nothing to copy and it succeeds.
+func Copy(oldName, newName string) error {
+	if oldName == newName {
+		return nil
+	}
+	pw, err := keyring.Get(keychainService, oldName)
+	if errors.Is(err, keyring.ErrNotFound) || (err == nil && pw == "") {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("read keychain for account %q: %w", oldName, err)
+	}
+	return Store(newName, pw)
+}
+
 var ansiEscape = regexp.MustCompile(`\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\)|.)`)
 
 // sanitize makes stderr safe to show in the TUI: no escape sequences or

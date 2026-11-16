@@ -31,12 +31,14 @@ const (
 	fSMTPTLS
 	fAliases
 	fSubmit
+	fDelete // edit mode only
 	fieldCount
 )
 
 const (
 	sourceOnePassword = iota
 	sourceKeychain
+	sourceKeep // edit mode only: leave the password as it is
 )
 
 const (
@@ -51,6 +53,8 @@ const (
 	ConnectPending ConnectResult = iota
 	ConnectSubmitted
 	ConnectCancelled
+	ConnectDelete     // the edited account was deleted; see DeletePassword
+	ConnectSaveAnyway // save the edit without a working login test
 )
 
 // ConnectRequest is a submitted form. Password is set only for the keychain
@@ -58,6 +62,16 @@ const (
 type ConnectRequest struct {
 	Account  config.Account
 	Password string
+}
+
+// EditRequest is a submitted edit form. Account holds the form's fields
+// only (alias emails without names); ApplyEdit merges it into the saved
+// account. Password is set only for the keychain option, and KeepPassword
+// means the password source wasn't touched.
+type EditRequest struct {
+	Account      config.Account
+	Password     string
+	KeepPassword bool
 }
 
 // Connect is the connect-account form, or, from NewPasswordPrompt, a prompt
@@ -77,12 +91,18 @@ type Connect struct {
 	account      config.Account // the saved account in password-only mode
 	existing     []string       // lowercased names already in use
 
+	editing    bool
+	orig       config.Account // the account being edited, as loaded
+	testFailed bool           // a failed test offers ctrl+s to save anyway
+	confirming bool           // asking whether to delete the account
+	deletePW   bool           // the delete was confirmed with y on a keychain account
+
 	busy       bool
 	err        string
 	maxW, maxH int
 
 	st   helpStyles
-	keys struct{ next, prev, submit, cancel, toggle key.Binding }
+	keys struct{ next, prev, submit, cancel, toggle, saveAnyway key.Binding }
 }
 
 // NewConnect is an empty form for a new account. existing are the account
@@ -105,6 +125,61 @@ func NewPasswordPrompt(th theme.Theme, acct config.Account) Connect {
 	c.setFocus(fSecret)
 	c.updateSecretInput()
 	return c
+}
+
+// NewEditAccount is the form prefilled from acct, as loaded (defaults
+// applied). existing are the other accounts' names. The password source
+// starts on Keep current, and a Delete account row follows Submit.
+func NewEditAccount(th theme.Theme, acct config.Account, existing []string) Connect {
+	c := NewConnect(th, existing)
+	c.editing, c.orig = true, acct
+	c.source = sourceKeep
+	c.tls, c.smtpTLS = acct.TLS, config.TLSImplicit
+	c.inputs[fName].SetValue(acct.Name)
+	c.inputs[fEmail].SetValue(acct.Email)
+	if acct.Username != acct.Email {
+		c.inputs[fUser].SetValue(acct.Username)
+	}
+	c.inputs[fHost].SetValue(acct.IMAPHost)
+	c.inputs[fPort].SetValue(strconv.Itoa(acct.IMAPPort))
+	c.inputs[fPort].Placeholder = defaultPort(acct.TLS, "993", "143")
+	if acct.SMTPHost != "" {
+		c.smtpTLS = acct.SMTPTLS
+		c.inputs[fSMTPHost].SetValue(acct.SMTPHost)
+		c.inputs[fSMTPPort].SetValue(strconv.Itoa(acct.SMTPPort))
+		emails := make([]string, len(acct.Aliases))
+		for i, a := range acct.Aliases {
+			emails[i] = a.Email
+		}
+		c.inputs[fAliases].SetValue(strings.Join(emails, ", "))
+	}
+	c.inputs[fSMTPPort].Placeholder = defaultPort(c.smtpTLS, "465", "587")
+	c.smtpTouched = true // the Gmail pre-fill never overwrites a saved account
+	if ref, ok := opReference(acct.PasswordCmd); ok {
+		c.inputs[fSecret].SetValue(ref) // kept for when 1Password is chosen
+	}
+	c.updateSecretInput()
+	return c
+}
+
+func defaultPort(tls, implicit, starttls string) string {
+	if tls == config.TLSStartTLS {
+		return starttls
+	}
+	return implicit
+}
+
+// opReference extracts <ref> from `op read <ref>`, undoing shellQuote.
+func opReference(cmd string) (string, bool) {
+	ref, ok := strings.CutPrefix(strings.TrimSpace(cmd), "op read ")
+	if !ok {
+		return "", false
+	}
+	ref = strings.TrimSpace(ref)
+	if len(ref) >= 2 && ref[0] == '\'' && ref[len(ref)-1] == '\'' {
+		ref = strings.ReplaceAll(ref[1:len(ref)-1], `'\''`, "'")
+	}
+	return ref, ref != ""
 }
 
 func newForm(th theme.Theme) Connect {
@@ -135,10 +210,13 @@ func newForm(th theme.Theme) Connect {
 	c.keys.submit = key.NewBinding(key.WithKeys("enter"))
 	c.keys.cancel = key.NewBinding(key.WithKeys("esc"))
 	c.keys.toggle = key.NewBinding(key.WithKeys("left", "right", "space", "h", "l"))
+	c.keys.saveAnyway = key.NewBinding(key.WithKeys("ctrl+s"))
 	return c
 }
 
-func isInput(f int) bool { return f != fTLS && f != fSource && f != fSMTPTLS && f != fSubmit }
+func isInput(f int) bool {
+	return f != fTLS && f != fSource && f != fSMTPTLS && f != fSubmit && f != fDelete
+}
 
 // PasswordOnly reports whether this is a password prompt for a saved account.
 func (c Connect) PasswordOnly() bool { return c.passwordOnly }
@@ -155,7 +233,21 @@ func (c *Connect) SetBusy(busy bool) {
 }
 
 // SetError shows why testing or saving failed.
-func (c *Connect) SetError(msg string) { c.err = msg }
+func (c *Connect) SetError(msg string) {
+	c.err = msg
+	c.confirming = false
+}
+
+// SetTestFailed shows why the login test failed and, when editing, offers
+// ctrl+s to save anyway until a field changes. New accounts don't get it.
+func (c *Connect) SetTestFailed(msg string) {
+	c.err = msg
+	c.testFailed = c.editing && !c.passwordOnly
+}
+
+// DeletePassword reports whether a ConnectDelete also removes the keychain
+// password: only for a keychain account, and not when kept with k.
+func (c Connect) DeletePassword() bool { return c.deletePW }
 
 func (c Connect) focusable() []int {
 	if c.passwordOnly {
@@ -163,6 +255,9 @@ func (c Connect) focusable() []int {
 	}
 	all := make([]int, 0, fieldCount)
 	for i := range fieldCount {
+		if i == fDelete && !c.editing || i == fSecret && c.source == sourceKeep {
+			continue
+		}
 		all = append(all, i)
 	}
 	return all
@@ -194,6 +289,9 @@ func (c *Connect) move(step int) {
 }
 
 func (c Connect) Update(msg tea.KeyPressMsg) (Connect, ConnectResult) {
+	if c.confirming && !c.busy {
+		return c.confirm(msg)
+	}
 	if key.Matches(msg, c.keys.cancel) {
 		return c, ConnectCancelled
 	}
@@ -201,6 +299,15 @@ func (c Connect) Update(msg tea.KeyPressMsg) (Connect, ConnectResult) {
 		return c, ConnectPending
 	}
 	switch {
+	case key.Matches(msg, c.keys.saveAnyway):
+		if !c.testFailed {
+			return c, ConnectPending
+		}
+		if err := c.validate(); err != "" {
+			c.err, c.testFailed = err, false
+			return c, ConnectPending
+		}
+		return c, ConnectSaveAnyway
 	case key.Matches(msg, c.keys.next):
 		c.move(1)
 	case key.Matches(msg, c.keys.prev):
@@ -212,16 +319,39 @@ func (c Connect) Update(msg tea.KeyPressMsg) (Connect, ConnectResult) {
 		}
 		c.err = ""
 		return c, ConnectSubmitted
+	case key.Matches(msg, c.keys.submit) && c.focus == fDelete:
+		c.confirming = true
 	case key.Matches(msg, c.keys.submit):
 		c.move(1)
 	case (c.focus == fTLS || c.focus == fSource || c.focus == fSMTPTLS) && key.Matches(msg, c.keys.toggle):
 		c.toggle()
+		c.testFailed = false
 	case isInput(c.focus):
 		before := c.inputs[c.focus].Value()
 		c.inputs[c.focus], _ = c.inputs[c.focus].Update(msg)
 		if c.inputs[c.focus].Value() != before {
+			c.testFailed = false
 			c.edited(c.focus)
 		}
+	}
+	return c, ConnectPending
+}
+
+// confirm handles keys while asking whether to delete the account. No key
+// reaches the fields. A keychain account can keep its password with k.
+func (c Connect) confirm(msg tea.KeyPressMsg) (Connect, ConnectResult) {
+	keychain := c.orig.PasswordCmd == ""
+	switch msg.String() {
+	case "y":
+		c.deletePW = keychain
+		return c, ConnectDelete
+	case "k":
+		if keychain {
+			c.deletePW = false
+			return c, ConnectDelete
+		}
+	case "n", "esc":
+		c.confirming = false
 	}
 	return c, ConnectPending
 }
@@ -234,6 +364,7 @@ func (c Connect) Paste(msg tea.PasteMsg) Connect {
 	before := c.inputs[c.focus].Value()
 	c.inputs[c.focus], _ = c.inputs[c.focus].Update(tea.PasteMsg{Content: singleLine(msg.Content)})
 	if c.inputs[c.focus].Value() != before {
+		c.testFailed = false
 		c.edited(c.focus)
 	}
 	return c
@@ -265,8 +396,16 @@ func (c *Connect) toggle() {
 		}
 		c.edited(fSMTPTLS)
 	case fSource:
-		c.source = 1 - c.source
+		if c.editing {
+			// Keep current, 1Password, keychain, as shown.
+			c.source = map[int]int{sourceKeep: sourceOnePassword, sourceOnePassword: sourceKeychain, sourceKeychain: sourceKeep}[c.source]
+		} else {
+			c.source = 1 - c.source
+		}
 		c.inputs[fSecret].SetValue("")
+		if ref, ok := opReference(c.orig.PasswordCmd); c.editing && c.source == sourceOnePassword && ok {
+			c.inputs[fSecret].SetValue(ref)
+		}
 		c.updateSecretInput()
 	}
 }
@@ -429,6 +568,65 @@ func (c Connect) Request() ConnectRequest {
 	return ConnectRequest{Account: a, Password: c.inputs[fSecret].Value()}
 }
 
+// EditRequest is the submitted edit form.
+func (c Connect) EditRequest() EditRequest {
+	r := c.Request()
+	return EditRequest{Account: r.Account, Password: r.Password, KeepPassword: c.source == sourceKeep}
+}
+
+// ApplyEdit returns old with the form's fields applied, for writing back to
+// config.toml. Keys the form doesn't show (tls_cert, archive_folder,
+// save_sent, alias names, ...) stay as they were. old is the account as
+// written in the file, so a port or TLS mode that only repeats a default
+// stays unwritten. Without an SMTP host the sending keys are cleared, as
+// the config requires.
+func ApplyEdit(old config.Account, r EditRequest) config.Account {
+	f := r.Account
+	a := old
+	a.Name, a.Email, a.Username, a.IMAPHost = f.Name, f.Email, f.Username, f.IMAPHost
+	if f.Username == f.Email {
+		a.Username = ""
+	}
+
+	eff := old.WithDefaults()
+	a.TLS, a.IMAPPort = f.TLS, f.IMAPPort
+	if old.TLS == "" && f.TLS == config.TLSImplicit {
+		a.TLS = ""
+	}
+	if old.IMAPPort == 0 && eff.TLS == f.TLS && f.IMAPPort == eff.IMAPPort {
+		a.IMAPPort = 0
+	}
+
+	if f.SMTPHost == "" {
+		a.SMTPHost, a.SMTPPort, a.SMTPTLS = "", 0, ""
+		a.FromName, a.Aliases, a.SaveSent = "", nil, nil
+	} else {
+		sm := old
+		sm.SMTPHost = f.SMTPHost
+		sm = sm.WithDefaults()
+		a.SMTPHost, a.SMTPTLS, a.SMTPPort = f.SMTPHost, f.SMTPTLS, f.SMTPPort
+		if old.SMTPTLS == "" && f.SMTPTLS == config.TLSImplicit {
+			a.SMTPTLS = ""
+		}
+		if old.SMTPPort == 0 && sm.SMTPTLS == f.SMTPTLS && f.SMTPPort == sm.SMTPPort {
+			a.SMTPPort = 0
+		}
+		names := map[string]string{}
+		for _, al := range old.Aliases {
+			names[strings.ToLower(al.Email)] = al.Name
+		}
+		a.Aliases = nil
+		for _, al := range f.Aliases {
+			a.Aliases = append(a.Aliases, config.Alias{Email: al.Email, Name: names[strings.ToLower(al.Email)]})
+		}
+	}
+
+	if !r.KeepPassword {
+		a.PasswordCmd = f.PasswordCmd
+	}
+	return a
+}
+
 // shellQuote quotes s for sh -c, leaving plain references unquoted.
 func shellQuote(s string) string {
 	safe := s != "" && strings.IndexFunc(s, func(r rune) bool {
@@ -447,8 +645,11 @@ func (c Connect) View() string {
 		return ""
 	}
 	title := "Connect account"
-	if c.passwordOnly {
+	switch {
+	case c.passwordOnly:
 		title = "Password for " + c.account.Name
+	case c.editing:
+		title = "Edit account"
 	}
 	lines := []string{ansi.Truncate(c.st.title.Render(title), innerW, ""), ""}
 	if c.passwordOnly {
@@ -457,15 +658,27 @@ func (c Connect) View() string {
 		for _, f := range []int{fName, fEmail, fUser, fHost, fPort} {
 			lines = append(lines, c.inputRow(f, innerW))
 		}
-		lines = append(lines,
-			c.choiceRow(fTLS, "TLS", []string{"implicit", "starttls"}, map[bool]int{true: 0, false: 1}[c.tls == config.TLSImplicit]),
-			c.choiceRow(fSource, "Password", []string{"1Password", "keychain"}, c.source),
-		)
+		lines = append(lines, c.choiceRow(fTLS, "TLS", []string{"implicit", "starttls"}, map[bool]int{true: 0, false: 1}[c.tls == config.TLSImplicit]))
+		if c.editing {
+			lines = append(lines, c.choiceRow(fSource, "Password", []string{"keep current", "1Password", "keychain"}, map[int]int{sourceKeep: 0, sourceOnePassword: 1, sourceKeychain: 2}[c.source]))
+		} else {
+			lines = append(lines, c.choiceRow(fSource, "Password", []string{"1Password", "keychain"}, c.source))
+		}
 	}
-	lines = append(lines, c.inputRow(fSecret, innerW))
 	note := "Stored as password_cmd = \"op read <reference>\""
-	if c.source == sourceKeychain {
+	switch c.source {
+	case sourceKeep:
+		current := "keychain"
+		if c.orig.PasswordCmd != "" {
+			current = "password_cmd"
+		}
+		lines = append(lines, c.readOnly("Current", current, innerW))
+		note = "The saved password isn't changed"
+	case sourceKeychain:
+		lines = append(lines, c.inputRow(fSecret, innerW))
 		note = "Saved in the OS keychain, never in config.toml"
+	default:
+		lines = append(lines, c.inputRow(fSecret, innerW))
 	}
 	lines = append(lines, strings.Repeat(" ", labelW+1)+c.st.dim.Render(ansi.Truncate(note, innerW-labelW-1, "…")))
 	if !c.passwordOnly {
@@ -486,6 +699,16 @@ func (c Connect) View() string {
 		lines = append(lines, c.st.badge.Render(button))
 	default:
 		lines = append(lines, button)
+	}
+	if c.editing && !c.busy {
+		switch {
+		case c.confirming:
+			lines = append(lines, c.st.alert.Render(fmt.Sprintf("Delete %s?", c.orig.Name)))
+		case c.focus == fDelete:
+			lines = append(lines, c.st.alert.Reverse(true).Padding(0, 1).Render("[ Delete account ]"))
+		default:
+			lines = append(lines, c.st.alert.Render("[ Delete account ]"))
+		}
 	}
 	if c.err != "" {
 		for _, l := range strings.Split(lipgloss.NewStyle().Width(innerW).Render(c.err), "\n") {
@@ -509,10 +732,18 @@ func (c Connect) Hints() []key.Binding {
 	switch {
 	case c.busy:
 		return []key.Binding{cancel}
+	case c.confirming && c.orig.PasswordCmd == "":
+		return []key.Binding{b("y", "delete + password"), b("k", "delete, keep password"), b("n", "cancel")}
+	case c.confirming:
+		return []key.Binding{b("y", "delete"), b("n", "cancel")}
 	case c.passwordOnly:
 		return []key.Binding{b("enter", "test & save"), cancel}
 	}
-	return []key.Binding{b("tab", "next"), b("←→", "choose"), b("enter", "test & save"), cancel}
+	hints := []key.Binding{b("tab", "next"), b("←→", "choose"), b("enter", "test & save")}
+	if c.testFailed {
+		hints = append(hints, b("ctrl+s", "save anyway"))
+	}
+	return append(hints, cancel)
 }
 
 func (c Connect) label(f int, text string) string {

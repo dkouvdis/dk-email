@@ -24,6 +24,7 @@ type refreshTickMsg struct{}
 // and, for the account whose folder is open, that folder's newest page.
 type refreshMsg struct {
 	account    int
+	id         int // the account's Model.ids entry; when set it wins over account
 	folders    []mail.Folder
 	foldersErr error
 	folder     string // "" when this account's folders aren't open
@@ -49,11 +50,11 @@ func tick(d time.Duration) tea.Cmd {
 	return tea.Tick(d, func(time.Time) tea.Msg { return refreshTickMsg{} })
 }
 
-func refreshAccount(mb mail.Mailbox, account int, folder string) tea.Cmd {
+func refreshAccount(mb mail.Mailbox, account, id int, folder string) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), refreshTimeout)
 		defer cancel()
-		msg := refreshMsg{account: account, folder: folder}
+		msg := refreshMsg{account: account, id: id, folder: folder}
 		msg.folders, msg.foldersErr = mb.Folders(ctx)
 		if folder != "" {
 			msg.summaries, msg.sumsErr = mb.Summaries(ctx, folder, refreshBefore, pageSize)
@@ -99,7 +100,7 @@ func (m Model) refreshAccounts(manual bool, only int) (Model, tea.Cmd) {
 		if i == m.open.account && !m.open.loading {
 			folder = m.open.folder
 		}
-		cmds = append(cmds, refreshAccount(mb, i, folder))
+		cmds = append(cmds, refreshAccount(mb, i, m.ids[i], folder))
 	}
 	if len(cmds) == 0 {
 		return m, nil
@@ -117,9 +118,14 @@ func (m Model) handleRefresh(msg refreshMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.refresh.pending--
+	var cmd tea.Cmd
+	var ok bool
+	if msg.account, ok = m.accountIndex(msg.account, msg.id); !ok {
+		// Its account was deleted or replaced meanwhile.
+		return m.finishRefresh(cmd, true)
+	}
 	stale := m.refresh.dirty || m.writes != m.refresh.writes
 	name := m.accts[msg.account].Name
-	var cmd tea.Cmd
 
 	switch {
 	case msg.foldersErr != nil:
@@ -139,6 +145,11 @@ func (m Model) handleRefresh(msg refreshMsg) (Model, tea.Cmd) {
 		m.list = m.list.Merge(msg.summaries)
 	}
 
+	return m.finishRefresh(cmd, stale)
+}
+
+// finishRefresh ends the refresh once every account has reported.
+func (m Model) finishRefresh(cmd tea.Cmd, stale bool) (Model, tea.Cmd) {
 	if m.refresh.pending == 0 {
 		m.log.Debug("refresh done", "stale", stale)
 		if m.refresh.manual && m.status == "Refreshing…" {
