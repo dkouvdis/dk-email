@@ -276,7 +276,7 @@ The connect-account popup has optional **SMTP host**, **SMTP port** and **SMTP T
 
 - Actions on a collapsed thread apply to every message in it. On an expanded row, or in the reader, they apply to the selected message. Opening a message marks it read.
 - `r`, `R` and `f` work on the thread list and in the reader. `c` works anywhere a folder is open. In the Drafts folder, `enter` reopens a draft in the composer. See [Sending mail](#sending-mail).
-- `enter` opens the conversation in a popup, and `esc` closes it. In the reader, `pgup`/`pgdn` (or `ctrl+u`/`ctrl+d`) scroll by a page, and `space` expands or collapses every message.
+- `enter` opens the conversation in a popup, and `esc` closes it. In the reader, `pgup`/`pgdn` (or `ctrl+u`/`ctrl+d`) scroll by a page, and `space` expands or collapses every message. A scrollbar on the right shows the position in long conversations.
 - **Mouse:** clicking a folder opens it. Clicking a thread selects it, and clicking it again opens it. The scroll wheel moves the selection (or scrolls the open popup) but never opens anything. Links in a message are underlined; cmd+click (ctrl+click on Linux) opens them while the reader popup is open, in terminals that support hyperlinks. To select text in the terminal, hold shift (or option on macOS) while dragging.
 - Every popup lists its keys in the bottom hint bar (`Close: esc`, `Send: ctrl+s`, …), not inside the popup, and the panes behind an open popup are dimmed.
 - In the `?` help popup, `/` filters keys by key or description.

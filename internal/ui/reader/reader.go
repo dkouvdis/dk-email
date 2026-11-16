@@ -17,6 +17,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/charmbracelet/x/ansi"
+	"github.com/dkouvdis/dk-email/internal/ui/scrollbar"
 	"github.com/dkouvdis/dk-email/internal/ui/theme"
 
 	"github.com/dkouvdis/dk-email/internal/mail"
@@ -46,7 +47,7 @@ type body struct {
 
 type keys struct{ up, down, pgUp, pgDown, top, bottom, expandAll key.Binding }
 
-type styles struct{ subject, label, sender, dim, dot, star, sep, err lipgloss.Style }
+type styles struct{ subject, label, sender, dim, dot, star, sep, err, thumb lipgloss.Style }
 
 type Model struct {
 	theme theme.Theme
@@ -89,6 +90,7 @@ func New(th theme.Theme, now func() time.Time) Model {
 			star:    th.Star,
 			sep:     lipgloss.NewStyle().Foreground(th.BorderColor),
 			err:     th.Error,
+			thumb:   th.Accent,
 		},
 	}
 }
@@ -167,7 +169,7 @@ func (m Model) SetMessage(uid mail.UID, msg mail.Message, err error) Model {
 	if err != nil {
 		m.bodies[uid] = body{state: failed, err: err}
 	} else {
-		m.bodies[uid] = m.renderBody(body{state: loaded, msg: msg}, m.width)
+		m.bodies[uid] = m.renderBody(body{state: loaded, msg: msg}, contentWidth(m.width))
 	}
 	return m
 }
@@ -261,7 +263,7 @@ func (m Model) SetSize(w, h int) Model {
 		m.bodies = maps.Clone(m.bodies)
 		for uid, b := range m.bodies {
 			if b.state == loaded {
-				m.bodies[uid] = m.renderBody(b, w)
+				m.bodies[uid] = m.renderBody(b, contentWidth(w))
 			}
 		}
 	}
@@ -288,7 +290,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case key.Matches(k, m.keys.top):
 		m.offset = 0
 	case key.Matches(k, m.keys.bottom):
-		m.offset = len(m.lines(m.width))
+		m.offset = len(m.lines(contentWidth(m.width)))
 	case key.Matches(k, m.keys.expandAll):
 		m.toggleAll()
 	}
@@ -313,10 +315,24 @@ func (m Model) clamp(offset int) int {
 	if m.height <= 0 {
 		return 0
 	}
-	return max(min(offset, len(m.lines(m.width))-m.height), 0)
+	return max(min(offset, len(m.lines(contentWidth(m.width)))-m.height), 0)
 }
 
-// View renders at most height lines, none wider than width.
+// minBarWidth is the narrowest pane that gets a scrollbar column.
+const minBarWidth = 20
+
+// contentWidth is the width message lines wrap to: the pane minus a gap and
+// the scrollbar column. It never depends on whether the bar shows, so
+// wrapping can't flip with scrollability.
+func contentWidth(w int) int {
+	if w >= minBarWidth {
+		return w - 2
+	}
+	return w
+}
+
+// View renders at most height lines, none wider than width. A scrollbar
+// column sits on the right when the pane is wide enough.
 func (m Model) View(width, height int) string {
 	if width <= 0 || height <= 0 {
 		return ""
@@ -324,11 +340,21 @@ func (m Model) View(width, height int) string {
 	if !m.open {
 		return m.st.dim.Render("No message selected.")
 	}
-	lines := m.lines(width)
-	offset := max(min(m.offset, len(lines)-height), 0)
-	lines = lines[offset:min(offset+height, len(lines))]
+	cw := contentWidth(width)
+	lines := m.lines(cw)
+	total := len(lines)
+	offset := max(min(m.offset, total-height), 0)
+	lines = slices.Clone(lines[offset:min(offset+height, total)])
+	var bar []string
+	if cw < width {
+		bar = scrollbar.Render(m.st.thumb, height, total, offset)
+	}
 	for i, l := range lines {
-		lines[i] = ansi.Truncate(l, width, "")
+		l = ansi.Truncate(l, cw, "")
+		if bar != nil {
+			l += strings.Repeat(" ", max(cw-lipgloss.Width(l), 0)) + " " + bar[i]
+		}
+		lines[i] = l
 	}
 	return strings.Join(lines, "\n")
 }

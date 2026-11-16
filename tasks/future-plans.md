@@ -43,7 +43,6 @@ must keep possible.
   notification. Shares the reconnect work with the overnight bug above.
 - **Multi-select and bulk actions**: mark several threads, then archive,
   delete, move or mark them read at once. Includes "mark folder as read".
-- **Scrollbar in the reader**.
 
 ### Outgoing
 

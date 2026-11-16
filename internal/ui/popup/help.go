@@ -10,6 +10,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/charmbracelet/x/ansi"
+	"github.com/dkouvdis/dk-email/internal/ui/scrollbar"
 	"github.com/dkouvdis/dk-email/internal/ui/theme"
 )
 
@@ -293,23 +294,7 @@ func (h Help) renderLine(l helpLine) string {
 // scrollbar returns one cell per visible row: a thumb where the view is,
 // blank elsewhere, or all blank when everything fits.
 func (h Help) scrollbar(vh int) []string {
-	bar := make([]string, vh)
-	for i := range bar {
-		bar[i] = " "
-	}
-	if !h.scrollable() {
-		return bar
-	}
-	total := len(h.lines)
-	thumb := max(vh*vh/total, 1)
-	pos := 0
-	if total > vh {
-		pos = h.offset * (vh - thumb) / (total - vh)
-	}
-	for i := pos; i < pos+thumb && i < vh; i++ {
-		bar[i] = h.st.thumb.Render("┃")
-	}
-	return bar
+	return scrollbar.Render(h.st.thumb, vh, len(h.lines), h.offset)
 }
 
 func pad(s string, w int) string {

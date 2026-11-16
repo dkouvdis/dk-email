@@ -332,3 +332,57 @@ func TestSetFlaggedAndRemove(t *testing.T) {
 		t.Error("reader still open with no messages left")
 	}
 }
+
+func longThread(t *testing.T, w, h int) Model {
+	t.Helper()
+	m := New(theme.Default(), func() time.Time { return now }).SetSize(w, h).Open(0, "INBOX", conversation(), 0)
+	return m.SetMessage(2, withBody(conversation().Messages[1], strings.Repeat("line\n", 100)), nil)
+}
+
+func TestScrollbar_ThumbAtTopAndWidthsAlign(t *testing.T) {
+	m := longThread(t, 40, 5)
+	rows := strings.Split(ansi.Strip(m.View(40, 5)), "\n")
+	if len(rows) != 5 {
+		t.Fatalf("rows = %d, want 5", len(rows))
+	}
+	for i, r := range rows {
+		if w := ansi.StringWidth(r); w != 40 {
+			t.Errorf("row %d width = %d, want 40: %q", i, w, r)
+		}
+	}
+	if !strings.HasSuffix(rows[0], "┃") {
+		t.Errorf("first row lacks the thumb: %q", rows[0])
+	}
+	if strings.HasSuffix(rows[4], "┃") {
+		t.Errorf("thumb should not reach the last row at the top: %q", rows[4])
+	}
+}
+
+func TestScrollbar_ThumbAtBottom(t *testing.T) {
+	m, _ := longThread(t, 40, 5).Update(press("G"))
+	rows := strings.Split(ansi.Strip(m.View(40, 5)), "\n")
+	if !strings.HasSuffix(rows[len(rows)-1], "┃") {
+		t.Errorf("last row lacks the thumb at the bottom:\n%s", strings.Join(rows, "\n"))
+	}
+	if strings.HasSuffix(rows[0], "┃") {
+		t.Errorf("first row still has the thumb at the bottom: %q", rows[0])
+	}
+}
+
+func TestScrollbar_AbsentWhenContentFits(t *testing.T) {
+	m := open(conversation(), 0)
+	if v := ansi.Strip(m.View(60, 200)); strings.Contains(v, "┃") {
+		t.Errorf("short message shows a scrollbar:\n%s", v)
+	}
+}
+
+func TestScrollbar_NoBarWhenNarrow(t *testing.T) {
+	m := longThread(t, 19, 5)
+	v := ansi.Strip(m.View(19, 5))
+	if strings.Contains(v, "┃") {
+		t.Errorf("narrow pane shows a scrollbar:\n%s", v)
+	}
+	if contentWidth(19) != 19 || contentWidth(20) != 18 {
+		t.Errorf("contentWidth(19)=%d contentWidth(20)=%d", contentWidth(19), contentWidth(20))
+	}
+}
