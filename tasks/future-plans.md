@@ -33,9 +33,6 @@ must keep possible.
   `save_sent` default to match.
   Sources: [Deprecation of Basic authentication in Exchange Online](https://learn.microsoft.com/en-us/exchange/clients-and-mobile-in-exchange-online/deprecation-of-basic-authentication-exchange-online),
   [SMTP AUTH deprecation timeline](https://techcommunity.microsoft.com/blog/exchange/updated-exchange-online-smtp-auth-basic-authentication-deprecation-timeline/4489835).
-- **Edit accounts**: change an existing account from the app, including adding
-  `smtp_host` to an account that can't send yet. Config updates must keep
-  preserving the user's formatting and comments.
 
 ## Medium Priority
 
