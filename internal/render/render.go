@@ -179,10 +179,10 @@ var (
 	plainEntities = regexp.MustCompile(`&(?:[a-zA-Z]{2,8}|#[0-9]{2,6});`)
 	// Preheader padding: a run of zero-width characters, spaces between.
 	plainPadding = regexp.MustCompile(`(?:[\x{200b}-\x{200d}\x{2060}\x{feff}\x{034f}][ \x{a0}]*){10}`)
-	// Generated links, "label ( https://… )" (html2text) or "label
-	// (https://… )" (HubSpot): a plain part generated from the HTML, whose
-	// links read better from the HTML itself.
-	plainLinks = regexp.MustCompile(`\( ?https?://\S+ \)`)
+	// Generated links, "label ( https://… )" (html2text), "label
+	// (https://… )" (HubSpot) or "[label](https://…)" (Klaviyo): a plain part
+	// generated from the HTML, whose links read better from the HTML itself.
+	plainLinks = regexp.MustCompile(`\( ?https?://\S+ \)|\]\(https?://[^\s)]+\)`)
 	// A stub telling the reader their client can't show HTML ("your email
 	// software can't display HTML emails"), standing in for the real content.
 	plainNoHTML = regexp.MustCompile(`(?i)\b(?:can['’]?t|cannot|can not|unable to|(?:does|do)(?:n['’]?t| not))\s+(?:display|show|view|read|render|support)\s+(?:html|rich[- ]text)`)
