@@ -117,6 +117,10 @@ func TestPlainIsJunk(t *testing.T) {
 		{"generated links", "View comment ( https://example.com/a )\n\nUnsubscribe ( https://example.com/u )", true},
 		{"hubspot links", "View listing (https://example.com/a )\n\nManage preferences (https://example.com/p )", true},
 		{"one spaced link", "See the docs ( https://example.com/a ) for more.", false},
+		{"only-HTML stub", "Hello,\n\nYou have received a newsletter from Series Eight.\n\nHowever, your email software can't display HTML emails. You can view the newsletter by clicking here:\n\nhttps://example.com/x\n", true},
+		{"does not support HTML", "Your email client does not support HTML. View it online: https://example.com", true},
+		{"curly apostrophe stub", "Your mail app can’t display HTML email.", true},
+		{"mentions HTML only", "Hi,\n\nI wrote the HTML templates for the site; can you review them?\n\nThanks", false},
 		{"mostly blank", strings.Repeat("\n", 30) + "Hi", true},
 	}
 	for _, tt := range tests {

@@ -183,17 +183,21 @@ var (
 	// (https://… )" (HubSpot): a plain part generated from the HTML, whose
 	// links read better from the HTML itself.
 	plainLinks = regexp.MustCompile(`\( ?https?://\S+ \)`)
+	// A stub telling the reader their client can't show HTML ("your email
+	// software can't display HTML emails"), standing in for the real content.
+	plainNoHTML = regexp.MustCompile(`(?i)\b(?:can['’]?t|cannot|can not|unable to|(?:does|do)(?:n['’]?t| not))\s+(?:display|show|view|read|render|support)\s+(?:html|rich[- ]text)`)
 )
 
 // plainIsJunk spots text/plain parts machine-generated from the HTML without
 // rendering it: leftover tags and entities, unexpanded template code,
-// preheader padding, or mostly blank lines. A real plain-text email trips
-// none of these.
+// preheader padding, an only-HTML stub, or mostly blank lines. A real
+// plain-text email trips none of these.
 func plainIsJunk(s string) bool {
 	if strings.TrimSpace(s) == "" {
 		return true
 	}
-	if strings.Contains(s, "%%=") || strings.Contains(s, "%%[") || plainPadding.MatchString(s) {
+	if strings.Contains(s, "%%=") || strings.Contains(s, "%%[") || plainPadding.MatchString(s) ||
+		plainNoHTML.MatchString(s) {
 		return true
 	}
 	if len(plainTags.FindAllStringIndex(s, 3)) == 3 || len(plainEntities.FindAllStringIndex(s, 3)) == 3 ||
