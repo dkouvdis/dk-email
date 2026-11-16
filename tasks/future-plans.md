@@ -4,9 +4,6 @@ Ideas deliberately deferred from the current scope, and known bugs. Each
 entry notes why it matters and, where it applies, what the current design
 must keep possible.
 
-## To be refined
-- using email alias
-
 ## Bugs
 
 - **Authentication lost overnight**: with the app left open overnight, the
@@ -36,11 +33,9 @@ must keep possible.
   `save_sent` default to match.
   Sources: [Deprecation of Basic authentication in Exchange Online](https://learn.microsoft.com/en-us/exchange/clients-and-mobile-in-exchange-online/deprecation-of-basic-authentication-exchange-online),
   [SMTP AUTH deprecation timeline](https://techcommunity.microsoft.com/blog/exchange/updated-exchange-online-smtp-auth-basic-authentication-deprecation-timeline/4489835).
-- **Send-as aliases**: send from own-domain addresses through an existing
-  account. Aliases (`{email, name}`) are listed in config or entered when
-  connecting an account; the composer gets a From field, and replies start
-  from the address the original was sent to. See
-  [tasks/aliases-spec.md](aliases-spec.md).
+- **Send-as aliases: docs and real sends**: the user guide `docs/send-as.md`,
+  README/SPEC notes, and sends from an alias checked on Gmail, Fastmail and
+  iCloud (task 5 of [tasks/aliases-todo.md](aliases-todo.md)).
 - **Edit accounts**: change an existing account from the app, including adding
   `smtp_host` to an account that can't send yet. Config updates must keep
   preserving the user's formatting and comments.
