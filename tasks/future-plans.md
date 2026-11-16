@@ -6,6 +6,7 @@ must keep possible.
 
 ## Bugs
 
+- When disallow reading 1pass, account shows horrible output
 - **Authentication lost overnight**: with the app left open overnight, the
   account stops working and the app has to be restarted. The IMAP client is
   meant to reconnect on a dropped connection, so find out why that path fails
