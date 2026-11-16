@@ -71,12 +71,14 @@ type Model struct {
 	filter   textinput.Model
 	keys     keys
 	st       styles
+	dim      func(string) string // theme.Dim, for inactive accounts
 }
 
 func New(th theme.Theme, names []string) Model {
 	m := Model{
 		cursor:  noRef,
 		open:    noRef,
+		dim:     th.Dim,
 		spinner: spinner.New(spinner.WithSpinner(spinner.MiniDot)),
 		keys: keys{
 			up:     key.NewBinding(key.WithKeys("k", "up")),
@@ -417,9 +419,10 @@ type row struct {
 	header bool // an account name
 }
 
-// rows lists each account and its folders. While a filter is typed, only
-// matching folders show, under their account, and accounts without a
-// match are left out.
+// rows lists each account and its folders. Accounts other than the
+// cursor's are dimmed, as the screen is behind a popup. While a filter is
+// typed, only matching folders show, under their account, undimmed, and
+// accounts without a match are left out.
 func (m Model) rows(width int) []row {
 	if m.query() != "" {
 		return m.filteredRows(width)
@@ -429,6 +432,7 @@ func (m Model) rows(width int) []row {
 		if i > 0 {
 			rows = append(rows, row{ref: noRef})
 		}
+		start := len(rows)
 		rows = append(rows, row{text: m.st.header.Render(ansi.Truncate(a.name, width, "…")), ref: noRef, header: true})
 		switch a.state {
 		case connecting:
@@ -455,6 +459,11 @@ func (m Model) rows(width int) []row {
 				}
 				r := ref{i, e.Name}
 				rows = append(rows, row{text: m.folderRow(e.Label, e.Depth, e.Unread, r, width), ref: r})
+			}
+		}
+		if m.cursor != noRef && i != m.cursor.account {
+			for j := start; j < len(rows); j++ {
+				rows[j].text = m.dim(rows[j].text)
 			}
 		}
 	}

@@ -297,6 +297,82 @@ func TestView_CursorFolderIsAccentNotReversed(t *testing.T) {
 	}
 }
 
+// rawLines is the view with styles, split into lines, each with its plain text.
+func rawLines(m Model) (raw, plain []string) {
+	raw = strings.Split(m.View(22, 40), "\n")
+	for _, l := range raw {
+		plain = append(plain, ansi.Strip(l))
+	}
+	return raw, plain
+}
+
+func TestView_DimsAccountsOtherThanTheCursors(t *testing.T) {
+	th := theme.Default()
+	m := New(th, []string{"Personal", "Work"})
+	m = m.SetFolders(0, gmailFolders(), nil)
+	m = m.SetFolders(1, []mail.Folder{{Name: "INBOX", Role: mail.RoleInbox, Unread: 1}, {Name: "Clients"}}, nil)
+
+	check := func(active string) {
+		t.Helper()
+		raw, plain := rawLines(m)
+		account := ""
+		for i, l := range plain {
+			if l == "Personal" || l == "Work" {
+				account = l
+			}
+			if l == "" {
+				continue
+			}
+			dimmed := raw[i] == th.Dim(l)
+			if dimmed != (account != active) {
+				t.Errorf("with %s active, %s row %q dimmed = %v", active, account, l, dimmed)
+			}
+		}
+	}
+
+	check("Personal")
+	m = m.SetOpen(1, "INBOX")
+	check("Work")
+}
+
+func TestView_FilterDoesNotDim(t *testing.T) {
+	th := theme.Default()
+	m := New(th, []string{"Personal", "Work"})
+	m = m.SetFolders(0, gmailFolders(), nil)
+	m = m.SetFolders(1, []mail.Folder{{Name: "INBOX", Role: mail.RoleInbox, Unread: 1}}, nil)
+
+	m = typeKeys(m, "/inbox")
+
+	raw, plain := rawLines(m)
+	for i, l := range plain {
+		if l != "" && raw[i] == th.Dim(l) {
+			t.Errorf("filtered row %q is dimmed", l)
+		}
+	}
+	if !slices.Contains(plain, "Work") {
+		t.Errorf("filter should show Work's Inbox:\n%s", strings.Join(plain, "\n"))
+	}
+}
+
+func TestView_TrashShowsNoUnreadCount(t *testing.T) {
+	folders := gmailFolders()
+	for i := range folders {
+		if folders[i].Role == mail.RoleTrash {
+			folders[i].Unread = 5
+		}
+	}
+	m := New(theme.Default(), []string{"Personal"}).SetFolders(0, folders, nil)
+
+	if hasLine(strings.Split(view(m), "\n"), "Trash", "5") {
+		t.Errorf("Trash shows its unread count:\n%s", view(m))
+	}
+	for _, e := range m.Accounts()[0].Tree {
+		if e.Name == "[Gmail]/Trash" && e.Unread != 0 {
+			t.Errorf("Trash entry Unread = %d, want 0 so pickers hide it too", e.Unread)
+		}
+	}
+}
+
 func TestFilter_SlashFiltersFoldersAndEnterOpens(t *testing.T) {
 	m := New(theme.Default(), []string{"Personal", "Work"})
 	m = m.SetFolders(0, gmailFolders(), nil)

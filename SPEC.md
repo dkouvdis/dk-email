@@ -36,6 +36,8 @@ The sidebar and the folder pickers show each account's folders as a tree, indent
 - The tree is always expanded. While a `/` filter is typed, matches are listed flat with their full path (`Work/Clients/Acme`).
 - In the move picker (`m`), the open folder is shown dimmed rather than left out, so the tree keeps its shape.
 
+Accounts other than the one under the sidebar cursor are dimmed, the same way as the screen behind a popup: muted text only, no bold, unread colour or ▶ accent. Nothing else changes; `/` filter results are never dimmed. Trash shows no unread count in the sidebar, the pickers or the list header. Added 2026-11-16 at your request.
+
 ### Thread list row
 
 ` ● *  Sender name            Subject (n)                     12:00` for an unread, starred thread of n messages, with one space of left padding. A collapsed thread shows its latest message. `space` expands it to show one indented row per message.

@@ -6,6 +6,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestPicker_ListModeAOpensPickerWithEveryAccount(t *testing.T) {
@@ -119,6 +120,20 @@ func TestHeader_UnreadCountFollowsReading(t *testing.T) {
 
 	if !strings.Contains(plain(m), "Personal › Inbox · 1 unread") {
 		t.Errorf("header count didn't follow reading:\n%s", plain(m))
+	}
+}
+
+func TestHeader_TrashShowsNoUnreadCount(t *testing.T) {
+	f := newFixture()
+	f.personal.AddMessage("[Gmail]/Trash", msg("Spam", "Junk", fixedNow.Add(-time.Hour), false, "t1"))
+	m := started(t, f, 70, 30)
+
+	m, cmd := m.openFolder(0, "[Gmail]/Trash")
+	m = settle(t, m, cmd)
+
+	v := plain(m)
+	if !strings.Contains(v, "Personal › Trash") || strings.Contains(v, " unread") {
+		t.Errorf("Trash header should name the folder without a count:\n%s", v)
 	}
 }
 

@@ -510,7 +510,7 @@ func TestModel_DimmedKeepsTextAndWidth(t *testing.T) {
 	m := started(t, newFixture(), 160, 30)
 	block := lipgloss.JoinHorizontal(lipgloss.Top, m.renderPane(PaneSidebar, m.panes.Sidebar, m.side.View), m.renderPane(PaneList, m.panes.List, m.listView))
 
-	got := m.dimmed(block)
+	got := m.theme.Dim(block)
 
 	if ansi.Strip(got) != ansi.Strip(block) {
 		t.Error("dimming changed the text")

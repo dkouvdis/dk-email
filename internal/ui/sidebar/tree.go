@@ -16,7 +16,7 @@ type Entry struct {
 	Path   string // shown while filtering: the path with "/" between parts
 	Depth  int
 	Folder bool
-	Unread int
+	Unread int // 0 for Trash, whose count isn't shown
 }
 
 type node struct {
@@ -51,6 +51,9 @@ func Tree(folders []mail.Folder) []Entry {
 			n.role = f.Role
 			n.entry.Label = Label(f)
 			n.entry.Path = n.entry.Label
+		}
+		if n.role == mail.RoleTrash {
+			n.entry.Unread = 0
 		}
 		if n.role != mail.RoleNone || parent == "" {
 			roots = append(roots, n)

@@ -453,7 +453,7 @@ func (m Model) render() string {
 	cols = append(cols, m.renderPane(PaneList, p.List, m.listView))
 	panes := lipgloss.JoinHorizontal(lipgloss.Top, cols...)
 	if m.popupOpen() || m.showConnect {
-		panes = m.dimmed(panes)
+		panes = m.theme.Dim(panes)
 	}
 	screen := lipgloss.JoinVertical(lipgloss.Left,
 		panes,
@@ -484,16 +484,6 @@ func (m Model) render() string {
 	return screen
 }
 
-// dimmed redraws block in the muted style only, so nothing behind a popup
-// (the selected row, the focused border) competes with it.
-func (m Model) dimmed(block string) string {
-	lines := strings.Split(ansi.Strip(block), "\n")
-	for i, l := range lines {
-		lines[i] = m.styles.dim.Render(l)
-	}
-	return strings.Join(lines, "\n")
-}
-
 // renderPane draws a bordered pane whose content is rendered for its inner size.
 func (m Model) renderPane(pane Pane, r Rect, content func(w, h int) string) string {
 	style := m.styles.pane
@@ -506,10 +496,11 @@ func (m Model) renderPane(pane Pane, r Rect, content func(w, h int) string) stri
 	return style.Width(r.W).Height(r.H).Render(body)
 }
 
-// unreadNote is " · N unread" for the open folder, or "" when it has none.
+// unreadNote is " · N unread" for the open folder, or "" when it has none
+// or is Trash, whose count isn't shown.
 func (m Model) unreadNote() string {
 	f, ok := m.side.Folder(m.open.account, m.open.folder)
-	if !ok || f.Unread == 0 {
+	if !ok || f.Unread == 0 || f.Role == mail.RoleTrash {
 		return ""
 	}
 	return m.styles.dim.Render(fmt.Sprintf(" · %d unread", f.Unread))

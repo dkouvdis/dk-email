@@ -5,9 +5,11 @@ package theme
 
 import (
 	"image/color"
+	"strings"
 
 	gansi "charm.land/glamour/v2/ansi"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/dkouvdis/dk-email/internal/config"
 )
@@ -86,6 +88,17 @@ func New(c config.Colors) Theme {
 		BorderColor: pick(c.Border, defaults.Border),
 		Markdown:    markdown(str(c.Accent, defaults.Accent), str(c.Hint, defaults.Hint), str(c.Border, defaults.Border), c.Muted),
 	}
+}
+
+// Dim redraws block in the Muted style only, dropping every other style
+// (bold, colours, the selected row), so it recedes behind what has focus:
+// the screen behind a popup, or the sidebar's inactive accounts.
+func (t Theme) Dim(block string) string {
+	lines := strings.Split(ansi.Strip(block), "\n")
+	for i, l := range lines {
+		lines[i] = t.Muted.Render(l)
+	}
+	return strings.Join(lines, "\n")
 }
 
 func markdown(accent, hint, border *string, muted config.Color) gansi.StyleConfig {
