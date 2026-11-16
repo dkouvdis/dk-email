@@ -4,7 +4,6 @@
 │                              ││                                                                                                          │
 │                              ││                                                                                                          │
 │                              ││                                                                                                          │
-│                              ││                                                                                                          │
 │                              ││      ╭────────────────────────────────────────────────────────────╮                                      │
 │                              ││      │ Connect account                                            │                                      │
 │                              ││      │                                                            │                                      │
@@ -20,6 +19,7 @@
 │                              ││      │ SMTP host  smtp.gmail.com                                  │                                      │
 │                              ││      │ SMTP port  465                                             │                                      │
 │                              ││      │ SMTP TLS   ● implicit   ○ starttls                         │                                      │
+│                              ││      │ Aliases    optional: me@mydomain.com, hi@mydomain.com      │                                      │
 │                              ││      │                                                            │                                      │
 │                              ││      │ [ Test & save ]                                            │                                      │
 │                              ││      ╰────────────────────────────────────────────────────────────╯                                      │

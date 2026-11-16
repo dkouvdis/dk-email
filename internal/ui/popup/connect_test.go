@@ -439,3 +439,77 @@ func TestConnect_SMTPTLSToggleChangesPortHint(t *testing.T) {
 		t.Errorf("tls %q, port hint %q after toggling back", c.smtpTLS, c.inputs[fSMTPPort].Placeholder)
 	}
 }
+
+func TestConnect_AliasesFieldFollowsSMTPTLS(t *testing.T) {
+	c := newConnect()
+	c.setFocus(fSMTPTLS)
+	c, _ = keys(c, "tab")
+	if c.focus != fAliases {
+		t.Fatalf("focus after SMTP TLS = %d, want the Aliases field", c.focus)
+	}
+	c, _ = keys(c, "tab")
+	if c.focus != fSubmit {
+		t.Errorf("focus after Aliases = %d, want Submit", c.focus)
+	}
+	if !strings.Contains(ansi.Strip(newConnect().View()), "Aliases") {
+		t.Error("Aliases row not shown")
+	}
+}
+
+func submitAliases(smtpHost, aliases string) (Connect, ConnectResult) {
+	c := fill(newConnect(), "Work", "me@example.com", "", "mail.example.com", "")
+	c.setFocus(fSMTPHost)
+	c = typeIn(c, smtpHost)
+	c.setFocus(fAliases)
+	c = typeIn(c, aliases)
+	c.setFocus(fSecret)
+	c = typeIn(c, "op://V/I/p")
+	return keys(c, "enter")
+}
+
+func TestConnect_AliasesRequest(t *testing.T) {
+	c, r := submitAliases("smtp.example.com", " hi@my.com , ,sales@my.com,")
+	if r != ConnectSubmitted {
+		t.Fatalf("result %v, error %q", r, c.err)
+	}
+	got := c.Request().Account.Aliases
+	if len(got) != 2 || got[0] != (config.Alias{Email: "hi@my.com"}) || got[1] != (config.Alias{Email: "sales@my.com"}) {
+		t.Errorf("aliases = %+v", got)
+	}
+	c, _ = submitAliases("smtp.example.com", "")
+	if a := c.Request().Account.Aliases; len(a) != 0 {
+		t.Errorf("empty field gave aliases %+v", a)
+	}
+}
+
+func TestConnect_AliasesValidation(t *testing.T) {
+	tests := []struct {
+		name, host, aliases, want string
+	}{
+		{"bad address", "smtp.example.com", "nope", "not a valid address"},
+		{"display name", "smtp.example.com", "Me <me@my.com>", "not a valid address"},
+		{"duplicate", "smtp.example.com", "a@my.com, A@my.com", "listed twice"},
+		{"account email", "smtp.example.com", "ME@example.com", "already the account email"},
+		{"no smtp host", "", "a@my.com", "Aliases need an SMTP host"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c, r := submitAliases(tt.host, tt.aliases)
+			if r != ConnectPending || !strings.Contains(c.err, tt.want) {
+				t.Errorf("result %v, error %q, want %q", r, c.err, tt.want)
+			}
+			if !strings.Contains(ansi.Strip(c.View()), tt.want) {
+				t.Errorf("error not shown:\n%s", ansi.Strip(c.View()))
+			}
+		})
+	}
+}
+
+func TestConnect_PasteIntoAliases(t *testing.T) {
+	c := newConnect()
+	c.setFocus(fAliases)
+	c = c.Paste(tea.PasteMsg{Content: "a@my.com, b@my.com\n"})
+	if got := c.inputs[fAliases].Value(); got != "a@my.com, b@my.com" {
+		t.Errorf("pasted = %q", got)
+	}
+}

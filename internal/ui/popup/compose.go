@@ -36,6 +36,9 @@ const (
 	ComposeSubject
 	ComposeBody
 	composeFields
+	// ComposeFrom is the From row, which sits before To in focus order and
+	// exists only with two or more choices (see SetFrom).
+	ComposeFrom
 )
 
 // ComposeValues is the text of every field.
@@ -56,6 +59,15 @@ type Compose struct {
 	body    textarea.Model
 	focus   ComposeField
 	initial ComposeValues
+
+	// from are the labels of the addresses to send as; the row shows with 2+.
+	from        []string
+	fromSel     int
+	initialFrom int
+	// fromOpen is set while the dropdown of choices is open; fromHi is its
+	// highlighted choice and fromTop the first one shown.
+	fromOpen        bool
+	fromHi, fromTop int
 
 	title     string
 	w, h      int
@@ -122,7 +134,38 @@ func (c *Compose) layout() {
 		c.headers[i].SetWidth(max(innerW-composeLabelW-1, 1))
 	}
 	c.body.SetWidth(max(innerW, 1))
-	c.body.SetHeight(max(innerH-composeRows-(len(c.footerLines(innerW))-1), 1))
+	c.body.SetHeight(max(innerH-composeRows-c.extraRows()-(len(c.footerLines(innerW))-1), 1))
+}
+
+// SetFrom sets the From choices (already formatted labels) and the selected
+// one, which becomes the baseline for Dirty. With fewer than two choices the
+// row is hidden.
+func (c *Compose) SetFrom(choices []string, selected int) {
+	c.from = choices
+	if selected < 0 || selected >= len(choices) {
+		selected = 0
+	}
+	c.fromSel, c.initialFrom = selected, selected
+	if !c.hasFrom() && c.focus == ComposeFrom {
+		c.setFocus(ComposeTo)
+	}
+	c.layout()
+}
+
+// FromIndex is the selected From choice.
+func (c Compose) FromIndex() int { return c.fromSel }
+
+// SetTitle replaces the popup title.
+func (c *Compose) SetTitle(t string) { c.title = t }
+
+func (c Compose) hasFrom() bool { return len(c.from) >= 2 }
+
+// extraRows is how many rows the From row adds to the layout.
+func (c Compose) extraRows() int {
+	if c.hasFrom() {
+		return 1
+	}
+	return 0
 }
 
 // SetError shows msg in the footer. An empty msg clears it.
@@ -161,13 +204,20 @@ func (c Compose) Values() ComposeValues {
 }
 
 // Dirty reports whether any field differs from where it started.
-func (c Compose) Dirty() bool { return c.Values() != c.initial }
+func (c Compose) Dirty() bool { return c.Values() != c.initial || c.fromSel != c.initialFrom }
 
 // Prompting reports whether the close prompt is showing.
 func (c Compose) Prompting() bool { return c.prompting }
 
 func (c *Compose) setFocus(f ComposeField) {
 	c.focus = f
+	if f == ComposeFrom {
+		for i := range c.headers {
+			c.headers[i].Blur()
+		}
+		c.body.Blur()
+		return
+	}
 	for i := range c.headers {
 		if ComposeField(i) == f {
 			c.headers[i].Focus()
@@ -183,12 +233,30 @@ func (c *Compose) setFocus(f ComposeField) {
 }
 
 func (c *Compose) move(step int) {
-	c.setFocus((c.focus + ComposeField(step) + composeFields) % composeFields)
+	order := []ComposeField{ComposeTo, ComposeCc, ComposeBcc, ComposeSubject, ComposeBody}
+	if c.hasFrom() {
+		order = append([]ComposeField{ComposeFrom}, order...)
+	}
+	for i, f := range order {
+		if f == c.focus {
+			c.setFocus(order[(i+step+len(order))%len(order)])
+			return
+		}
+	}
+}
+
+// cycleFrom moves the From selection by step, wrapping.
+func (c *Compose) cycleFrom(step int) {
+	n := len(c.from)
+	c.fromSel = (c.fromSel + step + n) % n
 }
 
 // forward gives msg to the focused input.
 func (c *Compose) forward(msg tea.Msg) tea.Cmd {
 	var cmd tea.Cmd
+	if c.focus == ComposeFrom {
+		return nil
+	}
 	if c.focus == ComposeBody {
 		c.body, cmd = c.body.Update(msg)
 	} else {
@@ -210,9 +278,12 @@ func (c Compose) Update(msg tea.Msg) (Compose, ComposeResult, tea.Cmd) {
 		if c.prompting {
 			return c.updatePrompt(msg)
 		}
+		if c.fromOpen {
+			return c.updateDropdown(msg), ComposeNone, nil
+		}
 		return c.updateKey(msg)
 	case tea.PasteMsg:
-		if c.busy != "" || c.prompting {
+		if c.busy != "" || c.prompting || c.fromOpen {
 			return c, ComposeNone, nil
 		}
 		if c.focus != ComposeBody {
@@ -221,6 +292,22 @@ func (c Compose) Update(msg tea.Msg) (Compose, ComposeResult, tea.Cmd) {
 		return c, ComposeNone, c.forward(msg)
 	}
 	return c, ComposeNone, c.forward(msg)
+}
+
+// updateDropdown handles keys while the From choices are open; everything
+// but moving, picking and closing is ignored.
+func (c Compose) updateDropdown(msg tea.KeyPressMsg) Compose {
+	switch msg.String() {
+	case "up", "k":
+		c.fromHi = max(c.fromHi-1, 0)
+	case "down", "j":
+		c.fromHi = min(c.fromHi+1, len(c.from)-1)
+	case "enter":
+		c.fromSel, c.fromOpen = c.fromHi, false
+	case "esc":
+		c.fromOpen = false
+	}
+	return c
 }
 
 func (c Compose) updateKey(msg tea.KeyPressMsg) (Compose, ComposeResult, tea.Cmd) {
@@ -240,8 +327,21 @@ func (c Compose) updateKey(msg tea.KeyPressMsg) (Compose, ComposeResult, tea.Cmd
 		c.move(-1)
 		return c, ComposeNone, nil
 	case "enter":
+		if c.focus == ComposeFrom {
+			c.fromOpen, c.fromHi = true, c.fromSel
+			return c, ComposeNone, nil
+		}
 		if c.focus != ComposeBody {
 			c.move(1)
+			return c, ComposeNone, nil
+		}
+	case "left", "right", "space":
+		if c.focus == ComposeFrom {
+			step := 1
+			if msg.String() == "left" {
+				step = -1
+			}
+			c.cycleFrom(step)
 			return c, ComposeNone, nil
 		}
 	}
@@ -273,10 +373,25 @@ func headerLine(s string) string {
 // when that's too small to use.
 func (c Compose) View() string {
 	innerW, innerH := FrameInner(c.w, c.h)
-	if innerW < 20 || innerH <= composeRows {
+	if innerW < 20 || innerH <= composeRows+c.extraRows() {
 		return ""
 	}
 	lines := make([]string, 0, innerH)
+	if c.hasFrom() {
+		label := fmt.Sprintf("%-*s", composeLabelW, "From")
+		if c.focus == ComposeFrom {
+			label = c.th.Accent.Render(label)
+		} else {
+			label = c.th.Muted.Render(label)
+		}
+		addr := ansi.Truncate(c.from[c.fromSel], max(innerW-composeLabelW-2, 1), "…")
+		if c.focus == ComposeFrom {
+			addr = c.th.Cursor.Render(addr + " ▾")
+		} else {
+			addr += c.th.Muted.Render(" ▾")
+		}
+		lines = append(lines, label+addr)
+	}
 	for i := range c.headers {
 		label := fmt.Sprintf("%-*s", composeLabelW, composeLabels[i])
 		if ComposeField(i) == c.focus {
@@ -294,12 +409,70 @@ func (c Compose) View() string {
 	lines = append(lines, strings.Split(c.body.View(), "\n")...)
 
 	footer := c.footerLines(innerW)
+	if c.fromOpen {
+		// Everything behind the list recedes, as behind any popup.
+		for i := range lines {
+			lines[i] = c.th.Dim(lines[i])
+		}
+		for i := range footer {
+			footer[i] = c.th.Dim(footer[i])
+		}
+		lines = c.overlayDropdown(lines, innerW, innerH-len(footer))
+	}
 	body := lines[:min(len(lines), innerH-len(footer))]
 	for len(body) < innerH-len(footer) {
 		body = append(body, "")
 	}
 	body = append(body, footer...)
 	return FrameTitled(c.th, c.title, strings.Join(body, "\n"), c.w, c.h)
+}
+
+// overlayDropdown draws the From choices in a bordered box over the rows
+// under the From row, starting on the row right under it at
+// the value column. It scrolls so the highlighted choice stays visible; rows
+// is how many body rows there are above the footer.
+func (c *Compose) overlayDropdown(lines []string, w, rows int) []string {
+	const top = 1 // the From row
+	frameH := 2   // border rows
+	n := max(min(len(c.from), rows-top-frameH, len(lines)-top-frameH), 1)
+	if c.fromHi < c.fromTop {
+		c.fromTop = c.fromHi
+	}
+	if c.fromHi >= c.fromTop+n {
+		c.fromTop = c.fromHi - n + 1
+	}
+	avail := max(w-composeLabelW, 5)
+	longest := 0
+	for _, ch := range c.from {
+		longest = max(longest, ansi.StringWidth(ch))
+	}
+	boxW := min(longest+4, avail)
+	innerW := boxW - 4
+	items := make([]string, n)
+	for i := range items {
+		idx := c.fromTop + i
+		text := ansi.Truncate(c.from[idx], innerW, "…")
+		text += strings.Repeat(" ", max(innerW-ansi.StringWidth(text), 0))
+		if idx == c.fromHi {
+			text = c.th.Cursor.Render(text)
+		}
+		items[i] = text
+	}
+	box := strings.Split(Frame(c.th, strings.Join(items, "\n"), boxW, n+frameH), "\n")
+	for i, l := range box {
+		if top+i < len(lines) {
+			lines[top+i] = splice(lines[top+i], l, composeLabelW)
+		}
+	}
+	return lines
+}
+
+// splice draws over on line starting at column col, keeping what line has to
+// the left and right of it.
+func splice(line, over string, col int) string {
+	left := ansi.Truncate(line, col, "")
+	left += strings.Repeat(" ", max(col-ansi.StringWidth(left), 0))
+	return left + over + ansi.TruncateLeft(line, col+ansi.StringWidth(over), "")
 }
 
 // footerLines are the last rows: the close prompt, an error or the busy
@@ -312,7 +485,7 @@ func (c Compose) footerLines(w int) []string {
 		return []string{ansi.Truncate(c.th.Cursor.Padding(0, 1).Render(c.promptQuestion()+"  "+HintLine(c.Hints())), w, "…")}
 	case c.err != "":
 		_, innerH := FrameInner(c.w, c.h)
-		n := min(composeErrLines, max(1, innerH-composeRows))
+		n := min(composeErrLines, max(1, innerH-composeRows-c.extraRows()))
 		lines := strings.Split(ansi.Wrap(oneLine(c.err), w, ""), "\n")
 		if len(lines) > n {
 			lines = lines[:n]
@@ -348,7 +521,14 @@ func (c Compose) Hints() []key.Binding {
 	case c.prompting:
 		return []key.Binding{h("d", "discard"), h("e", "keep editing")}
 	}
-	return []key.Binding{h("ctrl+s", "send"), h("tab", "next field"), h("shift+tab", "previous field"), h("esc", "close")}
+	if c.fromOpen {
+		return []key.Binding{h("↑/↓", "move"), h("enter", "pick"), h("esc", "close")}
+	}
+	keys := []key.Binding{h("ctrl+s", "send"), h("tab", "next field"), h("shift+tab", "previous field"), h("esc", "close")}
+	if c.focus == ComposeFrom {
+		keys = append([]key.Binding{h("enter", "choose"), h("←/→", "switch")}, keys...)
+	}
+	return keys
 }
 
 func oneLine(s string) string {

@@ -29,8 +29,8 @@ account login.
 - **From is chosen, not typed.** The composer's From row is a selector
   (`←`/`→` or `space` cycles, like the connect popup's TLS row). It is not a
   text input, so From can only be an address the account can send as.
-  `compose.Fields` gains `From mail.Address`; `FieldsOf` and `draft` carry
-  it through.
+  `compose.Fields` does not carry From: the UI sets `draft.From` from the
+  selected choice after parsing the fields (`startSend`, `startSave`).
 - **Reopened drafts keep their From.** If a saved draft's From isn't among
   the account's addresses (the alias was removed from config), it is
   added to that composer's choices so nothing is silently changed.
@@ -53,8 +53,8 @@ account login.
 
 ### Phase 2: Core
 
-- [ ] Task 3: From row in the composer, wired to the account's addresses
-- [ ] Task 4: Aliases field in the connect-account popup
+- [x] Task 3: From row in the composer, wired to the account's addresses
+- [x] Task 4: Aliases field in the connect-account popup
 
 ### Checkpoint: Core
 

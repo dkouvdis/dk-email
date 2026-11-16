@@ -292,7 +292,7 @@ func TestConnect_AAddsASecondAccount(t *testing.T) {
 		t.Fatal("A didn't open the popup")
 	}
 	m = typeKeys(t, m, "Personal")
-	for range 11 { // to the Test & save button
+	for range 12 { // to the Test & save button
 		m = send(t, m, press("tab"))
 	}
 	m = pressSettled(t, m, "enter")
@@ -378,5 +378,51 @@ func TestConnect_PasteReachesTheForm(t *testing.T) {
 
 	if !strings.Contains(plain(m), "Pasted Name") {
 		t.Errorf("paste didn't reach the connect form:\n%s", plain(m))
+	}
+}
+
+// connectWithAliases fills a Gmail form (SMTP pre-filled) and types aliases.
+func connectWithAliases(t *testing.T, aliases string) (Model, *fakeOnboarding) {
+	t.Helper()
+	o := newOnboarding()
+	m := firstRun(t, o, nil)
+	m = fillGmailKeychain(t, m, "Gmail", "pw")
+	for range 3 { // SMTP host, SMTP port, SMTP TLS
+		m = send(t, m, press("tab"))
+	}
+	m = send(t, m, press("tab")) // Aliases
+	m = typeKeys(t, m, aliases)
+	m = send(t, m, press("tab")) // Test & save
+	next, cmd := m.Update(press("enter"))
+	m = next.(Model)
+	m = settle(t, m, cmd)
+	return m, o
+}
+
+func TestConnect_AliasesAreSavedAndKept(t *testing.T) {
+	m, o := connectWithAliases(t, "hi@my.com, sales@my.com")
+	if m.showConnect || len(o.added) != 1 {
+		t.Fatalf("not saved: popup %v, added %+v", m.showConnect, o.added)
+	}
+	want := []config.Alias{{Email: "hi@my.com"}, {Email: "sales@my.com"}}
+	if got := o.added[0].Aliases; len(got) != 2 || got[0] != want[0] || got[1] != want[1] {
+		t.Errorf("saved aliases = %+v", got)
+	}
+	if got := m.accts[0].Aliases; len(got) != 2 || got[0] != want[0] || got[1] != want[1] {
+		t.Errorf("model account aliases = %+v, want them without a restart", got)
+	}
+}
+
+func TestConnect_NoAliasesSavesNone(t *testing.T) {
+	m, o := connectWithAliases(t, "")
+	if len(o.added) != 1 || len(o.added[0].Aliases) != 0 || len(m.accts[0].Aliases) != 0 {
+		t.Errorf("added %+v, model %+v", o.added, m.accts)
+	}
+}
+
+func TestConnect_BadAliasSavesNothing(t *testing.T) {
+	m, o := connectWithAliases(t, "nope")
+	if !m.showConnect || len(o.added) != 0 || len(o.dialed) != 0 {
+		t.Errorf("popup %v, added %+v, dialed %v", m.showConnect, o.added, o.dialed)
 	}
 }

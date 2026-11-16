@@ -1,29 +1,29 @@
 ╭──────────────────────────────╮╭──────────────────────────────────────────────────────────────────────────────────────╮
-│ Personal                     ││ Inbo╭──────────────────────────────────────────╮                                     │
-│ ▶ Inbox                    2 ││  ●  │ Keys                                     │                               13:30 │
-│   Sent Mail                  ││  ●  │ / press / to filter by key or descripti… │                               Nov 8 │
-│   All Mail                   ││     │                                          │                                     │
-│   Trash                      ││     │                                          │                                     │
-│   Receipts                 1 ││     │ Composer                                 │                                     │
-│                              ││     │   ctrl+s      send                       │                                     │
-│ Work                         ││     │   tab         next field                 │                                     │
-│   Inbox                    1 ││     │   shift+tab   previous field             │                                     │
-│   Archive                    ││     │   enter       next field (in a header)   │                                     │
-│                              ││     │   esc         close, or save / discard   │                                     │
-│                              ││     │   ctrl+c      quit now                   │                                     │
-│                              ││     │                                          │                                     │
-│                              ││     │ Accounts & view                          │                                     │
-│                              ││     │   a           accounts                   │                                     │
-│                              ││     │   /           filter folders             │                                     │
-│                              ││     │   A           connect account          ┃ │                                     │
-│                              ││     │   v           split/list               ┃ │                                     │
-│                              ││     │                                        ┃ │                                     │
-│                              ││     │ General                                ┃ │                                     │
-│                              ││     │   ?           help                     ┃ │                                     │
-│                              ││     │   esc         back                     ┃ │                                     │
-│                              ││     │   q           quit                     ┃ │                                     │
-│                              ││     │   ctrl+c      quit now                 ┃ │                                     │
-│                              ││     ╰──────────────────────────────────────────╯                                     │
+│ Personal                     ││ Inb╭────────────────────────────────────────────╮                                    │
+│ ▶ Inbox                    2 ││  ● │ Keys                                       │                              13:30 │
+│   Sent Mail                  ││  ● │ / press / to filter by key or description  │                              Nov 8 │
+│   All Mail                   ││    │                                            │                                    │
+│   Trash                      ││    │ Composer                                   │                                    │
+│   Receipts                 1 ││    │   ctrl+s        send                       │                                    │
+│                              ││    │   tab           next field                 │                                    │
+│ Work                         ││    │   shift+tab     previous field             │                                    │
+│   Inbox                    1 ││    │   enter / ←/→   choose From                │                                    │
+│   Archive                    ││    │   enter         next field (in a header)   │                                    │
+│                              ││    │   esc           close, or save / discard   │                                    │
+│                              ││    │   ctrl+c        quit now                   │                                    │
+│                              ││    │                                            │                                    │
+│                              ││    │ Accounts & view                            │                                    │
+│                              ││    │   a             accounts                   │                                    │
+│                              ││    │   /             filter folders             │                                    │
+│                              ││    │   A             connect account          ┃ │                                    │
+│                              ││    │   v             split/list               ┃ │                                    │
+│                              ││    │                                          ┃ │                                    │
+│                              ││    │ General                                  ┃ │                                    │
+│                              ││    │   ?             help                     ┃ │                                    │
+│                              ││    │   esc           back                     ┃ │                                    │
+│                              ││    │   q             quit                     ┃ │                                    │
+│                              ││    │   ctrl+c        quit now                 ┃ │                                    │
+│                              ││    ╰────────────────────────────────────────────╯                                    │
 │                              ││                                                                                      │
 ╰──────────────────────────────╯╰──────────────────────────────────────────────────────────────────────────────────────╯
                                                                                                                   narrow

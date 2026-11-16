@@ -41,6 +41,10 @@ type draftState struct {
 	// fields against it so what they don't carry (From, threading, the
 	// original of a forward) survives.
 	base mail.Draft
+	// from are the addresses the composer's From row cycles through.
+	from []mail.Address
+	// titlePrefix is the title up to the From address.
+	titlePrefix string
 	// loading is set while the message being replied to is fetched, before
 	// the composer opens. It holds the slot so no other draft starts.
 	loading bool
@@ -144,22 +148,48 @@ func (m Model) startDraft(account int, base mail.Draft, kind composeKind) (Model
 	if fields.Subject != "" {
 		title += " · " + fields.Subject
 	}
-	from := base.From.Email
-	if from == "" {
-		from = m.identities(account)[0].Email
+	choices := m.identities(account)
+	if e := base.From.Email; e != "" && indexOfAddr(choices, e) < 0 {
+		choices = append(choices, base.From)
 	}
-	title += " · " + from
+	selected := max(indexOfAddr(choices, base.From.Email), 0)
+	prefix := title
+	title += " · " + choices[selected].Email
 	focus := popup.ComposeTo
 	if kind == composeReply || kind == composeReplyAll || (kind == composeDraft && len(recipients(base)) > 0) {
 		focus = popup.ComposeBody
 	}
 	pop := popup.NewCompose(m.theme, title, popup.ComposeValues(fields), focus)
+	labels := make([]string, len(choices))
+	for i, a := range choices {
+		labels[i] = a.String()
+	}
+	pop.SetFrom(labels, selected)
 	pop.SetSize(m.panes.Popup.W, m.panes.Popup.H)
 	_, canSave := m.drafter(account)
 	pop.EnableSave(canSave)
-	m.draft = &draftState{account: account, base: base, pop: pop}
+	m.draft = &draftState{account: account, base: base, from: choices, titlePrefix: prefix, pop: pop}
 	m.log.Debug("popup opened", "popup", "compose", "action", kind.String())
 	return m, nil
+}
+
+// indexOfAddr is the index of the address with email in list, compared
+// case-insensitively, or -1.
+func indexOfAddr(list []mail.Address, email string) int {
+	for i, a := range list {
+		if email != "" && strings.EqualFold(a.Email, email) {
+			return i
+		}
+	}
+	return -1
+}
+
+// selectedFrom is the address picked in the composer's From row.
+func (d *draftState) selectedFrom() mail.Address {
+	if i := d.pop.FromIndex(); i >= 0 && i < len(d.from) {
+		return d.from[i]
+	}
+	return d.base.From
 }
 
 // closeDraft closes the composer, returning to the view beneath it.
@@ -174,6 +204,7 @@ func (m Model) updateComposer(msg tea.Msg) (Model, tea.Cmd) {
 	var res popup.ComposeResult
 	var cmd tea.Cmd
 	d.pop, res, cmd = d.pop.Update(msg)
+	d.pop.SetTitle(d.titlePrefix + " · " + d.selectedFrom().Email)
 	switch res {
 	case popup.ComposeSend:
 		return m.startSend()
@@ -208,6 +239,7 @@ func (m Model) startSend() (Model, tea.Cmd) {
 		d.pop.SetError(err.Error())
 		return m, nil
 	}
+	draft.From = d.selectedFrom()
 	d.pop.SetBusy(statusSending)
 	m.sending = true
 	m.status, m.statusErr = statusSending, false
@@ -231,6 +263,7 @@ func (m Model) startSave() (Model, tea.Cmd) {
 		d.pop.SetError(err.Error())
 		return m, nil
 	}
+	draft.From = d.selectedFrom()
 	d.pop.SetBusy(statusSaving)
 	d.pop.SetCancellable(true)
 	ctx, cancel := context.WithTimeout(context.Background(), saveTimeout)

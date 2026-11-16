@@ -29,6 +29,7 @@ const (
 	fSMTPHost
 	fSMTPPort
 	fSMTPTLS
+	fAliases
 	fSubmit
 	fieldCount
 )
@@ -117,6 +118,7 @@ func newForm(th theme.Theme) Connect {
 
 		fSMTPHost: "optional, enables sending",
 		fSMTPPort: "465",
+		fAliases:  "optional: me@mydomain.com, hi@mydomain.com",
 	}
 	for i := range fieldCount {
 		if !isInput(i) {
@@ -350,6 +352,15 @@ func (c Connect) validate() string {
 	case c.value(fSMTPHost) == "" && c.value(fSMTPPort) != "":
 		return "SMTP port is set but SMTP host is empty"
 	}
+	if aliases := c.aliases(); len(aliases) > 0 {
+		if c.value(fSMTPHost) == "" {
+			return "Aliases need an SMTP host"
+		}
+		a := config.Account{Email: c.value(fEmail), Aliases: aliases}
+		if errs := a.AliasErrors(); len(errs) > 0 {
+			return errs[0].Error()
+		}
+	}
 	switch {
 	case c.source == sourceOnePassword && c.value(fSecret) == "":
 		return "1Password reference is required, e.g. op://Vault/Item/password"
@@ -357,6 +368,17 @@ func (c Connect) validate() string {
 		return "Password is required"
 	}
 	return ""
+}
+
+// aliases parses the Aliases field: comma-separated, trimmed, empties dropped.
+func (c Connect) aliases() []config.Alias {
+	var out []config.Alias
+	for _, e := range strings.Split(c.inputs[fAliases].Value(), ",") {
+		if e = strings.TrimSpace(e); e != "" {
+			out = append(out, config.Alias{Email: e})
+		}
+	}
+	return out
 }
 
 // validPort accepts an empty port, which means the default.
@@ -398,6 +420,7 @@ func (c Connect) Request() ConnectRequest {
 	if a.SMTPHost = c.value(fSMTPHost); a.SMTPHost != "" {
 		a.SMTPPort, _ = strconv.Atoi(c.value(fSMTPPort))
 		a.SMTPTLS = c.smtpTLS
+		a.Aliases = c.aliases()
 	}
 	if c.source == sourceOnePassword {
 		a.PasswordCmd = "op read " + shellQuote(c.value(fSecret))
@@ -450,6 +473,7 @@ func (c Connect) View() string {
 			c.inputRow(fSMTPHost, innerW),
 			c.inputRow(fSMTPPort, innerW),
 			c.choiceRow(fSMTPTLS, "SMTP TLS", []string{"implicit", "starttls"}, map[bool]int{true: 0, false: 1}[c.smtpTLS == config.TLSImplicit]),
+			c.inputRow(fAliases, innerW),
 		)
 	}
 	lines = append(lines, "")
@@ -500,7 +524,7 @@ func (c Connect) label(f int, text string) string {
 }
 
 func (c Connect) inputRow(f, innerW int) string {
-	names := map[int]string{fName: "Name", fEmail: "Email", fUser: "Username", fHost: "IMAP host", fPort: "Port", fSecret: "Reference", fSMTPHost: "SMTP host", fSMTPPort: "SMTP port"}
+	names := map[int]string{fName: "Name", fEmail: "Email", fUser: "Username", fHost: "IMAP host", fPort: "Port", fSecret: "Reference", fSMTPHost: "SMTP host", fSMTPPort: "SMTP port", fAliases: "Aliases"}
 	if f == fSecret && c.source == sourceKeychain {
 		names[fSecret] = "Password"
 	}

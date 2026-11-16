@@ -72,6 +72,7 @@ func (k KeyMap) HelpSections() []popup.Section {
 			help("ctrl+s", "send"),
 			help("tab", "next field"),
 			help("shift+tab", "previous field"),
+			help("enter / ←/→", "choose From"),
 			help("enter", "next field (in a header)"),
 			help("esc", "close, or save / discard"),
 			help("ctrl+c", "quit now"),

@@ -60,15 +60,15 @@ more than one address, and it cycles through them. The chosen address
 becomes `Draft.From` for both send and save.
 
 **Acceptance criteria:**
-- [ ] With aliases there is a From row, and it is focusable with `tab`; `←`/`→` (and `space`)
+- [x] With aliases there is a From row, and it is focusable with `tab`; `←`/`→` (and `space`)
       cycle through the addresses; it shows `Name <email>`. With no aliases there is no row
       (the layout is unchanged).
-- [ ] `compose.Fields` carries From; send and save use it; the hint bar lists
+- [x] The UI sets From after parsing (not via `compose.Fields`); send and save use it; the hint bar lists
       the cycle keys while the row is focused.
-- [ ] Reopening a draft keeps its From, even when it isn't in the current list.
+- [x] Reopening a draft keeps its From, even when it isn't in the current list.
 
 **Verification:**
-- [ ] `go test -race ./internal/ui/... ./internal/compose`
+- [x] `go test -race ./internal/ui/... ./internal/compose`
 - [ ] Manual: open the composer on an account with and without aliases at a
       small terminal size
 
@@ -86,13 +86,13 @@ comma-separated emails. It is saved as `aliases` with no names, and only
 when an SMTP host is set.
 
 **Acceptance criteria:**
-- [ ] Invalid or duplicate addresses show an error in the popup and nothing is saved.
-- [ ] Saved accounts get `aliases = [{ email = "..." }, …]`, and the composer
+- [x] Invalid or duplicate addresses show an error in the popup and nothing is saved.
+- [x] Saved accounts get `aliases = [{ email = "..." }, …]`, and the composer
       offers them straight away, with no restart.
-- [ ] Empty field or empty SMTP host: no `aliases` key written.
+- [x] Empty field or empty SMTP host: no `aliases` key written.
 
 **Verification:**
-- [ ] `go test -race ./internal/ui/... ./internal/config`
+- [x] `go test -race ./internal/ui/... ./internal/config`
 
 **Dependencies:** Task 1 (independent of Tasks 2 and 3, so it can run in parallel)
 

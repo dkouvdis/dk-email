@@ -297,6 +297,10 @@ func (a Account) validateSMTP() []error {
 	return errs
 }
 
+// AliasErrors reports the problems with the account's aliases, using the
+// same rules as loading the config.
+func (a Account) AliasErrors() []error { return a.validateAliases() }
+
 // validateAliases checks each alias is a bare address and that none repeats
 // another alias or the account email, ignoring case.
 func (a Account) validateAliases() []error {
