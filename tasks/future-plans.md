@@ -1,11 +1,16 @@
 # Future Plans
 
-Ideas deliberately deferred from the current scope. Each entry notes why it was
-deferred and what the current design must keep possible.
+Ideas deliberately deferred from the current scope.
+
+
+## UX improvements
+
+- when composing, go offline, ask to save to draft, it says "Saving", stuck cant do anything else
+- Search
+- Scrollbar when reading
 
 ## Incoming
 
-- Do not show mail count in Bin/Trash
 
 ## Outgoing
 
