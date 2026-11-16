@@ -23,6 +23,7 @@ const (
 	ComposeClose   // esc with nothing changed
 	ComposeDiscard // d in the close prompt
 	ComposeSave    // s or esc in the close prompt, when saving is enabled
+	ComposeCancel  // esc while busy with work that can be cancelled
 )
 
 // ComposeField is a field of the composer, in focus order.
@@ -43,6 +44,8 @@ type ComposeValues struct{ To, Cc, Bcc, Subject, Body string }
 const (
 	composeLabelW = 9 // "Subject" and the gap after it
 	composeRows   = 6 // the 4 header rows, the rule and the footer around the body
+	// composeErrLines is the most rows an error may take.
+	composeErrLines = 3
 )
 
 var composeLabels = [ComposeBody]string{"To", "Cc", "Bcc", "Subject"}
@@ -59,7 +62,9 @@ type Compose struct {
 	err, busy string
 	prompting bool
 	canSave   bool
-	th        theme.Theme
+	// cancellable is set while the busy work can be cancelled with esc.
+	cancellable bool
+	th          theme.Theme
 }
 
 // NewCompose is a composer with v filled in. focus is the field to start in.
@@ -106,16 +111,25 @@ func NewCompose(th theme.Theme, title string, v ComposeValues, focus ComposeFiel
 // SetSize sets the size of the whole popup, border included.
 func (c *Compose) SetSize(w, h int) {
 	c.w, c.h = w, h
-	innerW, innerH := FrameInner(w, h)
+	c.layout()
+}
+
+// layout sizes the inputs to the popup. The body gives up a row for every
+// extra row the footer takes, so its cursor stays in view.
+func (c *Compose) layout() {
+	innerW, innerH := FrameInner(c.w, c.h)
 	for i := range c.headers {
 		c.headers[i].SetWidth(max(innerW-composeLabelW-1, 1))
 	}
 	c.body.SetWidth(max(innerW, 1))
-	c.body.SetHeight(max(innerH-composeRows, 1))
+	c.body.SetHeight(max(innerH-composeRows-(len(c.footerLines(innerW))-1), 1))
 }
 
 // SetError shows msg in the footer. An empty msg clears it.
-func (c *Compose) SetError(msg string) { c.err = msg }
+func (c *Compose) SetError(msg string) {
+	c.err = msg
+	c.layout()
+}
 
 // SetBusy shows label in the footer and ignores keys until it's set to "".
 func (c *Compose) SetBusy(label string) {
@@ -123,8 +137,14 @@ func (c *Compose) SetBusy(label string) {
 	if label != "" {
 		c.err = ""
 		c.prompting = false
+	} else {
+		c.cancellable = false
 	}
+	c.layout()
 }
+
+// SetCancellable sets whether esc cancels the busy work. SetBusy("") clears it.
+func (c *Compose) SetCancellable(on bool) { c.cancellable = on }
 
 // EnableSave sets whether the close prompt offers saving a draft.
 func (c *Compose) EnableSave(on bool) { c.canSave = on }
@@ -182,6 +202,9 @@ func (c Compose) Update(msg tea.Msg) (Compose, ComposeResult, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
 		if c.busy != "" {
+			if c.cancellable && msg.String() == "esc" {
+				return c, ComposeCancel, nil
+			}
 			return c, ComposeNone, nil
 		}
 		if c.prompting {
@@ -270,28 +293,39 @@ func (c Compose) View() string {
 	lines = append(lines, rule)
 	lines = append(lines, strings.Split(c.body.View(), "\n")...)
 
-	body := lines[:min(len(lines), innerH-1)]
-	for len(body) < innerH-1 {
+	footer := c.footerLines(innerW)
+	body := lines[:min(len(lines), innerH-len(footer))]
+	for len(body) < innerH-len(footer) {
 		body = append(body, "")
 	}
-	body = append(body, c.footer(innerW))
+	body = append(body, footer...)
 	return FrameTitled(c.th, c.title, strings.Join(body, "\n"), c.w, c.h)
 }
 
-// footer is the last row: the close prompt, an error or the busy label. The
-// keys themselves are in the hint bar (see Hints); with nothing to say the
-// row stays blank so the body doesn't move.
-func (c Compose) footer(w int) string {
-	var s string
+// footerLines are the last rows: the close prompt, an error or the busy
+// label. The keys themselves are in the hint bar (see Hints); with nothing to
+// say the row stays blank so the body doesn't move. An error wraps onto up to
+// composeErrLines rows, fewer when the popup is short.
+func (c Compose) footerLines(w int) []string {
 	switch {
 	case c.prompting:
-		s = c.th.Cursor.Padding(0, 1).Render(c.promptQuestion() + "  " + HintLine(c.Hints()))
+		return []string{ansi.Truncate(c.th.Cursor.Padding(0, 1).Render(c.promptQuestion()+"  "+HintLine(c.Hints())), w, "…")}
 	case c.err != "":
-		s = c.th.Error.Render(oneLine(c.err))
+		_, innerH := FrameInner(c.w, c.h)
+		n := min(composeErrLines, max(1, innerH-composeRows))
+		lines := strings.Split(ansi.Wrap(oneLine(c.err), w, ""), "\n")
+		if len(lines) > n {
+			lines = lines[:n]
+			lines[n-1] = ansi.Truncate(lines[n-1]+" …", w, "…")
+		}
+		for i, l := range lines {
+			lines[i] = c.th.Error.Render(l)
+		}
+		return lines
 	case c.busy != "":
-		s = c.th.Muted.Render(c.busy)
+		return []string{ansi.Truncate(c.th.Muted.Render(c.busy), w, "…")}
 	}
-	return ansi.Truncate(s, w, "…")
+	return []string{""}
 }
 
 func (c Compose) promptQuestion() string {
@@ -305,6 +339,8 @@ func (c Compose) promptQuestion() string {
 func (c Compose) Hints() []key.Binding {
 	h := func(k, desc string) key.Binding { return key.NewBinding(key.WithKeys(k), key.WithHelp(k, desc)) }
 	switch {
+	case c.busy != "" && c.cancellable:
+		return []key.Binding{h("esc", "cancel"), h("ctrl+c", "quit now")}
 	case c.busy != "":
 		return []key.Binding{h("ctrl+c", "quit now")}
 	case c.prompting && c.canSave:

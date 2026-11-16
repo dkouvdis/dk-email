@@ -4,13 +4,11 @@ Ideas deliberately deferred from the current scope, and known bugs. Each
 entry notes why it matters and, where it applies, what the current design
 must keep possible.
 
+## To be refined
+- using email alias
+
 ## Bugs
 
-- **Composer stuck on "Saving…" when offline**: compose, go offline, press
-  `esc` and choose save. The status stays on "Saving…" and nothing else can be
-  done. The draft is held in a popup that can't be left, so it can be lost.
-  Saving should fail with a status line and leave the composer open, like a
-  failed send.
 - **Authentication lost overnight**: with the app left open overnight, the
   account stops working and the app has to be restarted. The IMAP client is
   meant to reconnect on a dropped connection, so find out why that path fails

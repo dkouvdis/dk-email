@@ -1,10 +1,12 @@
 package ui
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -737,5 +739,65 @@ func TestCompose_SaveDuringARefreshQueuesAnotherOne(t *testing.T) {
 
 	if folderCalls(f.personal) != before+2 || m.refresh.pending != 0 || m.refresh.rerun {
 		t.Errorf("Folders calls %d→%d, pending %d, rerun %v; want the in-flight refresh then a rerun", before, folderCalls(f.personal), m.refresh.pending, m.refresh.rerun)
+	}
+}
+
+// deadlineRecorder records the deadline of the context each call got.
+type deadlineRecorder struct {
+	saveDeadline, sendDeadline       time.Time
+	saveHasDeadline, sendHasDeadline bool
+}
+
+func (r *deadlineRecorder) SaveDraft(ctx context.Context, _ mail.Draft) error {
+	r.saveDeadline, r.saveHasDeadline = ctx.Deadline()
+	return nil
+}
+
+func (r *deadlineRecorder) OpenDraft(context.Context, mail.MessageRef) (mail.Draft, error) {
+	return mail.Draft{}, nil
+}
+
+func (r *deadlineRecorder) Send(ctx context.Context, _ mail.Draft) error {
+	r.sendDeadline, r.sendHasDeadline = ctx.Deadline()
+	return nil
+}
+
+func TestCompose_SaveAndSendHaveADeadline(t *testing.T) {
+	rec := &deadlineRecorder{}
+	m, _ := composeFixtureWith(t, rec)
+	m, cmd := saveFromPrompt(t, m, "s")
+	if m.cancelSave == nil {
+		t.Error("startSave left no way to cancel the save")
+	}
+	cmd()
+	saveBound := time.Now().Add(saveTimeout)
+	sendDraft(rec, 0, mail.Draft{})()
+	sendBound := time.Now().Add(sendTimeout)
+	if !rec.saveHasDeadline || rec.saveDeadline.After(saveBound) {
+		t.Errorf("save deadline = %v (set %v), want one no later than %v", rec.saveDeadline, rec.saveHasDeadline, saveBound)
+	}
+	if !rec.sendHasDeadline || rec.sendDeadline.After(sendBound) {
+		t.Errorf("send deadline = %v (set %v), want one no later than %v", rec.sendDeadline, rec.sendHasDeadline, sendBound)
+	}
+}
+
+func TestCompose_EscCancelsASave(t *testing.T) {
+	m, s := composeFixture(t)
+	m, cmd := saveFromPrompt(t, m, "s")
+	if !m.saving || m.cancelSave == nil {
+		t.Fatalf("saving %v, cancelSave set %v", m.saving, m.cancelSave != nil)
+	}
+	m, none := keyCmd(t, m, "esc")
+	if none != nil || m.status != statusCancelling || !m.composing() {
+		t.Errorf("esc: cmd %v, status %q, composing %v", none != nil, m.status, m.composing())
+	}
+	m = send(t, m, cmd()) // the ctx is cancelled, so the fake answers context.Canceled
+
+	if len(s.Saved()) != 1 || !m.composing() || m.saving || m.cancelSave != nil || m.status != statusSaveCancelled || m.statusErr {
+		t.Fatalf("saved %d, composing %v, saving %v, status %q (err %v)", len(s.Saved()), m.composing(), m.saving, m.status, m.statusErr)
+	}
+	m = typed(t, m, "!") // editing resumes
+	if got := m.draft.pop.Values().Body; got != "Shall we?!" {
+		t.Errorf("body = %q, want typing to work after cancelling", got)
 	}
 }

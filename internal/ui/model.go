@@ -3,6 +3,7 @@
 package ui
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"slices"
@@ -100,6 +101,8 @@ type Model struct {
 	draft   *draftState
 	sending bool
 	saving  bool
+	// cancelSave ends the save in flight.
+	cancelSave context.CancelFunc
 }
 
 // New builds the root model. Init connects every account with connect. log

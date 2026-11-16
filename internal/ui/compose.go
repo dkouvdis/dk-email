@@ -17,11 +17,20 @@ import (
 )
 
 const (
-	statusFinishDraft = "Finish or discard the draft first"
-	statusSending     = "Sending…"
-	statusSaving      = "Saving…"
-	statusSaved       = "Draft saved"
-	statusDiscarded   = "Draft discarded"
+	// saveTimeout bounds saving a draft, which is IMAP only.
+	saveTimeout = 15 * time.Second
+	// sendTimeout bounds a whole send: SMTP plus the IMAP steps around it.
+	sendTimeout = 30 * time.Second
+)
+
+const (
+	statusFinishDraft   = "Finish or discard the draft first"
+	statusSending       = "Sending…"
+	statusSaving        = "Saving…"
+	statusSaved         = "Draft saved"
+	statusCancelling    = "Cancelling…"
+	statusSaveCancelled = "Save cancelled"
+	statusDiscarded     = "Draft discarded"
 )
 
 // draftState is the message being composed, from the first key press until
@@ -157,6 +166,11 @@ func (m Model) updateComposer(msg tea.Msg) (Model, tea.Cmd) {
 		return m.startSend()
 	case popup.ComposeSave:
 		return m.startSave()
+	case popup.ComposeCancel:
+		if m.saving && m.cancelSave != nil {
+			m.cancelSave()
+			m.setStatus(statusCancelling)
+		}
 	case popup.ComposeClose:
 		m.closeDraft()
 	case popup.ComposeDiscard:
@@ -205,23 +219,29 @@ func (m Model) startSave() (Model, tea.Cmd) {
 		return m, nil
 	}
 	d.pop.SetBusy(statusSaving)
+	d.pop.SetCancellable(true)
+	ctx, cancel := context.WithTimeout(context.Background(), saveTimeout)
+	m.cancelSave = cancel
 	m.saving = true
 	m.status, m.statusErr = statusSaving, false
 	m.log.Debug("draft save started", "account", m.accts[d.account].Name, "recipients", len(recipients(draft)), "replaces", draft.DraftOf != nil)
-	return m, saveDraft(drafter, d.account, draft)
+	return m, saveDraft(ctx, cancel, drafter, d.account, draft)
 }
 
-// saveDraft runs in a tea.Cmd. The transport enforces its own timeout.
-func saveDraft(dr mail.Drafter, account int, d mail.Draft) tea.Cmd {
+// saveDraft runs in a tea.Cmd. ctx ends after saveTimeout, so a dead
+// connection fails the save instead of hanging it, or when esc cancels it.
+func saveDraft(ctx context.Context, cancel context.CancelFunc, dr mail.Drafter, account int, d mail.Draft) tea.Cmd {
 	return func() tea.Msg {
 		start := time.Now()
-		err := dr.SaveDraft(context.Background(), d)
+		defer cancel()
+		err := dr.SaveDraft(ctx, d)
 		return draftSavedMsg{account: account, draft: d, err: err, took: time.Since(start)}
 	}
 }
 
 func (m Model) handleDraftSaved(msg draftSavedMsg) (tea.Model, tea.Cmd) {
 	m.saving = false
+	m.cancelSave = nil
 	if msg.account >= 0 && msg.account < len(m.accts) {
 		m.log.Debug("draft save finished", "account", m.accts[msg.account].Name, "ok", msg.err == nil, "recipients", len(recipients(msg.draft)), "took", msg.took.Round(time.Millisecond))
 	}
@@ -233,6 +253,10 @@ func (m Model) handleDraftSaved(msg draftSavedMsg) (tea.Model, tea.Cmd) {
 		// Saved, so there's nothing to retry.
 		m.closeDraft()
 		m.status, m.statusErr = capitalize(msg.err.Error()), true
+	case errors.Is(msg.err, context.Canceled) && m.composing():
+		m.draft.pop.SetBusy("")
+		m.status, m.statusErr = statusSaveCancelled, false
+		return m, nil
 	case !m.composing():
 		m.setError(msg.err)
 		return m, nil
@@ -245,11 +269,14 @@ func (m Model) handleDraftSaved(msg draftSavedMsg) (tea.Model, tea.Cmd) {
 	return m.refreshAfterDraft(msg.account)
 }
 
-// sendDraft runs in a tea.Cmd. The transport enforces its own timeout.
+// sendDraft runs in a tea.Cmd. It gives up after sendTimeout; past delivery
+// that is reported like any later failure.
 func sendDraft(s mail.Sender, account int, d mail.Draft) tea.Cmd {
 	return func() tea.Msg {
 		start := time.Now()
-		err := s.Send(context.Background(), d)
+		ctx, cancel := context.WithTimeout(context.Background(), sendTimeout)
+		defer cancel()
+		err := s.Send(ctx, d)
 		return sentMsg{account: account, draft: d, err: err, took: time.Since(start)}
 	}
 }

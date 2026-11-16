@@ -337,3 +337,55 @@ func BenchmarkComposeTypeLongBody(b *testing.B) {
 		_ = c.View()
 	}
 }
+
+func TestCompose_EscCancelsOnlyCancellableBusyWork(t *testing.T) {
+	c := newTestCompose(ComposeValues{}, ComposeTo)
+	c.SetBusy("Saving…")
+	if _, r := press(c, "esc"); r != ComposeNone {
+		t.Errorf("esc while busy = %v, want none", r)
+	}
+	hints := func(c Compose) string {
+		var b strings.Builder
+		for _, h := range c.Hints() {
+			b.WriteString(h.Help().Desc + ";")
+		}
+		return b.String()
+	}
+	if h := hints(c); strings.Contains(h, "cancel") {
+		t.Errorf("hints = %q, want no cancel", h)
+	}
+	c.SetCancellable(true)
+	if _, r := press(c, "esc"); r != ComposeCancel {
+		t.Errorf("esc while busy and cancellable = %v, want cancel", r)
+	}
+	if h := hints(c); !strings.Contains(h, "cancel") {
+		t.Errorf("hints = %q, want cancel", h)
+	}
+	c.SetBusy("")
+	if _, r := press(c, "esc"); r == ComposeCancel {
+		t.Error("SetBusy(\"\") should clear cancellable")
+	}
+}
+
+func TestCompose_LongErrorWrapsAtAFixedSize(t *testing.T) {
+	c := NewCompose(theme.Default(), "New", ComposeValues{}, ComposeTo)
+	c.SetSize(50, 14)
+	height := func() int { return len(strings.Split(c.View(), "\n")) }
+	before := height()
+
+	msg := "Send failed: sending: send via smtp.gmail.com:465: connect: dial tcp: lookup smtp.gmail.com: no such host"
+	c.SetError(msg)
+	v := ansi.Strip(c.View())
+	flat := strings.Join(strings.Fields(strings.NewReplacer("│", " ").Replace(v)), " ")
+	for _, w := range strings.Fields(msg) {
+		if !strings.Contains(flat, w) {
+			t.Errorf("word %q missing from the view:\n%s", w, v)
+		}
+	}
+	if strings.Contains(v, "…") {
+		t.Errorf("a %d-char error should fit in %d rows:\n%s", len(msg), composeErrLines, v)
+	}
+	if got := height(); got != before {
+		t.Errorf("view has %d lines with the error, %d without", got, before)
+	}
+}

@@ -230,6 +230,7 @@ save_sent    = false               # optional, save a copy to Sent; default: fal
 | `ctrl+c` | quit, even while composing |
 
 - If you press `esc` after changing something, the popup's last row asks (`Save draft?`) and the hint bar lists the answers: `s` saves to Drafts, `d` discards, `e` keeps editing, and `esc` saves and closes. A draft is only discarded on purpose. If the account can't save drafts, only `d` and `e` are offered.
+- While a draft is saving, `esc` cancels the save and leaves the composer open. If the server already stored the draft, a retry can leave a duplicate.
 - Sending happens in the background (`Sending…`). A bad address or a failed send shows in the composer's footer, with your text intact, and `ctrl+s` retries. `q` types a `q` while you compose, so it never quits by accident.
 - If the message was delivered but saving the Sent copy, marking the original answered or removing the draft failed, the composer closes and the status bar says so. dk-email never retries then, so nothing is sent twice.
 
