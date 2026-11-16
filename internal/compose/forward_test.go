@@ -26,7 +26,7 @@ func TestForward_Golden(t *testing.T) {
 		"Shall we try the new place?\n" +
 		"\n" +
 		"Let me know.\n"
-	base := Forward(msg, "INBOX", me)
+	base := Forward(msg, "INBOX", mine)
 	if base.Body != want {
 		t.Errorf("Forward body =\n%q\nwant\n%q", base.Body, want)
 	}
@@ -50,7 +50,7 @@ func TestForward_Fields(t *testing.T) {
 	msg.MessageID, msg.References, msg.InReplyTo = "m1@example.com", []string{"m0@example.com"}, "m0@example.com"
 	msg.ReplyTo = []mail.Address{ben}
 	msg.Cc = []mail.Address{carol}
-	d := Forward(msg, "Archive", me)
+	d := Forward(msg, "Archive", mine)
 	if d.From != me {
 		t.Errorf("From = %v", d.From)
 	}
@@ -84,7 +84,7 @@ func TestForward_Subject(t *testing.T) {
 		t.Run(tc.in, func(t *testing.T) {
 			msg := original()
 			msg.Subject = tc.in
-			if got := Forward(msg, "INBOX", me).Subject; got != tc.want {
+			if got := Forward(msg, "INBOX", mine).Subject; got != tc.want {
 				t.Errorf("Subject = %q, want %q", got, tc.want)
 			}
 		})
@@ -129,7 +129,7 @@ func TestForward_Body(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			msg := original()
 			tc.mut(&msg)
-			if got := Forward(msg, "INBOX", me).Body; got != tc.want {
+			if got := Forward(msg, "INBOX", mine).Body; got != tc.want {
 				t.Errorf("Body =\n%q\nwant\n%q", got, tc.want)
 			}
 		})
@@ -139,7 +139,7 @@ func TestForward_Body(t *testing.T) {
 func TestForward_BodyDoesNotListAttachments(t *testing.T) {
 	msg := original()
 	msg.Attachments = []mail.Attachment{{Name: "secret.pdf", ContentType: "application/pdf", Size: 10}}
-	if got := Forward(msg, "INBOX", me).Body; strings.Contains(got, "secret.pdf") {
+	if got := Forward(msg, "INBOX", mine).Body; strings.Contains(got, "secret.pdf") {
 		t.Errorf("Body mentions the attachment:\n%s", got)
 	}
 }

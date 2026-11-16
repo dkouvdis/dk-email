@@ -181,6 +181,7 @@ password_cmd = "op read op://Personal/Gmail/app-password"   # omit to use the ke
 # smtp_port      = 465                                      # optional: 465 for implicit, 587 for starttls
 # smtp_tls       = "implicit"                               # optional: "implicit" | "starttls"
 # from_name      = "Your Name"                              # optional: display name on outgoing mail
+# aliases        = [{ email = "me@example.com", name = "Me" }]   # optional: other From addresses (needs smtp_host)
 # save_sent      = true                                     # optional: default false on imap.gmail.com, true elsewhere
 ```
 

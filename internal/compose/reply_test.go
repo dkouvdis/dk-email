@@ -14,6 +14,11 @@ var (
 	ben   = mail.Address{Name: "Bob", Email: "bob@example.com"}
 	carol = mail.Address{Name: "Carol", Email: "carol@example.com"}
 	dave  = mail.Address{Email: "dave@example.com"}
+
+	alias = mail.Address{Name: "Me at Work", Email: "work@example.org"}
+	mine  = []mail.Address{me}
+	// mineWithAlias is the account address plus one alias.
+	mineWithAlias = []mail.Address{me, alias}
 )
 
 func original() mail.Message {
@@ -39,7 +44,7 @@ func TestReply_Golden(t *testing.T) {
 		"> Shall we try the new place?\n" +
 		">\n" +
 		"> Let me know.\n"
-	base := Reply(msg, "INBOX", me)
+	base := Reply(msg, "INBOX", mine)
 	if base.Body != want {
 		t.Errorf("Reply body =\n%q\nwant\n%q", base.Body, want)
 	}
@@ -57,7 +62,7 @@ func TestReply_Fields(t *testing.T) {
 	msg := original()
 	msg.MessageID = "m1@example.com"
 	msg.References = []string{"m0@example.com"}
-	d := Reply(msg, "Archive", me)
+	d := Reply(msg, "Archive", mine)
 	if d.From != me {
 		t.Errorf("From = %v", d.From)
 	}
@@ -156,11 +161,11 @@ func TestReply_Recipients(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			msg := original()
 			msg.From, msg.To, msg.Cc, msg.ReplyTo = tc.from, tc.to, tc.cc, tc.replyTo
-			r := Reply(msg, "INBOX", me)
+			r := Reply(msg, "INBOX", mine)
 			if !reflect.DeepEqual(r.To, tc.wantTo) || len(r.Cc) != 0 {
 				t.Errorf("Reply To = %v Cc = %v, want To %v and no Cc", r.To, r.Cc, tc.wantTo)
 			}
-			a := ReplyAll(msg, "INBOX", me)
+			a := ReplyAll(msg, "INBOX", mine)
 			if !reflect.DeepEqual(a.To, tc.wantAllTo) || !reflect.DeepEqual(a.Cc, tc.wantAllCc) {
 				t.Errorf("ReplyAll To = %v Cc = %v, want To %v Cc %v", a.To, a.Cc, tc.wantAllTo, tc.wantAllCc)
 			}
@@ -178,8 +183,8 @@ func TestReply_DoesNotAliasMessage(t *testing.T) {
 	msg.ReplyTo = []mail.Address{ann}
 	msg.References = []string{"a@x"}
 	msg.MessageID = "b@x"
-	_ = ReplyAll(msg, "INBOX", me)
-	d := Reply(msg, "INBOX", me)
+	_ = ReplyAll(msg, "INBOX", mine)
+	d := Reply(msg, "INBOX", mine)
 	d.To[0] = mail.Address{Email: "changed@example.com"}
 	d.References[0] = "changed"
 	if msg.ReplyTo[0] != ann || msg.References[0] != "a@x" || msg.To[0] != me || msg.To[1] != ben {
@@ -205,7 +210,7 @@ func TestReply_Subject(t *testing.T) {
 		t.Run(tc.in, func(t *testing.T) {
 			msg := original()
 			msg.Subject = tc.in
-			if got := Reply(msg, "INBOX", me).Subject; got != tc.want {
+			if got := Reply(msg, "INBOX", mine).Subject; got != tc.want {
 				t.Errorf("Subject = %q, want %q", got, tc.want)
 			}
 		})
@@ -231,7 +236,7 @@ func TestReply_Threading(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			msg := original()
 			msg.MessageID, msg.References = tc.id, tc.refs
-			d := Reply(msg, "INBOX", me)
+			d := Reply(msg, "INBOX", mine)
 			if d.InReplyTo != tc.wantInRepl {
 				t.Errorf("InReplyTo = %q, want %q", d.InReplyTo, tc.wantInRepl)
 			}
@@ -271,7 +276,7 @@ func TestReply_Body(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			msg := original()
 			tc.mut(&msg)
-			if got := Reply(msg, "INBOX", me).Body; got != tc.want {
+			if got := Reply(msg, "INBOX", mine).Body; got != tc.want {
 				t.Errorf("Body =\n%q\nwant\n%q", got, tc.want)
 			}
 		})
@@ -282,8 +287,72 @@ func TestReply_BodyIsOnlyTheMessageBody(t *testing.T) {
 	msg := original()
 	msg.Subject, msg.Body = "SUBJECT", "body"
 	msg.Attachments = []mail.Attachment{{Name: "secret.pdf"}}
-	got := Reply(msg, "INBOX", me).Body
+	got := Reply(msg, "INBOX", mine).Body
 	if want := "\n\nOn Tue, 10 Nov 2026 at 12:00, Alice <alice@example.com> wrote:\n> body\n"; got != want {
 		t.Errorf("Body = %q, want %q", got, want)
+	}
+}
+
+func TestReply_PicksFrom(t *testing.T) {
+	headerAlias := mail.Address{Name: "Header Name", Email: "WORK@example.org"}
+	tests := []struct {
+		name   string
+		from   mail.Address
+		to, cc []mail.Address
+		want   mail.Address
+		wantTo []mail.Address
+	}{
+		{name: "alias in to", from: ann, to: []mail.Address{headerAlias}, want: alias, wantTo: []mail.Address{ann}},
+		{name: "alias only in cc", from: ann, to: []mail.Address{ben}, cc: []mail.Address{headerAlias}, want: alias, wantTo: []mail.Address{ann}},
+		{name: "first of mine in to wins over cc", from: ann, to: []mail.Address{ben, me}, cc: []mail.Address{alias}, want: me, wantTo: []mail.Address{ann}},
+		{name: "not addressed to mine", from: ann, to: []mail.Address{ben}, cc: []mail.Address{carol}, want: me, wantTo: []mail.Address{ann}},
+		{name: "my own message from an alias", from: headerAlias, to: []mail.Address{ben, carol}, want: alias, wantTo: []mail.Address{ben, carol}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			msg := original()
+			msg.From, msg.To, msg.Cc = tc.from, tc.to, tc.cc
+			for name, d := range map[string]mail.Draft{
+				"Reply":    Reply(msg, "INBOX", mineWithAlias),
+				"ReplyAll": ReplyAll(msg, "INBOX", mineWithAlias),
+				"Forward":  Forward(msg, "INBOX", mineWithAlias),
+			} {
+				if d.From != tc.want {
+					t.Errorf("%s From = %v, want %v", name, d.From, tc.want)
+				}
+			}
+			if got := Reply(msg, "INBOX", mineWithAlias).To; !reflect.DeepEqual(got, tc.wantTo) {
+				t.Errorf("Reply To = %v, want %v", got, tc.wantTo)
+			}
+		})
+	}
+}
+
+func TestReply_NoMine(t *testing.T) {
+	d := Reply(original(), "INBOX", nil)
+	if d.From != (mail.Address{}) {
+		t.Errorf("From = %v, want zero", d.From)
+	}
+}
+
+func TestReplyAll_DropsEveryAddressOfMine(t *testing.T) {
+	msg := original()
+	msg.From = ann
+	msg.To = []mail.Address{{Email: "ME@example.com"}, ben, {Email: "Work@Example.org"}}
+	msg.Cc = []mail.Address{alias, carol, me}
+	a := ReplyAll(msg, "INBOX", mineWithAlias)
+	if want := []mail.Address{ann, ben}; !reflect.DeepEqual(a.To, want) {
+		t.Errorf("To = %v, want %v", a.To, want)
+	}
+	if want := []mail.Address{carol}; !reflect.DeepEqual(a.Cc, want) {
+		t.Errorf("Cc = %v, want %v", a.Cc, want)
+	}
+	// Sent from an alias: its recipients, with none of mine.
+	msg.From = alias
+	msg.To = []mail.Address{ben, me}
+	msg.Cc = nil
+	a = ReplyAll(msg, "INBOX", mineWithAlias)
+	if want := []mail.Address{ben}; !reflect.DeepEqual(a.To, want) || len(a.Cc) != 0 {
+		t.Errorf("To = %v Cc = %v, want To %v", a.To, a.Cc, want)
 	}
 }

@@ -101,10 +101,19 @@ func (m *Model) draftAccount(account int) (int, bool) {
 	return account, true
 }
 
-// identity is the From address of account's messages.
-func (m Model) identity(account int) mail.Address {
+// identities are the addresses account sends as: its email with from_name,
+// then its aliases, each named by its own name or else from_name.
+func (m Model) identities(account int) []mail.Address {
 	a := m.accts[account]
-	return mail.Address{Name: a.FromName, Email: a.Email}
+	out := []mail.Address{{Name: a.FromName, Email: a.Email}}
+	for _, al := range a.Aliases {
+		name := al.Name
+		if name == "" {
+			name = a.FromName
+		}
+		out = append(out, mail.Address{Name: name, Email: al.Email})
+	}
+	return out
 }
 
 // activeAccount is the account the sidebar cursor is in, the one the
@@ -123,7 +132,7 @@ func (m Model) startCompose() (Model, tea.Cmd) {
 	if !ok {
 		return m, nil
 	}
-	return m.startDraft(account, compose.New(m.identity(account)), composeNew)
+	return m.startDraft(account, compose.New(m.identities(account)[0]), composeNew)
 }
 
 // startDraft opens base in the composer. A reply starts in the body, above
@@ -135,7 +144,11 @@ func (m Model) startDraft(account int, base mail.Draft, kind composeKind) (Model
 	if fields.Subject != "" {
 		title += " · " + fields.Subject
 	}
-	title += " · " + m.identity(account).Email
+	from := base.From.Email
+	if from == "" {
+		from = m.identities(account)[0].Email
+	}
+	title += " · " + from
 	focus := popup.ComposeTo
 	if kind == composeReply || kind == composeReplyAll || (kind == composeDraft && len(recipients(base)) > 0) {
 		focus = popup.ComposeBody

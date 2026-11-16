@@ -8,6 +8,7 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/dkouvdis/dk-email/internal/config"
 	"github.com/dkouvdis/dk-email/internal/mail"
 	"github.com/dkouvdis/dk-email/internal/mail/mailtest"
 	"github.com/dkouvdis/dk-email/internal/ui/popup"
@@ -383,5 +384,45 @@ func TestReply_HintsAdvertiseReply(t *testing.T) {
 	m = pressSettled(t, m, "enter")
 	if h := hints(); !strings.Contains(h, "Reply: r | Forward: f | New message: c") {
 		t.Errorf("reader hints = %q", h)
+	}
+}
+
+// aliasFixture is an inbox with one message from Alice, addressed To the
+// account's alias and Cc the account address, on an account that has the alias.
+func aliasFixture(t *testing.T) Model {
+	t.Helper()
+	f := newFixture()
+	f.personalSender = &mailtest.Sender{}
+	m := msg("", "Invoice", fixedNow.Add(-time.Hour), true, "i1")
+	m.From = replyAlice
+	m.To = []mail.Address{{Email: "Sales@example.com"}, replyMe}
+	m.Body = "Body of i1."
+	f.personal.AddMessage("INBOX", m)
+	model := started(t, f, 160, 30)
+	model.accts[0].Email, model.accts[0].FromName = replyMe.Email, replyMe.Name
+	model.accts[0].Aliases = []config.Alias{{Email: "sales@example.com", Name: "Sales Team"}}
+	return model
+}
+
+func TestReply_FromTheAliasTheMessageWasSentTo(t *testing.T) {
+	m := replied(t, aliasFixture(t), "r")
+
+	if want := (mail.Address{Name: "Sales Team", Email: "sales@example.com"}); m.draft.base.From != want {
+		t.Errorf("From = %v, want %v", m.draft.base.From, want)
+	}
+	if view := plain(m); !strings.Contains(view, "Reply · Re: Invoice · sales@example.com") || strings.Contains(view, "me@example.com") {
+		t.Errorf("composer title should show the alias, not the account:\n%s", view)
+	}
+}
+
+func TestReply_ReplyAllListsNeitherTheAccountNorItsAlias(t *testing.T) {
+	m := replied(t, aliasFixture(t), "R")
+
+	d := m.draft.base
+	if got := addrs(d.To); got != "alice@example.com" || len(d.Cc) != 0 {
+		t.Errorf("To = %s, Cc = %s; want just Alice", got, addrs(d.Cc))
+	}
+	if v := m.draft.pop.Values(); v.To != "Alice <alice@example.com>" || v.Cc != "" {
+		t.Errorf("To %q, Cc %q", v.To, v.Cc)
 	}
 }

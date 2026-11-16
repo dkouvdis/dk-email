@@ -304,3 +304,40 @@ func TestQuote(t *testing.T) {
 		}
 	}
 }
+
+func TestAppendAccount_Aliases(t *testing.T) {
+	a := work()
+	a.SMTPHost = "smtp.example.com"
+	a.Aliases = []Alias{{Email: "a@x.com"}, {Email: "b@x.com", Name: `B "Q"`}}
+	path, _ := copyFixture(t, "empty.toml")
+
+	if err := AppendAccount(path, a); err != nil {
+		t.Fatalf("AppendAccount() error = %v", err)
+	}
+
+	data, _ := os.ReadFile(path)
+	want := `aliases = [{ email = "a@x.com" }, { email = "b@x.com", name = "B \"Q\"" }]` + "\n"
+	if !strings.Contains(string(data), want) {
+		t.Errorf("file missing %q:\n%s", want, data)
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("re-load error = %v", err)
+	}
+	if got := a.WithDefaults(); !reflect.DeepEqual(cfg.Accounts[0], got) {
+		t.Errorf("re-loaded %+v, want %+v", cfg.Accounts[0], got)
+	}
+}
+
+func TestAppendAccount_NoAliasesWritesNone(t *testing.T) {
+	path, _ := copyFixture(t, "empty.toml")
+
+	if err := AppendAccount(path, work()); err != nil {
+		t.Fatalf("AppendAccount() error = %v", err)
+	}
+
+	data, _ := os.ReadFile(path)
+	if strings.Contains(string(data), "aliases") {
+		t.Errorf("aliases written:\n%s", data)
+	}
+}

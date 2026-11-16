@@ -10,6 +10,7 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -70,7 +71,7 @@ func TestLoad_FullExample(t *testing.T) {
 		t.Fatalf("got %d accounts, want %d", len(cfg.Accounts), len(wantAccounts))
 	}
 	for i, want := range wantAccounts {
-		if cfg.Accounts[i] != want {
+		if !reflect.DeepEqual(cfg.Accounts[i], want) {
 			t.Errorf("Accounts[%d] = %+v, want %+v", i, cfg.Accounts[i], want)
 		}
 	}
@@ -456,6 +457,57 @@ func TestLoad_SMTPValidationErrors(t *testing.T) {
 				if !strings.Contains(err.Error(), want) {
 					t.Errorf("error = %q, want it to contain %q", err, want)
 				}
+			}
+		})
+	}
+}
+
+func TestLoad_Aliases(t *testing.T) {
+	cfg, err := Load(writeConfig(t, smtpBase+"smtp_host = \"s\"\naliases = [{ email = \"c@x.com\", name = \"C\" }, { email = \"b@x.com\" }]\n"))
+
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	want := []Alias{{Email: "c@x.com", Name: "C"}, {Email: "b@x.com"}}
+	if got := cfg.Accounts[0].Aliases; !reflect.DeepEqual(got, want) {
+		t.Errorf("Aliases = %+v, want %+v", got, want)
+	}
+}
+
+func TestLoad_NoAliasesIsNil(t *testing.T) {
+	cfg, err := Load(writeConfig(t, smtpBase))
+
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if got := cfg.Accounts[0].Aliases; got != nil {
+		t.Errorf("Aliases = %+v, want nil", got)
+	}
+}
+
+func TestLoad_AliasValidationErrors(t *testing.T) {
+	tests := []struct {
+		name string
+		keys string
+		want string
+	}{
+		{"without host", `aliases = [{ email = "a@x.com" }]`, "aliases is set but smtp_host is empty"},
+		{"not an address", "smtp_host = \"s\"\naliases = [{ email = \"nope\" }]", `aliases[0]: email "nope" is not a valid address`},
+		{"display name form", "smtp_host = \"s\"\naliases = [{ email = \"A <a@x.com>\" }]", `aliases[0]: email "A <a@x.com>" is not a valid address`},
+		{"empty", "smtp_host = \"s\"\naliases = [{ name = \"A\" }]", `aliases[0]: email "" is not a valid address`},
+		{"account email", "smtp_host = \"s\"\naliases = [{ email = \"A@X.com\" }]", `aliases[0]: "A@X.com" is already the account email`},
+		{"listed twice", "smtp_host = \"s\"\naliases = [{ email = \"b@x.com\" }, { email = \"B@x.com\" }]", `aliases[1]: "B@x.com" is listed twice`},
+		{"unknown key", "smtp_host = \"s\"\naliases = [{ email = \"b@x.com\", nmae = \"B\" }]", "nmae"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := Load(writeConfig(t, smtpBase+tt.keys+"\n"))
+
+			if err == nil {
+				t.Fatalf("Load() error = nil, want %q", tt.want)
+			}
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Errorf("error = %q, want it to contain %q", err, tt.want)
 			}
 		})
 	}

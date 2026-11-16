@@ -118,14 +118,14 @@ func (m Model) startFromTarget(kind composeKind) (Model, tea.Cmd) {
 // startMessageDraft opens the composer on kind's draft for msg. A forward's
 // attachments aren't listed; the sender copies them from the original.
 func (m Model) startMessageDraft(account int, folder string, msg mail.Message, kind composeKind) (Model, tea.Cmd) {
-	me := m.identity(account)
+	mine := m.identities(account)
 	switch kind {
 	case composeReplyAll:
-		return m.startDraft(account, compose.ReplyAll(msg, folder, me), kind)
+		return m.startDraft(account, compose.ReplyAll(msg, folder, mine), kind)
 	case composeForward:
-		return m.startDraft(account, compose.Forward(msg, folder, me), kind)
+		return m.startDraft(account, compose.Forward(msg, folder, mine), kind)
 	}
-	return m.startDraft(account, compose.Reply(msg, folder, me), kind)
+	return m.startDraft(account, compose.Reply(msg, folder, mine), kind)
 }
 
 func (m Model) handleReplyFetched(msg replyFetchedMsg) (Model, tea.Cmd) {

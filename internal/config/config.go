@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net/mail"
 	"os"
 	"path/filepath"
 	"strings"
@@ -36,6 +37,13 @@ type UI struct {
 	RefreshInterval Duration `toml:"refresh_interval"`
 }
 
+// Alias is another address the account can send as, such as one on the user's own domain.
+type Alias struct {
+	Email string `toml:"email"`
+	// Name is optional and falls back to from_name; empty both means address only.
+	Name string `toml:"name"`
+}
+
 // Account describes one IMAP account. There is deliberately no password field:
 // passwords come from PasswordCmd or the OS keychain.
 type Account struct {
@@ -61,6 +69,9 @@ type Account struct {
 	SMTPTLS  string `toml:"smtp_tls"`
 	// FromName is the display name on outgoing mail; empty means address only.
 	FromName string `toml:"from_name"`
+	// Aliases are other addresses the account sends as through the same SMTP
+	// login. They need smtp_host.
+	Aliases []Alias `toml:"aliases"`
 	// SaveSent overrides whether a copy of sent mail is appended to the Sent
 	// folder; nil means use the SaveSentCopy default.
 	SaveSent *bool `toml:"save_sent"`
@@ -265,6 +276,7 @@ func (a Account) validateSMTP() []error {
 			{"smtp_port", a.SMTPPort != 0},
 			{"smtp_tls", a.SMTPTLS != ""},
 			{"from_name", a.FromName != ""},
+			{"aliases", len(a.Aliases) > 0},
 			{"save_sent", a.SaveSent != nil},
 		} {
 			if k.set {
@@ -273,6 +285,7 @@ func (a Account) validateSMTP() []error {
 		}
 		return errs
 	}
+	errs = append(errs, a.validateAliases()...)
 	switch a.SMTPTLS {
 	case TLSImplicit, TLSStartTLS:
 	default:
@@ -280,6 +293,33 @@ func (a Account) validateSMTP() []error {
 	}
 	if a.SMTPPort < 1 || a.SMTPPort > 65535 {
 		errs = append(errs, fmt.Errorf("smtp_port must be between 1 and 65535, got %d", a.SMTPPort))
+	}
+	return errs
+}
+
+// validateAliases checks each alias is a bare address and that none repeats
+// another alias or the account email, ignoring case.
+func (a Account) validateAliases() []error {
+	var errs []error
+	seen := map[string]bool{}
+	if e := strings.ToLower(strings.TrimSpace(a.Email)); e != "" {
+		seen[e] = true
+	}
+	for i, al := range a.Aliases {
+		email := strings.TrimSpace(al.Email)
+		parsed, err := mail.ParseAddress(email)
+		if err != nil || parsed.Address != email {
+			errs = append(errs, fmt.Errorf("aliases[%d]: email %q is not a valid address", i, al.Email))
+			continue
+		}
+		key := strings.ToLower(email)
+		switch {
+		case key == strings.ToLower(strings.TrimSpace(a.Email)):
+			errs = append(errs, fmt.Errorf("aliases[%d]: %q is already the account email", i, al.Email))
+		case seen[key]:
+			errs = append(errs, fmt.Errorf("aliases[%d]: %q is listed twice", i, al.Email))
+		}
+		seen[key] = true
 	}
 	return errs
 }

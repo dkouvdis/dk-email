@@ -101,6 +101,17 @@ func accountBlock(a Account) string {
 	}
 	str("smtp_tls", a.SMTPTLS)
 	str("from_name", a.FromName)
+	if len(a.Aliases) > 0 {
+		items := make([]string, len(a.Aliases))
+		for i, al := range a.Aliases {
+			items[i] = "email = " + quote(al.Email)
+			if al.Name != "" {
+				items[i] += ", name = " + quote(al.Name)
+			}
+			items[i] = "{ " + items[i] + " }"
+		}
+		fmt.Fprintf(&b, "aliases = [%s]\n", strings.Join(items, ", "))
+	}
 	if a.SaveSent != nil {
 		fmt.Fprintf(&b, "save_sent = %t\n", *a.SaveSent)
 	}

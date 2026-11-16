@@ -7,8 +7,9 @@ import (
 	"github.com/dkouvdis/dk-email/internal/mail"
 )
 
-// Reply drafts a reply to msg, which lives in folder, from me (the account
-// identity; me.Email is what identifies my own messages).
+// Reply drafts a reply to msg, which lives in folder. mine are the addresses
+// the account sends as; mine[0] is the account address, the rest its aliases.
+// They identify my own messages and choose From (see pickFrom).
 //
 // To is msg's Reply-To if it has one, else its From. When msg is from me, To
 // is msg's own To instead, so a reply to a message I sent goes to its
@@ -29,10 +30,10 @@ import (
 //
 //	On Tue, 10 Nov 2026 at 12:00, Alice <alice@example.com> wrote:
 //	> Shall we try the new place?
-func Reply(msg mail.Message, folder string, me mail.Address) mail.Draft {
+func Reply(msg mail.Message, folder string, mine []mail.Address) mail.Draft {
 	return mail.Draft{
-		From:       me,
-		To:         replyRecipients(msg, me),
+		From:       pickFrom(msg, mine),
+		To:         replyRecipients(msg, mine),
 		Subject:    replySubject(msg.Subject),
 		Body:       "\n\n" + attribution(msg) + "\n" + quote(msg.Body),
 		InReplyTo:  msg.MessageID,
@@ -41,16 +42,19 @@ func Reply(msg mail.Message, folder string, me mail.Address) mail.Draft {
 	}
 }
 
-// ReplyAll is Reply plus msg's original To and Cc, minus me. Addresses are
+// ReplyAll is Reply plus msg's original To and Cc, minus all of mine. Addresses are
 // compared case-insensitively and listed once, in To before Cc. If that
 // leaves To empty, the first Cc moves up to To.
-func ReplyAll(msg mail.Message, folder string, me mail.Address) mail.Draft {
-	d := Reply(msg, folder, me)
+func ReplyAll(msg mail.Message, folder string, mine []mail.Address) mail.Draft {
+	d := Reply(msg, folder, mine)
 	to := d.To
-	if !fromMe(msg, me) {
+	if !fromMe(msg, mine) {
 		to = append(slices.Clone(to), msg.To...)
 	}
-	seen := map[string]bool{strings.ToLower(me.Email): true}
+	seen := map[string]bool{}
+	for _, a := range mine {
+		seen[strings.ToLower(a.Email)] = true
+	}
 	d.To = unseen(to, seen)
 	d.Cc = unseen(msg.Cc, seen)
 	if len(d.To) == 0 && len(d.Cc) > 0 {
@@ -62,13 +66,46 @@ func ReplyAll(msg mail.Message, folder string, me mail.Address) mail.Draft {
 	return d
 }
 
-func fromMe(msg mail.Message, me mail.Address) bool {
-	return strings.EqualFold(msg.From.Email, me.Email)
+// fromMe reports whether msg was sent from any of mine.
+func fromMe(msg mail.Message, mine []mail.Address) bool {
+	_, ok := find(msg.From, mine)
+	return ok
 }
 
-func replyRecipients(msg mail.Message, me mail.Address) []mail.Address {
+// find returns the entry of mine with a's email, ignoring case.
+func find(a mail.Address, mine []mail.Address) (mail.Address, bool) {
+	for _, m := range mine {
+		if strings.EqualFold(a.Email, m.Email) {
+			return m, true
+		}
+	}
+	return mail.Address{}, false
+}
+
+// pickFrom is the address to reply or forward from. For my own message it is
+// the address it was sent from; else the first of msg's To, then Cc, that is
+// one of mine; else mine[0]. It returns the entry from mine, so its
+// configured name is used. With no mine it returns the zero address.
+func pickFrom(msg mail.Message, mine []mail.Address) mail.Address {
+	if len(mine) == 0 {
+		return mail.Address{}
+	}
+	if m, ok := find(msg.From, mine); ok {
+		return m
+	}
+	for _, l := range [][]mail.Address{msg.To, msg.Cc} {
+		for _, a := range l {
+			if m, ok := find(a, mine); ok {
+				return m
+			}
+		}
+	}
+	return mine[0]
+}
+
+func replyRecipients(msg mail.Message, mine []mail.Address) []mail.Address {
 	switch {
-	case fromMe(msg, me):
+	case fromMe(msg, mine):
 		return slices.Clone(msg.To)
 	case len(msg.ReplyTo) > 0:
 		return slices.Clone(msg.ReplyTo)

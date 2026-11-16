@@ -62,7 +62,7 @@ func (m Model) handleDraftOpened(msg draftOpenedMsg) (Model, tea.Cmd) {
 	d := msg.draft
 	d.ReplyTo = nil
 	if d.From == (mail.Address{}) {
-		d.From = m.identity(msg.account)
+		d.From = m.identities(msg.account)[0]
 	}
 	return m.startDraft(msg.account, d, composeDraft)
 }

@@ -1,6 +1,7 @@
 package popup
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
@@ -145,7 +146,7 @@ func TestConnect_SubmitOnePasswordReference(t *testing.T) {
 		Name: "Work", Email: "me@example.com", Username: "login", IMAPHost: "mail.example.com", IMAPPort: 1143,
 		TLS: config.TLSStartTLS, PasswordCmd: `op read 'op://Work Vault/IMAP/password'`,
 	}
-	if req.Account != want || req.Password != "" {
+	if !reflect.DeepEqual(req.Account, want) || req.Password != "" {
 		t.Errorf("Request() = %+v, want %+v and no password", req, want)
 	}
 }
@@ -225,7 +226,7 @@ func TestConnect_PasswordOnlyMode(t *testing.T) {
 	if r != ConnectSubmitted {
 		t.Fatalf("result = %v, error %q", r, c.err)
 	}
-	if req := c.Request(); req.Account != acct || req.Password != "app-pass" || !c.PasswordOnly() {
+	if req := c.Request(); !reflect.DeepEqual(req.Account, acct) || req.Password != "app-pass" || !c.PasswordOnly() {
 		t.Errorf("Request() = %+v", req)
 	}
 	if _, r = keys(NewPasswordPrompt(theme.Default(), acct), "tab", "enter"); r != ConnectPending {
@@ -300,11 +301,11 @@ func TestConnect_PasteIntoFields(t *testing.T) {
 
 	c, _ = keys(c, "shift+tab") // the source choice: pasting does nothing
 	before := c.Request()
-	if c.Paste(tea.PasteMsg{Content: "x"}).Request() != before {
+	if !reflect.DeepEqual(c.Paste(tea.PasteMsg{Content: "x"}).Request(), before) {
 		t.Error("paste on a choice field changed the form")
 	}
 	c.SetBusy(true)
-	if c.Paste(tea.PasteMsg{Content: "x"}).Request() != before {
+	if !reflect.DeepEqual(c.Paste(tea.PasteMsg{Content: "x"}).Request(), before) {
 		t.Error("paste while testing changed the form")
 	}
 }
