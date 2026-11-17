@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -85,6 +86,50 @@ func connectAccount(connect Connector, index, id int, acct config.Account) tea.C
 	}
 }
 
+// retryFailed connects again every account whose connection failed, for
+// ctrl+r: a password manager prompt that was dismissed, or a server that
+// was down.
+func (m Model) retryFailed() (Model, tea.Cmd) {
+	if m.connect == nil {
+		return m, nil
+	}
+	var cmds []tea.Cmd
+	var names []string
+	cloned := false
+	for i := range m.accts {
+		if !m.side.Failed(i) {
+			continue
+		}
+		if !cloned {
+			m.boxes, m.senders = slices.Clone(m.boxes), slices.Clone(m.senders)
+			cloned = true
+		}
+		// A failed folder listing leaves a logged-in mailbox behind.
+		if old := m.boxes[i]; old != nil {
+			_ = old.Close()
+		}
+		m.boxes[i], m.senders[i] = nil, nil
+		if m.open.account == i {
+			m = m.clearOpen()
+		}
+		name := m.accts[i].Name
+		m.side = m.side.SetConnecting(i)
+		m.log.Debug("reconnecting", "account", name)
+		names = append(names, name)
+		// The failed attempt has already reported, so the id is reused.
+		cmds = append(cmds, connectAccount(m.connect, i, m.ids[i], m.accts[i]))
+	}
+	if len(cmds) == 0 {
+		return m, nil
+	}
+	if len(names) == 1 {
+		m.setStatus(fmt.Sprintf("Connecting %s…", names[0]))
+	} else {
+		m.setStatus(fmt.Sprintf("Connecting %d accounts…", len(names)))
+	}
+	return m, tea.Batch(append([]tea.Cmd{m.side.Tick()}, cmds...)...)
+}
+
 func loadSummaries(mb mail.Mailbox, account int, folder string, before mail.UID) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), summariesTimeout)
@@ -125,8 +170,11 @@ func (m Model) handleAccount(msg accountMsg) (Model, tea.Cmd) {
 	}
 	if msg.err != nil {
 		text := fmt.Sprintf("%s: %v", name, msg.err)
+		text = strings.TrimSuffix(text, ".")
 		if m.onboard.UpdateAccount != nil {
-			text = strings.TrimSuffix(text, ".") + ". Press E to edit it."
+			text += ". Press ctrl+r to retry or E to edit it."
+		} else {
+			text += ". Press ctrl+r to retry."
 		}
 		m.setError(errors.New(text))
 		return m, nil

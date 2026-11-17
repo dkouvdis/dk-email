@@ -20,5 +20,5 @@
 │                              ││                                                                                                          │
 │                              ││                                                                                                          │
 ╰──────────────────────────────╯╰──────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-Work: login to account "Work" (mail.example.com:993) failed: invalid credentials                                                      narrow
+Work: login to account "Work" (mail.example.com:993) failed: invalid credentials. Press ctrl+r to retry.                              narrow
 Up: k/↑ | Down: j/↓ | Open: enter | Expand: space | Read/unread: u | Star: s | Archive: e | Delete: d | Move: m | … | Help: ? | Quit: q     

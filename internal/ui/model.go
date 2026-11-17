@@ -369,7 +369,9 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, m.keys.Picker):
 		return m.openPicker()
 	case key.Matches(msg, m.keys.Refresh):
-		return m.startRefresh(true)
+		m, retry := m.retryFailed()
+		m, refresh := m.startRefresh(true)
+		return m, tea.Batch(retry, refresh)
 	case key.Matches(msg, m.keys.Connect):
 		return m.openConnect()
 	case key.Matches(msg, m.keys.EditAccount):

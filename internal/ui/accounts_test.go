@@ -424,3 +424,124 @@ func TestList_UnexpectedPageIsIgnored(t *testing.T) {
 		t.Errorf("a page nobody asked for changed the list to %d messages", m.list.Count())
 	}
 }
+
+func TestRetryFailed_ReconnectsFailedAccount(t *testing.T) {
+	f := newFixture()
+	f.errs["Work"] = errors.New("authorization prompt dismissed, please try again")
+	m := started(t, f, 120, 30)
+	if !m.side.Failed(1) {
+		t.Fatal("Work should have failed to connect")
+	}
+	if !strings.Contains(m.status, "Press ctrl+r to retry") {
+		t.Errorf("status = %q, want the retry hint", m.status)
+	}
+
+	delete(f.errs, "Work")
+	m.status, m.statusErr = "", false // a key press clears the error first
+	m, cmd := m.retryFailed()
+	if !m.side.Connecting() || m.side.Failed(1) {
+		t.Error("Work should show as connecting")
+	}
+	if m.status != "Connecting Work…" {
+		t.Errorf("status = %q", m.status)
+	}
+	m = settle(t, m, cmd)
+
+	if m.side.Failed(1) || m.side.Connecting() || m.boxes[1] == nil {
+		t.Error("Work should be connected after the retry")
+	}
+}
+
+func TestCtrlR_RetriesFailedAccountOnly(t *testing.T) {
+	f := newFixture()
+	f.errs["Work"] = errors.New("boom")
+	m := started(t, f, 120, 30)
+	connects := map[string]int{}
+	inner := f.connector()
+	m.connect = func(ctx context.Context, a config.Account) (Conn, error) {
+		connects[a.Name]++
+		return inner(ctx, a)
+	}
+
+	delete(f.errs, "Work")
+	next, cmd := m.Update(press("ctrl+r"))
+	m = settle(t, next.(Model), cmd)
+
+	if connects["Work"] != 1 || connects["Personal"] != 0 {
+		t.Errorf("connects = %v, want only Work", connects)
+	}
+	if m.side.Failed(1) || m.boxes[1] == nil {
+		t.Error("Work should be connected")
+	}
+}
+
+func TestRetryFailed_SkipsConnectedAndConnecting(t *testing.T) {
+	f := newFixture()
+	m := started(t, f, 120, 30)
+	m.connect = func(context.Context, config.Account) (Conn, error) {
+		t.Error("connect must not be called")
+		return Conn{}, errors.New("unexpected")
+	}
+	m2, cmd := m.retryFailed()
+	if cmd != nil {
+		t.Error("connected accounts: want no command")
+	}
+
+	m2.side = m2.side.SetConnecting(1)
+	m2, cmd = m2.retryFailed()
+	if cmd != nil || !m2.side.Connecting() {
+		t.Error("connecting account: want no command and still connecting")
+	}
+}
+
+// countingBox counts Close and Folders calls on a fake mailbox.
+type countingBox struct {
+	*mailtest.Fake
+	closes, folders int
+}
+
+func (c *countingBox) Folders(ctx context.Context) ([]mail.Folder, error) {
+	c.folders++
+	return c.Fake.Folders(ctx)
+}
+
+func (c *countingBox) Close() error {
+	c.closes++
+	return c.Fake.Close()
+}
+
+func TestCtrlR_ClosesMailboxOfAccountWhoseFolderListingFailed(t *testing.T) {
+	f := newFixture()
+	old := &countingBox{Fake: mailtest.New()}
+	old.Fail(mailtest.MethodFolders, errors.New("list failed"))
+	var connects int
+	m := newModel(func(ctx context.Context, a config.Account) (Conn, error) {
+		if a.Name != "Work" {
+			return Conn{Mailbox: f.personal}, nil
+		}
+		connects++
+		if connects == 1 {
+			return Conn{Mailbox: old}, nil
+		}
+		return Conn{Mailbox: f.work}, nil
+	})
+	m = send(t, m, size(120, 30))
+	m = settle(t, m, m.Init())
+	if !m.side.Failed(1) || m.boxes[1] == nil {
+		t.Fatal("Work should be failed with a mailbox left behind")
+	}
+	foldersBefore := old.folders
+
+	next, cmd := m.Update(press("ctrl+r"))
+	m = settle(t, next.(Model), cmd)
+
+	if old.closes != 1 {
+		t.Errorf("old mailbox closed %d times, want 1", old.closes)
+	}
+	if old.folders != foldersBefore {
+		t.Error("the old mailbox was refreshed")
+	}
+	if connects != 2 || m.side.Failed(1) || m.boxes[1] != mail.Mailbox(f.work) {
+		t.Errorf("connects = %d, failed = %v: want Work reconnected with the new mailbox", connects, m.side.Failed(1))
+	}
+}

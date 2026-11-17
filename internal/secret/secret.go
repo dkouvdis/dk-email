@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os/exec"
 	"regexp"
 	"strings"
 	"time"
@@ -51,6 +52,11 @@ type CmdError struct {
 }
 
 func (e *CmdError) Error() string {
+	var exit *exec.ExitError
+	if e.Stderr != "" && errors.As(e.Err, &exit) {
+		// The exit status adds nothing to what the command itself said.
+		return fmt.Sprintf("%s for account %q failed: %s", e.Key, e.Account, e.Stderr)
+	}
 	msg := fmt.Sprintf("%s for account %q failed: %v", e.Key, e.Account, e.Err)
 	if e.Stderr != "" {
 		msg += ": " + e.Stderr
@@ -308,10 +314,15 @@ func CopyClientSecret(oldName, newName string) (copied bool, err error) {
 
 var ansiEscape = regexp.MustCompile(`\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\)|.)`)
 
-// sanitize makes stderr safe to show in the TUI: no escape sequences or
-// control characters, whitespace collapsed, and length capped.
+// logPrefix matches the Go log prefix some tools print, such as op's
+// "[ERROR] 2026/11/17 10:12:33 ".
+var logPrefix = regexp.MustCompile(`\[[A-Z]+\] \d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} ?`)
+
+// sanitize makes stderr safe to show in the TUI: no escape sequences, control
+// characters or log prefixes, whitespace collapsed, and length capped.
 func sanitize(s string) string {
 	s = ansiEscape.ReplaceAllString(s, "")
+	s = logPrefix.ReplaceAllString(s, "")
 	s = strings.Map(func(r rune) rune {
 		switch {
 		case unicode.IsSpace(r):

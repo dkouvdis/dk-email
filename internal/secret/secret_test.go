@@ -693,3 +693,32 @@ func TestCopyClientSecret(t *testing.T) {
 		}
 	})
 }
+
+func TestSanitize_StripsLogPrefix(t *testing.T) {
+	cases := map[string]string{
+		"[ERROR] 2026/11/17 10:12:33 authorization prompt dismissed, please try again\n": "authorization prompt dismissed, please try again",
+		"[ERROR] 2026/11/17 10:12:33 first\n[WARN] 2026/11/17 10:12:34 second\n":         "first second",
+	}
+	for in, want := range cases {
+		if got := sanitize(in); got != want {
+			t.Errorf("sanitize(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestCmdError_ExitErrorWithStderrOmitsExitStatus(t *testing.T) {
+	err := &CmdError{Key: "password_cmd", Account: "Work", Stderr: "authorization prompt dismissed", Err: exitError(t)}
+
+	want := `password_cmd for account "Work" failed: authorization prompt dismissed`
+	if err.Error() != want {
+		t.Errorf("Error() = %q, want %q", err.Error(), want)
+	}
+}
+
+func TestCmdError_ExitErrorWithoutStderrKeepsExitStatus(t *testing.T) {
+	err := &CmdError{Key: "password_cmd", Account: "Work", Err: exitError(t)}
+
+	if !strings.Contains(err.Error(), "exit status 1") {
+		t.Errorf("Error() = %q, want exit status", err.Error())
+	}
+}

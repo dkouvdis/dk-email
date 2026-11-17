@@ -298,7 +298,7 @@ func TestEdit_ConnectErrorSuggestsE(t *testing.T) {
 	m = m.WithOnboarding(f.onboarding())
 	m = settle(t, m, m.Init())
 
-	if !strings.HasSuffix(m.status, "login failed. Press E to edit it.") {
+	if !strings.HasSuffix(m.status, "login failed. Press ctrl+r to retry or E to edit it.") {
 		t.Errorf("status = %q", m.status)
 	}
 	// A failed account can be picked in the sidebar and edited.
