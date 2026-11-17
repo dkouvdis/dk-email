@@ -52,9 +52,21 @@ must keep possible.
 
 ### General
 
-- **Generic password sources**: support credential sources beyond
-  `password_cmd` and the OS keychain, with finer control over how secrets are
-  resolved. The rule against storing a plaintext `password` in config stays.
+- **Any `password_cmd` from the connect and edit popups**: replace the
+  **1Password** login choice with **Command**, a field holding the whole
+  `password_cmd` (placeholder `op read op://Vault/Item/password`, note
+  pointing to `docs/accounts.md`). A bare `op://…` reference is still saved
+  as `op read '<ref>'`, so 1Password stays one paste. Editing shows the
+  account's current command as saved, not only `op read` ones, which
+  `opReference` in `internal/ui/popup/connect.go` limits today. Today other
+  password managers (pass, gpg, Bitwarden) need `config.toml` edited by hand.
+- **Cache `password_cmd` between reconnects**: a password account runs
+  `password_cmd` on every connect, so each reconnect (see the overnight bug
+  above) can bring up another 1Password or pinentry prompt. Keep the
+  password in memory for the session, optionally with a lifetime, and drop it
+  when the server rejects it so the next try runs the command again. The
+  password never touches disk. Plan together with IDLE and the overnight
+  bug.
 - **Settings in the app**: change UI settings without editing the config file
   by hand.
 
