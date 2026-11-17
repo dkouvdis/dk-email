@@ -158,8 +158,8 @@ don't allow app passwords.
    point.
 
 To switch an existing account to OAuth, press `E` on it, set **Login** to
-**OAuth 2.0** and do the same. See [Editing and deleting
-accounts](accounts.md).
+**OAuth 2.0** and do the same. See [Editing an
+account](accounts.md#editing-an-account).
 
 ## Configuration reference
 
