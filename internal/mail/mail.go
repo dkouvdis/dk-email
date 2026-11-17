@@ -95,6 +95,39 @@ func (f Flag) String() string {
 	return fmt.Sprintf("flag(%d)", int(f))
 }
 
+// SearchKind is what a SearchTerm matches.
+type SearchKind int
+
+const (
+	SearchText SearchKind = iota // anywhere in headers or body
+	SearchFrom
+	SearchTo
+	SearchCc
+	SearchSubject
+	SearchBody
+	SearchUnread
+	SearchRead
+	SearchStarred
+	SearchSince  // on or after Date
+	SearchBefore // before Date
+)
+
+// SearchTerm is one condition of a SearchQuery. Value is set for the text
+// kinds, Date for SearchSince and SearchBefore. Not negates the term.
+type SearchTerm struct {
+	Kind  SearchKind
+	Value string
+	Date  time.Time
+	Not   bool
+}
+
+// SearchQuery is a folder search: every term must match. Raw is the query as
+// the user typed it.
+type SearchQuery struct {
+	Raw   string
+	Terms []SearchTerm
+}
+
 type Folder struct {
 	Name      string // full server path, e.g. "[Gmail]/All Mail"
 	Delimiter string // hierarchy separator, e.g. "/"
