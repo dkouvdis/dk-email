@@ -200,14 +200,14 @@ Plan: [oauth-plan.md](oauth-plan.md).
 **Description:** Document all three credential modes (`oauth2`, `password_cmd`, and `keychain`) and step-by-step BYO `oauth_client_id` registration for Microsoft Entra ID and Google Cloud in `docs/accounts.md`, `README.md`, and `SPEC.md`.
 
 **Acceptance criteria:**
-- [ ] `docs/accounts.md` covers step-by-step BYO `client_id` setup for Microsoft Entra ID (public client, `http://localhost`, scopes, no client secret) and Google Cloud Desktop OAuth (`Internal` vs `Testing` 7-day refresh expiry vs unverified `Published`, plus App Password alternative), alongside `1Password`/`password_cmd` and external `oama` token commands.
-- [ ] New `docs/oauth.md` is a complete, friendly OAuth guide: how sign-in works (browser PKCE, Microsoft device code), step-by-step Microsoft and Google app registration, every `oauth_*` config key with examples, external token commands (`oama`), where tokens are stored and how refresh works, re-authenticating with `E`, and troubleshooting (common AADSTS / Google errors, `invalid_grant`, 7-day Testing expiry). `docs/accounts.md` and `README.md` link to it.
-- [ ] `README.md` and `SPEC.md` document `auth = "oauth2"`, `XOAUTH2` support on IMAP/SMTP, and Microsoft 365 `save_sent` default behavior.
+- [x] `docs/accounts.md` covers step-by-step BYO `client_id` setup for Microsoft Entra ID (public client, `http://localhost`, scopes, no client secret) and Google Cloud Desktop OAuth (`Internal` vs `Testing` 7-day refresh expiry vs unverified `Published`, plus App Password alternative), alongside `1Password`/`password_cmd` and external `oama` token commands.
+- [x] New `docs/oauth.md` is a complete, friendly OAuth guide: how sign-in works (browser PKCE, Microsoft device code), step-by-step Microsoft and Google app registration, every `oauth_*` config key with examples, external token commands (`oama`), where tokens are stored and how refresh works, re-authenticating with `E`, and troubleshooting (common AADSTS / Google errors, `invalid_grant`, 7-day Testing expiry). `docs/accounts.md` and `README.md` link to it.
+- [x] `README.md` and `SPEC.md` document `auth = "oauth2"`, `XOAUTH2` support on IMAP/SMTP, and Microsoft 365 `save_sent` default behavior.
 
 **Verification:**
-- [ ] Tests pass: `go test -race ./...`
-- [ ] Build succeeds: `go build -o bin/dk-email ./cmd/dk-email`
-- [ ] Manual check: Read rendered markdown docs for accuracy and completeness.
+- [x] Tests pass: `go test -race ./...`
+- [x] Build succeeds: `go build -o bin/dk-email ./cmd/dk-email`
+- [x] Manual check: Read rendered markdown docs for accuracy and completeness.
 
 **Dependencies:** Task 7
 

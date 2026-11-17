@@ -14,7 +14,7 @@ A keyboard-driven terminal email client for **triaging several IMAP accounts** (
 4. I read a whole conversation in a popup over the thread list.
 5. Without leaving the keyboard, I can **mark read/unread, star/flag, archive, delete, and move** a thread or message.
 6. The layout adapts to the terminal width, and I can switch between split and list + popup modes.
-7. My passwords come from **1Password** (`op read`) or the **OS keychain**, never from a plain-text file.
+7. My passwords come from **1Password** (`op read`) or the **OS keychain**, never from a plain-text file. Microsoft 365, Outlook.com and Google accounts can instead **sign in with OAuth 2.0** in the browser, with the sign-in kept in the keychain.
 
 ### Layout
 
@@ -51,7 +51,7 @@ Messages in the conversation are stacked oldest to newest. The latest (or first 
 ## Assumptions
 
 1. **`dk-email` is the official name** for the binary and config folder (confirmed). The config lives at `$XDG_CONFIG_HOME/dk-email/`, falling back to `~/.config/dk-email/` on **every OS, macOS included**.
-2. **No plain-text `password` field in v1.** Passwords come only from `password_cmd` or the keychain.
+2. **No plain-text `password` field in v1.** Passwords come only from `password_cmd` or the keychain, and OAuth client secrets only from `oauth_client_secret_cmd` or the keychain.
 3. **Threading happens per folder** (Thunderbird's default; confirmed): client-side, from `Message-ID` / `In-Reply-To` / `References`, falling back to normalized subject only for replies (`Re:`/`Fwd:`) that carry no references, so unrelated mails with a generic subject never merge. There's no cross-folder threading, so replies sitting in Sent won't appear inside Inbox threads.
 4. **v1 caches nothing on disk.** Headers and bodies are kept in memory for the session. `~/.cache/dk-email/` is reserved for the future cache and holds only the debug log.
 5. **Each folder loads its newest 200 messages**, and more are fetched when scrolling reaches the end.
@@ -60,7 +60,7 @@ Messages in the conversation are stacked oldest to newest. The latest (or first 
 8. **Archive moves mail to the account's archive folder.** That's the folder with IMAP's special-use marker `\Archive`, or else `\All` (Gmail's All Mail), unless `archive_folder` overrides it in config. If none of these exist, archive is disabled for that account and a message explains why.
 9. **Keybindings and themes are fixed in v1.** `keys.toml` and `themes/` are reserved names (and whitelisted in the config `.gitignore`) but aren't read yet.
 10. **go-imap v2 is still in beta (v2.0.0-beta.8).** I'm accepting this because the v1 library is no longer maintained. The dependency is isolated behind the `mail` interface.
-11. **Gmail needs an app password.** With 2-Step Verification (including passkeys), Gmail rejects the normal Google password over IMAP. Users create an app password at https://myaccount.google.com/apppasswords and point `password_cmd` at it. Login errors include this hint. **Google Workspace accounts** don't allow app passwords and need OAuth, so they aren't supported in v1.
+11. **Gmail needs an app password.** With 2-Step Verification (including passkeys), Gmail rejects the normal Google password over IMAP. Users create an app password at https://myaccount.google.com/apppasswords and point `password_cmd` at it. Login errors include this hint. **Google Workspace accounts** that don't allow app passwords sign in with OAuth 2.0 instead (see Configuration).
 
 ## Tech Stack
 
@@ -120,10 +120,11 @@ git tag -a v0.1.0-beta.1 -m "v0.1.0-beta.1" && git push origin v0.1.0-beta.1   #
 ```
 cmd/dk-email/          → main: flags, wiring, tea.NewProgram
 internal/config/       → paths (XDG), load/validate/append-account, writes config-dir .gitignore
-internal/secret/       → password resolution: password_cmd runner, keychain get/set
+internal/secret/       → password resolution: password_cmd runner, keychain get/set; OAuth token bundles and client secrets in the keychain
+internal/oauth/        → stdlib-only OAuth 2.0: Microsoft/Google providers, loopback PKCE and device code sign-in, refreshing TokenSource, XOAUTH2 SASL client
 internal/mail/         → provider-agnostic domain types + Mailbox interface (no IMAP imports)
 internal/mail/imap/    → go-imap v2 implementation of mail.Mailbox
-internal/mail/smtp/    → go-smtp transport (implicit TLS / STARTTLS, AUTH PLAIN)
+internal/mail/smtp/    → go-smtp transport (implicit TLS / STARTTLS, AUTH PLAIN or XOAUTH2)
 internal/compose/      → pure: reply / reply-all / forward / new drafts, composer fields, MIME build (send and draft mode), FromRaw to reopen a draft
 internal/send/         → implements mail.Sender and mail.Drafter: forward attachments, SMTP, Sent copy, \Answered, save / reopen / remove drafts
 internal/thread/       → builds threads from message summaries (pure, no I/O)
@@ -182,7 +183,12 @@ password_cmd = "op read op://Personal/Gmail/app-password"   # omit to use the ke
 # smtp_tls       = "implicit"                               # optional: "implicit" | "starttls"
 # from_name      = "Your Name"                              # optional: display name on outgoing mail
 # aliases        = [{ email = "me@example.com", name = "Me" }]   # optional: other From addresses (needs smtp_host)
-# save_sent      = true                                     # optional: default false on imap.gmail.com, true elsewhere
+# save_sent      = true                                     # optional: default false on Gmail and Microsoft 365/Outlook hosts, true elsewhere
+# auth           = "oauth2"                                 # optional: "password" (default) | "oauth2"
+# oauth_provider = "microsoft"                              # with auth = "oauth2": "microsoft" | "google"
+# oauth_client_id = "…"                                     # with auth = "oauth2": the user's own app registration
+# oauth_tenant   = "common"                                 # optional, Microsoft only
+# oauth_client_secret_cmd = "op read …"                     # optional, Google only (else the keychain)
 ```
 
 - **Defaults and validation:**
@@ -194,8 +200,9 @@ password_cmd = "op read op://Personal/Gmail/app-password"   # omit to use the ke
   - `tls_cert` (optional) is a PEM file of certificates trusted for that account **instead of** the system roots. It's for local bridges with self-signed certificates, such as Proton Mail Bridge, whose 20-year certificate macOS rejects as "not standards compliant" even when trusted in Keychain. The host name and expiry are still verified. `~/` is expanded, and a relative path is resolved from the config file's folder. A missing file, or one with no PEM certificate, fails at load. Added 2026-11-09 with your approval.
 - **Sending keys** (`smtp_host`, `smtp_port`, `smtp_tls`, `from_name`, `save_sent`) are specified in [tasks/smtp-spec.md](tasks/smtp-spec.md#configuration). `aliases` (other From addresses sent through the same SMTP login, also needing `smtp_host`) is specified in [tasks/aliases-spec.md](tasks/aliases-spec.md) and documented for users in [docs/send-as.md](docs/send-as.md). Existing configs keep working, with sending disabled until `smtp_host` is set.
 - **Password resolution:** if `password_cmd` is set, run it with `sh -c` and use the **first line** of stdout with only the line ending removed. Spaces inside the password are kept, and extra lines (as `pass show` prints) are ignored. The command inherits the user's environment but gets no stdin, and on timeout (60s) its whole process group is killed. Errors include the command's stderr (control characters stripped, length capped) but never its stdout. If `op` isn't on the inherited `PATH`, use its absolute path. Otherwise read from the keychain (service `dk-email`, key = account `name`). If neither yields a password, the account is shown as "needs password", and pressing `A` opens the connect popup to supply one (stored in the keychain).
-- **The connect-account popup appends** a new `[[account]]` block to the file as text, so the user's comments and formatting are preserved. It never re-encodes the whole file. When the address ends in `@gmail.com` / `@googlemail.com`, the popup pre-fills `imap.gmail.com:993 implicit`. Its password source is either a 1Password reference (stored as `password_cmd = "op read <ref>"`) or "enter once → keychain".
-- **Editing accounts:** `E` on the sidebar account opens the same form prefilled (spec: [tasks/edit-accounts-spec.md](tasks/edit-accounts-spec.md), user guide: [docs/accounts.md](docs/accounts.md)). Its password source starts on **Keep current**. Submit tests the login like connect, then replaces that account's `[[account]]` block in place: everything outside the block is kept byte for byte, and keys the form doesn't show are carried over from the account as written. After a failed test, `ctrl+s` saves anyway (config validation still runs). A rename moves a keychain password to the new name. A **Delete account** row after Submit removes the block after a confirmation (`y` delete, `k` keep the keychain password, `n`/`esc` cancel). A stale config (the account isn't at its index with its name) writes nothing.
+- **OAuth 2.0** (added 2026-11-17; plan: [tasks/oauth-plan.md](tasks/oauth-plan.md), user guide: [docs/oauth.md](docs/oauth.md)): `auth = "oauth2"` with `oauth_provider` + `oauth_client_id` signs in with the user's own app registration, by loopback authorization code + PKCE (`http://localhost:<port>/`) or, for Microsoft, an RFC 8628 device code. The token bundle is kept in the keychain under `oauth:<name>` and a Google client secret under `oauth-client-secret:<name>`; `oauth_client_secret` in the file is rejected. IMAP and SMTP fetch credentials for every connection, reconnect and send, and log in with `XOAUTH2`; the token is refreshed within two minutes of expiry, and a rotated refresh token is saved before use. `auth = "oauth2"` with `password_cmd` instead treats the command's first line as an access token (external tools such as `oama`). A missing, expired or revoked sign-in tells the user to press `E` and sign in again. `save_sent` defaults to `false` on Exchange Online / Outlook.com hosts as well as Gmail.
+- **The connect-account popup appends** a new `[[account]]` block to the file as text, so the user's comments and formatting are preserved. It never re-encodes the whole file. When the address ends in `@gmail.com` / `@googlemail.com`, the popup pre-fills `imap.gmail.com:993 implicit`; Outlook, Hotmail, Live, MSN and Office365 addresses pre-fill `outlook.office365.com:993 implicit` and `smtp.office365.com:587 starttls`. Its login is a 1Password reference (stored as `password_cmd = "op read <ref>"`), "enter once → keychain", or OAuth 2.0 (provider, client ID, Microsoft tenant or Google client secret), which signs in before the login test and stores the sign-in in the keychain before the config is written.
+- **Editing accounts:** `E` on the sidebar account opens the same form prefilled (spec: [tasks/edit-accounts-spec.md](tasks/edit-accounts-spec.md), user guide: [docs/accounts.md](docs/accounts.md)). Its password source starts on **Keep current**. Submit tests the login like connect, then replaces that account's `[[account]]` block in place: everything outside the block is kept byte for byte, and keys the form doesn't show are carried over from the account as written. After a failed test, `ctrl+s` saves anyway (config validation still runs). A rename moves a keychain password or OAuth sign-in to the new name. A **Delete account** row after Submit removes the block after a confirmation (`y` delete, `k` keep the keychain password or OAuth sign-in, `n`/`esc` cancel). A stale config (the account isn't at its index with its name) writes nothing.
 - **Config-dir `.gitignore`**, written on first run if missing:
   ```
   *

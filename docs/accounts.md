@@ -11,7 +11,7 @@ with the account's current settings filled in:
 
 - name, email and username
 - IMAP host, port and TLS
-- password source
+- login: password source or OAuth 2.0
 - SMTP host, port and TLS
 - aliases
 
@@ -19,23 +19,27 @@ The keys are the same as in the connect popup: `tab`/`↓` and
 `shift+tab`/`↑` move between fields, `←`/`→` or `space` change a choice,
 `enter` saves and `esc` cancels.
 
-### Password
+### Login
 
-The password source starts on **Keep current**, which leaves the password
-as it is: the keychain entry or your `password_cmd`. Switch it to change
-the password:
+The **Login** row starts on **Keep current**, which leaves the login as it
+is: the keychain entry, your `password_cmd`, or the OAuth sign-in. Switch it
+to change it:
 
 - **1Password:** enter an `op://` reference. It's saved as
   `password_cmd = "op read …"`.
 - **Keychain:** type the new password. It replaces the one in the keychain.
+- **OAuth 2.0:** pick the provider and enter your app's client ID, then
+  **Sign in & save** signs in in your browser. Use this to switch an
+  account to OAuth, or to sign in again when the sign-in has expired. See
+  [Signing in with OAuth 2.0](oauth.md).
 
-If you rename an account that uses the keychain, its password moves to the
-new name.
+If you rename an account that uses the keychain or OAuth, its password or
+sign-in moves to the new name.
 
 ### Saving
 
 Saving works like connecting a new account: dk-email first tests the IMAP
-login, and the SMTP login when an SMTP host is set. Only if that works does
+login (after the browser sign-in, for OAuth), and the SMTP login when an SMTP host is set. Only if that works does
 it save the account and reconnect it, with no restart.
 
 If the test fails, the error shows in the popup. Fix the field and press
@@ -45,7 +49,8 @@ offline, the server is down, or your password manager is locked. The status
 bar then says the account was saved without a working login. If it still
 can't connect, the error tells you to press `E` to edit it again.
 
-Save anyway only skips the login test. The same config checks always run,
+Save anyway only skips the login test. With **OAuth 2.0** chosen it asks you
+to sign in first instead, because the sign-in is what gets saved. The same config checks always run,
 so for example aliases without an SMTP host are still rejected.
 
 ### What's kept
@@ -74,11 +79,11 @@ Submit and press `enter`. The popup asks to confirm:
 
 | Key | Action |
 |---|---|
-| `y` | delete the account (and its keychain password, if it has one) |
-| `k` | delete the account but keep its keychain password |
+| `y` | delete the account (and its keychain password or OAuth sign-in, if it has one) |
+| `k` | delete the account but keep its keychain password or OAuth sign-in |
 | `n` / `esc` | cancel |
 
-`k` is only offered for accounts that use the keychain. Deleting removes
+`k` is only offered for accounts that use the keychain or OAuth. Deleting removes
 the account's block from `config.toml`, disconnects it and moves the
 sidebar to the next account. If it was your last account, the connect
 popup opens as on first run.

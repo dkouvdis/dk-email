@@ -60,6 +60,7 @@ Supporting modules:
 
 - Config is intentionally strict: unknown keys fail validation; `password` key is rejected; credentials must come from `password_cmd` or keychain.
 - An account sends only when `smtp_host` is set; SMTP reuses the account's IMAP credentials and `tls_cert`.
+- OAuth accounts (`auth = "oauth2"`) get their login from a `mail.Credentials` callback on every IMAP dial/reconnect and SMTP send/verify, and log in with `XOAUTH2`; password accounts resolve their password once per connect. The UI never sees a token: sign-in returns an opaque `ui.OAuthSession`, and the keychain is always written before `config.toml`. User guide: `docs/oauth.md`.
 - Outgoing mail is plain text. The Markdown seam is `compose.BodyPart`; a later HTML mode replaces it without touching reply, forward or transport code.
 - Saving and removing drafts is IMAP-side, via `DraftsFolder` and `Delete` on `imap.Client`; `Delete` needs UIDPLUS and never falls back to a plain `EXPUNGE` (without it the old draft is kept and the status says so).
 - Config updates preserve user formatting/comments: adding an account appends a TOML block instead of re-encoding the file.

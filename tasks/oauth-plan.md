@@ -34,7 +34,7 @@ Add first-class OAuth 2.0 (`XOAUTH2`) authentication for Microsoft 365 / Outlook
 ### Phase 3: Onboarding UI & Documentation
 - [x] Task 6: `OAuth 2.0` option and provider presets in `popup.Connect`
 - [x] Task 7: Connect/Edit OAuth sign-in, keychain rename/delete, and re-auth hints
-- [ ] Task 8: OAuth 2.0 and credential mode documentation
+- [x] Task 8: OAuth 2.0 and credential mode documentation
 
 ### Checkpoint: Complete
 - [ ] `go test -race ./...`, `go vet ./...`, `gofmt -l .`, and `go build -o bin/dk-email ./cmd/dk-email` clean

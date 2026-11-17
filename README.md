@@ -8,6 +8,7 @@ A keyboard-driven terminal email client for triaging several IMAP accounts (Gmai
 - Has two layouts: narrow (folders │ threads, the default) and list (threads only), toggled with `v`. List is forced below 80 columns.
 - Replies, reply-alls, forwards and new messages are written in a built-in composer and sent over SMTP. See [Sending mail](#sending-mail).
 - Reads passwords from 1Password (`op read`), any other command, or the OS keychain. They are never stored in a plain-text file.
+- Signs in to Microsoft 365, Outlook.com and Google with **OAuth 2.0** (`XOAUTH2` over IMAP and SMTP), using your own app registration. Tokens live in the OS keychain and refresh on their own. See [Signing in with OAuth 2.0](docs/oauth.md).
 
 v0.x is a personal tool: it reads, triages and sends mail. Nothing is cached on disk.
 
@@ -53,10 +54,10 @@ On first run with no accounts, the **connect-account popup** opens. It asks for 
 
 - a name, email and username;
 - the IMAP host, port and TLS mode;
-- a password source: either a 1Password reference, or "enter once → keychain";
+- a login: a 1Password reference, "enter once → keychain", or an **OAuth 2.0** browser sign-in ([guide](docs/oauth.md));
 - optionally, the SMTP host, port and TLS mode, which turn on [sending](#sending-mail).
 
-Gmail addresses pre-fill `imap.gmail.com:993` and `smtp.gmail.com:465` (implicit TLS). dk-email tests the IMAP connection, and the SMTP login too when an SMTP host is filled in, then appends an `[[account]]` block to `config.toml`, keeping your comments and formatting intact. Press `A` at any time to connect another account, and `E` to edit or delete one ([guide](docs/accounts.md)).
+Gmail addresses pre-fill `imap.gmail.com:993` and `smtp.gmail.com:465` (implicit TLS); Outlook, Hotmail, Live and Microsoft 365 addresses pre-fill `outlook.office365.com:993` and `smtp.office365.com:587` (STARTTLS). dk-email tests the IMAP connection, and the SMTP login too when an SMTP host is filled in, then appends an `[[account]]` block to `config.toml`, keeping your comments and formatting intact. Press `A` at any time to connect another account, and `E` to edit or delete one ([guide](docs/accounts.md)).
 
 The config folder lives at `$XDG_CONFIG_HOME/dk-email/` (default `~/.config/dk-email/`) on every OS, macOS included. The folder is `0700`, `config.toml` is `0600`, and a `.gitignore` is written so the folder can be kept in a dotfiles repo safely.
 
@@ -82,13 +83,17 @@ password_cmd = "op read op://Personal/Gmail/app-password"   # omit to use the ke
 # smtp_tls       = "implicit"                               # optional, "implicit" (default) | "starttls"
 # from_name      = "Your Name"                              # optional, display name on outgoing mail
 # aliases        = [{ email = "me@example.com", name = "Me" }]   # optional, other From addresses (needs smtp_host)
-# save_sent      = true                                     # optional, save a copy of sent mail to Sent (default: false on Gmail, true elsewhere)
+# save_sent      = true                                     # optional, save a copy of sent mail to Sent (default: false on Gmail and Microsoft 365/Outlook, true elsewhere)
+# auth           = "oauth2"                                 # optional, sign in with OAuth 2.0 instead of a password (see docs/oauth.md)
+# oauth_provider = "microsoft"                              # with auth = "oauth2": "microsoft" or "google"
+# oauth_client_id = "…"                                     # with auth = "oauth2": your app's client ID
 ```
 
 - Unknown keys are errors, so a typo like `pasword_cmd` can't silently fall back to the keychain. A `password` key is rejected: passwords never go in this file.
 - `archive_folder` defaults to the folder marked `\Archive`, or else `\All` (Gmail's All Mail). If neither exists, archive is disabled for that account.
 - `tls_cert` accepts `~/`. A relative path is resolved from the config file's folder. It applies to SMTP as well as IMAP.
 - The `smtp_*`, `from_name` and `save_sent` keys are described under [Sending mail](#sending-mail).
+- `auth` and the `oauth_*` keys are described in [Signing in with OAuth 2.0](docs/oauth.md#configuration-reference). An `oauth_client_secret` key is rejected like `password`.
 
 ### Colours
 
@@ -119,6 +124,8 @@ dk-email looks for a password in this order:
 2. **The OS keychain**: used when `password_cmd` is omitted.
 
 If neither yields a password, the account shows as needing a password, and `A` opens a prompt to store one in the keychain.
+
+Accounts with `auth = "oauth2"` don't use a password: they sign in with OAuth 2.0, and the sign-in is kept in the keychain. With `auth = "oauth2"`, `password_cmd` instead prints an access token, for external token tools such as `oama`. See [Signing in with OAuth 2.0](docs/oauth.md).
 
 #### 1Password
 
@@ -168,7 +175,7 @@ secret-tool store --label "dk-email" service dk-email username "Personal"
 
 #### Gmail
 
-Gmail rejects your normal Google password over IMAP when 2-Step Verification is on. Create an **app password** at <https://myaccount.google.com/apppasswords>, then store it in 1Password or the keychain. Google Workspace accounts that don't allow app passwords aren't supported, because they need OAuth. The same app password works for sending (see [Sending mail](#sending-mail)).
+Gmail rejects your normal Google password over IMAP when 2-Step Verification is on. Create an **app password** at <https://myaccount.google.com/apppasswords>, then store it in 1Password or the keychain. The same app password works for sending (see [Sending mail](#sending-mail)). Google Workspace accounts that don't allow app passwords can sign in with OAuth 2.0 instead; see [Signing in with OAuth 2.0](docs/oauth.md#google-google-cloud).
 
 #### Proton Mail Bridge
 
@@ -203,13 +210,13 @@ smtp_host    = "smtp.gmail.com"    # enables sending
 smtp_port    = 465                 # optional, 465 for implicit, 587 for starttls
 smtp_tls     = "implicit"          # optional, "implicit" (default) | "starttls"
 from_name    = "Your Name"         # optional, display name on outgoing mail; default: the address only
-save_sent    = false               # optional, save a copy to Sent; default: false on Gmail, true elsewhere
+save_sent    = false               # optional, save a copy to Sent; default: false on Gmail and Microsoft 365/Outlook, true elsewhere
 ```
 
-- **Credentials:** SMTP logs in with the account's `username` and the same password as IMAP (`password_cmd` or the keychain). There's no separate SMTP password. For Gmail, the same app password works for IMAP and SMTP.
+- **Credentials:** SMTP logs in with the account's `username` and the same password as IMAP (`password_cmd` or the keychain), or, for OAuth accounts, the same token with `XOAUTH2`. There's no separate SMTP password. For Gmail, the same app password works for IMAP and SMTP.
 - **TLS:** the connection is always encrypted, and dk-email never falls back to plaintext. With `smtp_tls = "starttls"`, STARTTLS is mandatory. `tls_cert` applies to SMTP too, so Proton Mail Bridge works for both.
 - **`smtp_port`** defaults to 465 for `implicit` and 587 for `starttls`. `smtp_tls` defaults to `implicit`.
-- **`save_sent`:** dk-email saves a copy of each sent message to the account's Sent folder over IMAP. Gmail already files mail sent through its SMTP server in Sent, so the default is `false` for `imap.gmail.com` to avoid duplicates, and `true` everywhere else. Set `save_sent = false` for any other provider that files SMTP-sent mail in Sent itself. If the account has no Sent folder, the message is still sent and the status warns.
+- **`save_sent`:** dk-email saves a copy of each sent message to the account's Sent folder over IMAP. Gmail, Exchange Online and Outlook.com already file mail sent through their SMTP servers in Sent, so the default is `false` for `imap.gmail.com`, `outlook.office365.com` and `imap-mail.outlook.com` (or SMTP host `smtp.office365.com` / `smtp-mail.outlook.com`) to avoid duplicates, and `true` everywhere else. Set `save_sent = false` for any other provider that files SMTP-sent mail in Sent itself. If the account has no Sent folder, the message is still sent and the status warns.
 - **`aliases`:** other addresses this account can send as, such as a custom domain. Gmail needs each one verified under "Send mail as" first, or it silently rewrites From. An address with its own SMTP login is a separate account. See [Sending from aliases](docs/send-as.md).
 - `smtp_port`, `smtp_tls`, `from_name`, `aliases` and `save_sent` without `smtp_host` are config errors.
 - **Microsoft 365 and Outlook.com** aren't supported yet. They no longer accept password logins and need OAuth, which dk-email doesn't have.
