@@ -14,10 +14,6 @@ must keep possible.
 
 ## High Priority
 
-- **Search**: server-side IMAP `SEARCH`, plus Gmail's `X-GM-RAW` for its
-  search syntax. Needs a search method on `mail.Mailbox` (keeping
-  `internal/mail` provider-agnostic), the IMAP implementation and a results
-  view in the thread list.
 - **Save and open attachments**: the reader only lists attachments. Add
   saving one to disk and opening it with the system's default app.
 - **Undo for delete, archive and move**: `d` deletes without confirmation by
@@ -34,6 +30,24 @@ must keep possible.
   notification. Shares the reconnect work with the overnight bug above.
 - **Multi-select and bulk actions**: mark several threads, then archive,
   delete, move or mark them read at once. Includes "mark folder as read".
+
+### Search
+
+Folder search (`/`) shipped; see `docs/search.md`. Follow-ups:
+
+- **More date formats**: `since:`/`after:`/`before:` take only `YYYY-MM-DD`
+  and `YYYY/MM/DD`; anything else silently becomes text and finds nothing.
+  Accept Gmail's American `MM/DD/YYYY` (document that `03/04/2026` is
+  4 March, as in Gmail), and add Gmail's relative `newer_than:` /
+  `older_than:` with `d`, `w`, `m`, `y` (e.g. `newer_than:7d`), compiled to
+  the same IMAP `SINCE`/`BEFORE`. Leave out `20260115` and `15.01.2026`.
+  All in `internal/search/parse.go`.
+- **Gmail `X-GM-RAW`**: pass the query through as-is when the server has
+  `X-GM-EXT-1`, so Gmail users get Gmail's own matching.
+  `mail.SearchQuery.Raw` already keeps the typed query for this.
+- **Search all folders**: one `SEARCH` per folder and a results view mixing
+  folders. On Gmail, searching All Mail covers it today.
+- **OR and grouping**, and **saved searches** as sidebar entries.
 
 ### Outgoing
 
