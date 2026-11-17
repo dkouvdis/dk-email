@@ -817,7 +817,7 @@ func (c Connect) View() string {
 		if c.editing {
 			lines = append(lines, c.choiceRow(fSource, "Login", []string{"keep current", "1Password", "keychain", "OAuth 2.0"}, map[int]int{sourceKeep: 0, sourceOnePassword: 1, sourceKeychain: 2, sourceOAuth: 3}[c.source]))
 		} else {
-			lines = append(lines, c.choiceRow(fSource, "Login", []string{"1Password", "keychain", "OAuth 2.0"}, c.source))
+			lines = append(lines, c.choiceRow(fSource, "Login", []string{"1Password", "keychain", "OAuth 2.0"}, map[int]int{sourceOnePassword: 0, sourceKeychain: 1, sourceOAuth: 2}[c.source]))
 		}
 	}
 	note := "Stored as password_cmd = \"op read <reference>\""
@@ -840,17 +840,14 @@ func (c Connect) View() string {
 		lines = append(lines, c.inputRow(fSecret, innerW))
 		note = "Saved in the OS keychain, never in config.toml"
 	case sourceOAuth:
-		lines = append(lines, c.choiceRow(fProvider, "Provider", []string{"Microsoft", "Google"}, map[bool]int{true: 0, false: 1}[c.provider == config.ProviderMicrosoft]), c.inputRow(fClientID, innerW))
-		for _, f := range []int{fTenant, fClientSecret} {
-			if c.visible(f) {
-				lines = append(lines, c.inputRow(f, innerW))
-			}
-		}
-		note = "Signs in with your browser; tokens go in the OS keychain"
+		lines = append(lines, c.oauthBox(innerW)...)
+		note = ""
 	default:
 		lines = append(lines, c.inputRow(fSecret, innerW))
 	}
-	lines = append(lines, strings.Repeat(" ", labelW+1)+c.st.dim.Render(ansi.Truncate(note, innerW-labelW-1, "…")))
+	if note != "" {
+		lines = append(lines, strings.Repeat(" ", labelW+1)+c.st.dim.Render(ansi.Truncate(note, innerW-labelW-1, "…")))
+	}
 	if !c.passwordOnly {
 		lines = append(lines,
 			c.inputRow(fSMTPHost, innerW),
@@ -963,6 +960,31 @@ func (c Connect) choiceRow(f int, name string, options []string, selected int) s
 		}
 	}
 	return c.label(f, name) + strings.Join(parts, "   ")
+}
+
+// oauthBox frames the OAuth fields in a box titled OAuth 2.0, so they read
+// as part of that login choice.
+func (c Connect) oauthBox(innerW int) []string {
+	w := innerW - 4 // the side borders and their padding
+	rows := []string{
+		c.choiceRow(fProvider, "Provider", []string{"Microsoft", "Google"}, map[bool]int{true: 0, false: 1}[c.provider == config.ProviderMicrosoft]),
+		c.inputRow(fClientID, w),
+	}
+	for _, f := range []int{fTenant, fClientSecret} {
+		if c.visible(f) {
+			rows = append(rows, c.inputRow(f, w))
+		}
+	}
+	rows = append(rows, strings.Repeat(" ", labelW+1)+c.st.dim.Render(ansi.Truncate("Browser sign-in; tokens are kept in the OS keychain", w-labelW-1, "…")))
+
+	title := "╭─ OAuth 2.0 "
+	out := []string{c.st.dim.Render(title + strings.Repeat("─", max(innerW-ansi.StringWidth(title)-1, 0)) + "╮")}
+	side := c.st.dim.Render("│")
+	for _, r := range rows {
+		r = ansi.Truncate(r, w, "")
+		out = append(out, side+" "+r+strings.Repeat(" ", max(w-ansi.StringWidth(r), 0))+" "+side)
+	}
+	return append(out, c.st.dim.Render("╰"+strings.Repeat("─", innerW-2)+"╯"))
 }
 
 func (c Connect) readOnly(name, value string, innerW int) string {

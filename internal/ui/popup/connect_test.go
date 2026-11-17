@@ -913,6 +913,46 @@ func hasField(c Connect, f int) bool {
 	return false
 }
 
+func TestConnect_SourceRowMarksSelected(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		form   Connect
+		source int
+		want   string
+	}{
+		{"new 1Password", newConnect(), sourceOnePassword, "● 1Password"},
+		{"new keychain", newConnect(), sourceKeychain, "● keychain"},
+		{"new OAuth", newConnect(), sourceOAuth, "● OAuth 2.0"},
+		{"edit keep", newEdit(editAccount()), sourceKeep, "● keep current"},
+		{"edit OAuth", newEdit(editAccount()), sourceOAuth, "● OAuth 2.0"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			v := ansi.Strip(toSource(t, tt.form, tt.source).View())
+			var row string
+			for _, l := range strings.Split(v, "\n") {
+				if strings.Contains(l, "Login") {
+					row = l
+				}
+			}
+			if !strings.Contains(row, tt.want) || strings.Count(row, "●") != 1 {
+				t.Errorf("Login row = %q, want %q as its only selected option", row, tt.want)
+			}
+		})
+	}
+}
+
+func TestConnect_OAuthFieldsAreBoxed(t *testing.T) {
+	v := ansi.Strip(toSource(t, newConnect(), sourceOAuth).View())
+	for _, want := range []string{"╭─ OAuth 2.0 ─", "│ Provider   ● Microsoft", "│ Client ID", "│ Tenant", "╰───"} {
+		if !strings.Contains(v, want) {
+			t.Errorf("view lacks %q:\n%s", want, v)
+		}
+	}
+	if v := ansi.Strip(newConnect().View()); strings.Contains(v, "╭─ OAuth 2.0") {
+		t.Errorf("box shown without OAuth selected:\n%s", v)
+	}
+}
+
 func TestConnect_SourceCycle(t *testing.T) {
 	c := newConnect()
 	c.setFocus(fSource)
@@ -1323,7 +1363,7 @@ func TestEditAccount_OAuthPrefill(t *testing.T) {
 func TestConnect_OAuthNoteAndButton(t *testing.T) {
 	c := oauthForm(t, config.ProviderMicrosoft)
 	v := ansi.Strip(c.View())
-	for _, want := range []string{"Signs in with your browser; tokens go in the OS keychain", "[ Sign in & save ]"} {
+	for _, want := range []string{"Browser sign-in; tokens are kept in the OS keychain", "[ Sign in & save ]"} {
 		if !strings.Contains(v, want) {
 			t.Errorf("view lacks %q:\n%s", want, v)
 		}
