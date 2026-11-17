@@ -1,7 +1,8 @@
 # Editing and deleting accounts
 
 You can change or remove an account from inside dk-email, without editing
-`config.toml` by hand.
+`config.toml` by hand. To connect a new one, see
+[Adding an account](adding-accounts.md).
 
 ## Editing an account
 

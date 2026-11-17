@@ -57,7 +57,7 @@ On first run with no accounts, the **connect-account popup** opens. It asks for 
 - a login: a 1Password reference, "enter once → keychain", or an **OAuth 2.0** browser sign-in ([guide](docs/oauth.md));
 - optionally, the SMTP host, port and TLS mode, which turn on [sending](#sending-mail).
 
-Gmail addresses pre-fill `imap.gmail.com:993` and `smtp.gmail.com:465` (implicit TLS); Outlook, Hotmail, Live and Microsoft 365 addresses pre-fill `outlook.office365.com:993` and `smtp.office365.com:587` (STARTTLS). dk-email tests the IMAP connection, and the SMTP login too when an SMTP host is filled in, then appends an `[[account]]` block to `config.toml`, keeping your comments and formatting intact. Press `A` at any time to connect another account, and `E` to edit or delete one ([guide](docs/accounts.md)).
+Gmail addresses pre-fill `imap.gmail.com:993` and `smtp.gmail.com:465` (implicit TLS); Outlook, Hotmail, Live and Microsoft 365 addresses pre-fill `outlook.office365.com:993` and `smtp.office365.com:587` (STARTTLS). dk-email tests the IMAP connection, and the SMTP login too when an SMTP host is filled in, then appends an `[[account]]` block to `config.toml`, keeping your comments and formatting intact. Press `A` at any time to connect another account, and `E` to edit or delete one ([guide](docs/accounts.md)). For which login to choose, two-factor authentication and per-provider settings, see [Adding an account](docs/adding-accounts.md).
 
 The config folder lives at `$XDG_CONFIG_HOME/dk-email/` (default `~/.config/dk-email/`) on every OS, macOS included. The folder is `0700`, `config.toml` is `0600`, and a `.gitignore` is written so the folder can be kept in a dotfiles repo safely.
 
@@ -219,7 +219,7 @@ save_sent    = false               # optional, save a copy to Sent; default: fal
 - **`save_sent`:** dk-email saves a copy of each sent message to the account's Sent folder over IMAP. Gmail, Exchange Online and Outlook.com already file mail sent through their SMTP servers in Sent, so the default is `false` for `imap.gmail.com`, `outlook.office365.com` and `imap-mail.outlook.com` (or SMTP host `smtp.office365.com` / `smtp-mail.outlook.com`) to avoid duplicates, and `true` everywhere else. Set `save_sent = false` for any other provider that files SMTP-sent mail in Sent itself. If the account has no Sent folder, the message is still sent and the status warns.
 - **`aliases`:** other addresses this account can send as, such as a custom domain. Gmail needs each one verified under "Send mail as" first, or it silently rewrites From. An address with its own SMTP login is a separate account. See [Sending from aliases](docs/send-as.md).
 - `smtp_port`, `smtp_tls`, `from_name`, `aliases` and `save_sent` without `smtp_host` are config errors.
-- **Microsoft 365 and Outlook.com** aren't supported yet. They no longer accept password logins and need OAuth, which dk-email doesn't have.
+- **Microsoft 365 and Outlook.com** don't accept passwords: they sign in with [OAuth 2.0](docs/oauth.md), for sending too.
 
 ### Writing a message
 
