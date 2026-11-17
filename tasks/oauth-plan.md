@@ -19,7 +19,7 @@ Add first-class OAuth 2.0 (`XOAUTH2`) authentication for Microsoft 365 / Outlook
 ### Phase 1: Foundation (Config, Keychain, Token Flows)
 - [x] Task 1: OAuth account config schema and Exchange `save_sent` default
 - [x] Task 2: Namespaced keychain storage for OAuth token bundles and client secrets
-- [ ] Task 3: OAuth 2.0 PKCE loopback, Device Code, and refreshing `TokenSource`
+- [x] Task 3: OAuth 2.0 PKCE loopback, Device Code, and refreshing `TokenSource`
 
 ### Checkpoint: Foundation
 - [ ] `go test -race ./internal/config ./internal/secret ./internal/oauth` passes; `go vet ./...` clean

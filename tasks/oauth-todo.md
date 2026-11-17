@@ -60,14 +60,14 @@ Plan: [oauth-plan.md](oauth-plan.md).
 **Description:** Create stdlib-only `internal/oauth` implementing Microsoft Entra v2.0 and Google provider endpoints, interactive Loopback Authorization Code + PKCE (`127.0.0.1:0`) and Microsoft RFC 8628 Device Code sign-in flows, and a mutex-serialized `TokenSource` that refreshes expiring tokens and persists rotated refresh tokens.
 
 **Acceptance criteria:**
-- [ ] Loopback PKCE S256 (`127.0.0.1:0`) and Microsoft RFC 8628 Device Code flows exchange authorization grants against `httptest` OAuth servers, validate `state`, and abort cleanly on context cancellation.
-- [ ] `TokenSource.Token(ctx)` returns cached valid tokens, refreshes when within 2 minutes of expiry, immediately persists rotated `refresh_token` responses via the store callback, and delegates to an external command callback when `password_cmd` is configured with `auth = "oauth2"`.
-- [ ] Error strings scrub `access_token`, `refresh_token`, and `client_secret` values, and wrap `invalid_grant` with a sentinel/detectable error for re-authentication hints.
+- [x] Loopback PKCE S256 (`127.0.0.1:0`) and Microsoft RFC 8628 Device Code flows exchange authorization grants against `httptest` OAuth servers, validate `state`, and abort cleanly on context cancellation.
+- [x] `TokenSource.Token(ctx)` returns cached valid tokens, refreshes when within 2 minutes of expiry, immediately persists rotated `refresh_token` responses via the store callback, and delegates to an external command callback when `password_cmd` is configured with `auth = "oauth2"`.
+- [x] Error strings scrub `access_token`, `refresh_token`, and `client_secret` values, and wrap `invalid_grant` with a sentinel/detectable error for re-authentication hints.
 
 **Verification:**
-- [ ] Tests pass: `go test -race ./internal/oauth`
-- [ ] Build succeeds: `go build -o bin/dk-email ./cmd/dk-email`
-- [ ] Manual check: Confirm test error strings redact all token/secret substrings.
+- [x] Tests pass: `go test -race ./internal/oauth`
+- [x] Build succeeds: `go build -o bin/dk-email ./cmd/dk-email`
+- [x] Manual check: Confirm test error strings redact all token/secret substrings.
 
 **Dependencies:** Task 1, Task 2
 
@@ -201,6 +201,7 @@ Plan: [oauth-plan.md](oauth-plan.md).
 
 **Acceptance criteria:**
 - [ ] `docs/accounts.md` covers step-by-step BYO `client_id` setup for Microsoft Entra ID (public client, `http://localhost`, scopes, no client secret) and Google Cloud Desktop OAuth (`Internal` vs `Testing` 7-day refresh expiry vs unverified `Published`, plus App Password alternative), alongside `1Password`/`password_cmd` and external `oama` token commands.
+- [ ] New `docs/oauth.md` is a complete, friendly OAuth guide: how sign-in works (browser PKCE, Microsoft device code), step-by-step Microsoft and Google app registration, every `oauth_*` config key with examples, external token commands (`oama`), where tokens are stored and how refresh works, re-authenticating with `E`, and troubleshooting (common AADSTS / Google errors, `invalid_grant`, 7-day Testing expiry). `docs/accounts.md` and `README.md` link to it.
 - [ ] `README.md` and `SPEC.md` document `auth = "oauth2"`, `XOAUTH2` support on IMAP/SMTP, and Microsoft 365 `save_sent` default behavior.
 
 **Verification:**
@@ -211,6 +212,7 @@ Plan: [oauth-plan.md](oauth-plan.md).
 **Dependencies:** Task 7
 
 **Files likely touched:**
+- `docs/oauth.md`
 - `docs/accounts.md`
 - `README.md`
 - `SPEC.md`

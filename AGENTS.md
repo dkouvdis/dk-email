@@ -52,7 +52,8 @@ Supporting modules:
 - `internal/render`: MIME parsing + HTML-to-markdown rendering (email cruft stripped first; junk text/plain parts fall back to HTML) + Glamour styling of HTML-derived bodies (plain text is only wrapped) + attachment extraction (it also exposes attachment `Parts` with bytes for forwarding).
 - `internal/compose`: pure drafting logic: reply/reply-all/forward/new drafts, composer fields (`Fields`/`FieldsOf`), MIME build (`Build` never writes Bcc; `BuildDraft` does), and `FromRaw` to reopen a saved draft.
 - `internal/send`: orchestration implementing `mail.Sender` (forward attachment fetch, build once, SMTP, Sent `APPEND`, `\Answered`, remove the replaced draft) and `mail.Drafter` (`SaveDraft`, `OpenDraft`).
-- `internal/secret`: password resolution from `password_cmd` or OS keychain.
+- `internal/secret`: password resolution from `password_cmd` or OS keychain, plus OAuth token bundles (`oauth:<account>`) and client secrets (`oauth-client-secret:<account>`) in the keychain.
+- `internal/oauth`: stdlib-only OAuth 2.0 for Microsoft and Google: loopback PKCE and Microsoft device code sign-in, and a serialized `TokenSource` that refreshes near expiry and saves rotated refresh tokens. Errors never carry tokens, codes or secrets.
 - `internal/config`: strict TOML load/validate/defaults and append-account persistence.
 
 ## Key repository-specific conventions
