@@ -39,7 +39,7 @@ Add server-side IMAP folder search (`/` when the thread list is focused) so user
 - [x] `go test -race ./internal/search ./internal/mail/...` passes against `imapmemserver` and `mailtest.Fake`
 
 ### Phase 2: Search TUI & Documentation
-- [ ] Task 11: Inline `/` list search bar, threaded results, paging, and refresh guard
+- [x] Task 11: Inline `/` list search bar, threaded results, paging, and refresh guard
 - [ ] Task 12: Search guide (`docs/search.md`), README/SPEC, and read-only Gmail live test
 
 ### Checkpoint: Complete

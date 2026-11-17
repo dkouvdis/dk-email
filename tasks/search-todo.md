@@ -69,14 +69,14 @@ Plan: [search-plan.md](search-plan.md).
 **Description:** Bind `/` when `PaneList` is focused to open an inline search prompt in the list header, run `Mailbox.Search` asynchronously with threaded results and infinite-scroll paging, prevent background folder refreshes from overwriting active search results, and restore the folder view on `esc`.
 
 **Acceptance criteria:**
-- [ ] Pressing `/` in `PaneList` focuses an inline `/ ` input (`enter` runs `Mailbox.Search` guarded by a search generation counter; `esc` cancels the prompt or clears an active search back to the folder's summaries; `/` in `PaneSidebar` still filters folders; `?` help popup lists `/` search).
-- [ ] Search results render threaded via `thread.Build` with a `search: <query>` header indicator, support all normal open/reply/flag/move/archive/delete actions, and paginate older matches via `LoadMoreMsg` (`before` UID).
-- [ ] Periodic auto-refresh (`internal/ui/refresh.go`) does not overwrite active search results with unfiltered folder summaries, while manual `ctrl+r` re-runs the active search.
+- [x] Pressing `/` in `PaneList` focuses an inline `/ ` input (`enter` runs `Mailbox.Search` guarded by a search generation counter; `esc` cancels the prompt or clears an active search back to the folder's summaries; `/` in `PaneSidebar` still filters folders; `?` help popup lists `/` search).
+- [x] Search results render threaded via `thread.Build` with a `search: <query>` header indicator, support all normal open/reply/flag/move/archive/delete actions, and paginate older matches via `LoadMoreMsg` (`before` UID).
+- [x] Periodic auto-refresh (`internal/ui/refresh.go`) does not overwrite active search results with unfiltered folder summaries, while manual `ctrl+r` re-runs the active search.
 
 **Verification:**
-- [ ] Tests pass: `go test -race ./internal/ui/...`
-- [ ] Build succeeds: `go build -o bin/dk-email ./cmd/dk-email`
-- [ ] Manual check: UI tests verify `/` prompt, threaded results, paging, refresh guard, and `esc` restore.
+- [x] Tests pass: `go test -race ./internal/ui/...`
+- [x] Build succeeds: `go build -o bin/dk-email ./cmd/dk-email`
+- [x] Manual check: UI tests verify `/` prompt, threaded results, paging, refresh guard, and `esc` restore.
 
 **Dependencies:** Task 10
 

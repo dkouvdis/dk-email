@@ -17,7 +17,7 @@ type KeyMap struct {
 	Refresh                key.Binding
 	Reply, ReplyAll        key.Binding
 	Forward, Compose       key.Binding
-	Picker, Filter         key.Binding
+	Picker, Filter, Search key.Binding
 	Connect, EditAccount   key.Binding
 	ToggleView, Help, Back key.Binding
 	Quit, ForceQuit        key.Binding
@@ -50,6 +50,7 @@ func DefaultKeyMap() KeyMap {
 		Compose:     b([]string{"c"}, "c", "new message"),
 		Picker:      b([]string{"a"}, "a", "accounts"),
 		Filter:      b([]string{"/"}, "/", "filter folders"),
+		Search:      b([]string{"/"}, "/", "search"),
 		Connect:     b([]string{"A"}, "A", "connect account"),
 		EditAccount: b([]string{"E"}, "E", "edit account"),
 		ToggleView:  b([]string{"v"}, "v", "split/list"),
@@ -78,7 +79,7 @@ func (k KeyMap) HelpSections() []popup.Section {
 			help("esc", "close, or save / discard"),
 			help("ctrl+c", "quit now"),
 		}},
-		{Title: "Accounts & view", Keys: []key.Binding{k.Picker, k.Filter, k.Connect, k.EditAccount, k.ToggleView}},
+		{Title: "Accounts & view", Keys: []key.Binding{k.Picker, k.Filter, k.Search, k.Connect, k.EditAccount, k.ToggleView}},
 		{Title: "General", Keys: []key.Binding{k.Help, k.Back, k.Quit, k.ForceQuit}},
 	}
 }
@@ -96,7 +97,7 @@ func (k KeyMap) hints(focus Pane, reading bool, kind Kind) []key.Binding {
 	}
 	switch focus {
 	case PaneList:
-		keys = append(keys, k.Expand, k.ToggleRead, k.Star, k.Archive, k.Delete, k.Move, k.Reply, k.Forward, k.Compose)
+		keys = append(keys, k.Expand, k.ToggleRead, k.Star, k.Archive, k.Delete, k.Move, k.Reply, k.Forward, k.Compose, k.Search)
 	case PaneSidebar:
 		keys = append(keys, key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "filter")))
 	}

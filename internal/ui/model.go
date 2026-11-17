@@ -12,6 +12,7 @@ import (
 
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/spinner"
+	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -67,6 +68,7 @@ type Model struct {
 	// that could undo an optimistic change.
 	writes, inflight int
 	list             threadlist.Model
+	search           listSearch
 	read             reader.Model
 
 	log           *slog.Logger
@@ -152,6 +154,8 @@ func New(cfg config.Config, connect Connector, log *slog.Logger) Model {
 		mode:          mode,
 		focus:         PaneList,
 	}
+	m.search.input = textinput.New()
+	m.search.input.Prompt = "/ "
 	for range names {
 		m.ids = append(m.ids, m.newID())
 	}
@@ -195,6 +199,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.helpPop = m.helpPop.Paste(msg)
 		case m.showPicker:
 			m.picker = m.picker.Paste(msg)
+		case m.search.input.Focused():
+			content := strings.Join(strings.Fields(msg.Content), " ")
+			m.search.input, _ = m.search.input.Update(tea.PasteMsg{Content: content})
 		case m.focus == PaneSidebar:
 			m.side = m.side.Paste(msg)
 		}
@@ -208,6 +215,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.openFolder(msg.Account, msg.Folder)
 	case summariesMsg:
 		return m.handleSummaries(msg)
+	case searchMsg:
+		return m.handleSearch(msg)
 	case threadlist.LoadMoreMsg:
 		return m.loadMore(msg.Before)
 	case messageMsg:
@@ -310,6 +319,10 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.side, cmd = m.side.Update(msg)
 		return m, cmd
 	}
+	// The list search prompt takes every key as well.
+	if m.search.input.Focused() && !m.popupOpen() {
+		return m.handleSearchKey(msg)
+	}
 	// q closes the topmost popup before it quits.
 	if key.Matches(msg, m.keys.Quit) {
 		if m.closeTopPopup() {
@@ -370,14 +383,22 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.openPicker()
 	case key.Matches(msg, m.keys.Refresh):
 		m, retry := m.retryFailed()
+		var rerun tea.Cmd
+		if m.searching() {
+			m, rerun = m.startSearch(m.search.query)
+		}
 		m, refresh := m.startRefresh(true)
-		return m, tea.Batch(retry, refresh)
+		return m, tea.Batch(retry, rerun, refresh)
 	case key.Matches(msg, m.keys.Connect):
 		return m.openConnect()
 	case key.Matches(msg, m.keys.EditAccount):
 		return m.openEdit()
 	case key.Matches(msg, m.keys.Compose) && m.open.account >= 0:
 		return m.startCompose()
+	case m.focus == PaneList && key.Matches(msg, m.keys.Search):
+		return m.openSearch()
+	case m.focus == PaneList && m.searching() && key.Matches(msg, m.keys.Back):
+		return m.clearSearch()
 	case m.focus == PaneList && key.Matches(msg, m.keys.Reply):
 		return m.startReply(false)
 	case m.focus == PaneList && key.Matches(msg, m.keys.ReplyAll):
@@ -539,11 +560,17 @@ const listHeaderRows = 1
 // account in list mode where there's no sidebar.
 func (m Model) listView(w, h int) string {
 	var title string
+	note := m.unreadNote()
+	if m.searching() {
+		note = m.styles.dim.Render(fmt.Sprintf(" · search: %s (%d)", m.search.query.Raw, m.search.total))
+	}
 	switch {
+	case m.search.input.Focused():
+		title = m.search.input.View()
 	case m.open.account >= 0 && m.panes.Kind == KindNarrow:
-		title = m.styles.title.Render(m.open.label) + m.unreadNote()
+		title = m.styles.title.Render(m.open.label) + note
 	case m.open.account >= 0:
-		title = m.styles.title.Render(m.accts[m.open.account].Name) + m.styles.dim.Render(" › "+m.open.label) + m.unreadNote()
+		title = m.styles.title.Render(m.accts[m.open.account].Name) + m.styles.dim.Render(" › "+m.open.label) + note
 	case len(m.accts) > 0:
 		title = m.styles.title.Render("Threads")
 	default:
@@ -558,6 +585,8 @@ func (m Model) listView(w, h int) string {
 		body = m.styles.dim.Render("Threads appear here once a folder is open.")
 	case m.open.loading:
 		body = m.styles.dim.Render("Loading…")
+	case m.searching() && m.list.Count() == 0:
+		body = m.styles.dim.Render("No messages match.")
 	default:
 		body = m.list.View(w, h-listHeaderRows)
 	}

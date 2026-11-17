@@ -97,7 +97,7 @@ func (m Model) refreshAccounts(manual bool, only int) (Model, tea.Cmd) {
 			continue
 		}
 		folder := ""
-		if i == m.open.account && !m.open.loading {
+		if i == m.open.account && !m.open.loading && !m.searching() {
 			folder = m.open.folder
 		}
 		cmds = append(cmds, refreshAccount(mb, i, m.ids[i], folder))
@@ -134,7 +134,7 @@ func (m Model) handleRefresh(msg refreshMsg) (Model, tea.Cmd) {
 		m.side = m.side.SetFolders(msg.account, msg.folders, nil)
 	}
 
-	openHere := msg.folder != "" && m.open.account == msg.account && m.open.folder == msg.folder && !m.open.loading
+	openHere := msg.folder != "" && m.open.account == msg.account && m.open.folder == msg.folder && !m.open.loading && !m.searching()
 	switch {
 	case !openHere:
 	case errors.Is(msg.sumsErr, mail.ErrFolderChanged):

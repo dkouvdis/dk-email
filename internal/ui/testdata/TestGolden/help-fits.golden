@@ -39,13 +39,13 @@
 │                              ││    │   enter / ←/→   choose From              ┃ │                                    │
 │                              ││    │   enter         next field (in a header) ┃ │                                    │
 │                              ││    │   esc           close, or save / discard ┃ │                                    │
-│                              ││    │   ctrl+c        quit now                 ┃ │                                    │
+│                              ││    │   ctrl+c        quit now                   │                                    │
 │                              ││    │                                            │                                    │
 │                              ││    │ Accounts & view                            │                                    │
 │                              ││    │   a             accounts                   │                                    │
 │                              ││    │   /             filter folders             │                                    │
+│                              ││    │   /             search                     │                                    │
 │                              ││    │   A             connect account            │                                    │
-│                              ││    │   E             edit account               │                                    │
 │                              ││    ╰────────────────────────────────────────────╯                                    │
 │                              ││                                                                                      │
 │                              ││                                                                                      │

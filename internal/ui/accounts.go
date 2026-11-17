@@ -199,6 +199,12 @@ func (m Model) openFolder(account int, folder string) (Model, tea.Cmd) {
 	}
 	m.open = openFolder{account: account, folder: folder, label: label, loading: true}
 	m.list = m.list.SetSummaries(nil, false)
+	m.search.gen++
+	m.search.query = mail.SearchQuery{}
+	m.search.total = 0
+	m.search.prev, m.search.prevTotal = mail.SearchQuery{}, 0
+	m.search.input.Reset()
+	m.search.input.Blur()
 	m.read = m.read.Close()
 	m.readerPopup = false
 	m.side = m.side.SetOpen(account, folder)
@@ -222,6 +228,9 @@ func (m Model) loadMore(before mail.UID) (Model, tea.Cmd) {
 	}
 	m.setStatus("Loading older messages…")
 	m.log.Debug("load page", "account", m.accts[m.open.account].Name, "before", before)
+	if m.searching() {
+		return m, runSearch(m.boxes[m.open.account], m.open.account, m.open.folder, m.search.query, before, m.search.gen)
+	}
 	return m, loadSummaries(m.boxes[m.open.account], m.open.account, m.open.folder, before)
 }
 
