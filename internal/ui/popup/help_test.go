@@ -291,3 +291,17 @@ func TestHelp_PasteIntoFilter(t *testing.T) {
 }
 
 func hintText(bs []key.Binding) string { return ansi.Strip(HintLine(bs)) }
+
+func TestHelp_FilterMatchesKeyText(t *testing.T) {
+	h := NewHelp(theme.Default(), []Section{{"Search", []key.Binding{
+		bind("from: to: cc:", "match an address"),
+		bind("-word", "exclude a term"),
+	}}})
+	h.SetSize(80, 40)
+	h, _ = h.Update(keyMsg("/"))
+	h = typeText(h, "from")
+	plain := ansi.Strip(h.View())
+	if !strings.Contains(plain, "from: to: cc:") || strings.Contains(plain, "-word") {
+		t.Errorf("filtering by key text failed:\n%s", plain)
+	}
+}

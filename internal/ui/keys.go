@@ -49,8 +49,8 @@ func DefaultKeyMap() KeyMap {
 		Forward:     b([]string{"f"}, "f", "forward"),
 		Compose:     b([]string{"c"}, "c", "new message"),
 		Picker:      b([]string{"a"}, "a", "accounts"),
-		Filter:      b([]string{"/"}, "/", "filter folders"),
-		Search:      b([]string{"/"}, "/", "search"),
+		Filter:      b([]string{"/"}, "/", "filter folder names"),
+		Search:      b([]string{"/"}, "/", "search folder"),
 		Connect:     b([]string{"A"}, "A", "connect account"),
 		EditAccount: b([]string{"E"}, "E", "edit account"),
 		ToggleView:  b([]string{"v"}, "v", "split/list"),
@@ -69,6 +69,18 @@ func (k KeyMap) HelpSections() []popup.Section {
 	return []popup.Section{
 		{Title: "Navigation", Keys: []key.Binding{k.Up, k.Down, k.Top, k.Bottom, k.Left, k.Right, k.NextPane, k.PrevPane}},
 		{Title: "Threads", Keys: []key.Binding{k.Open, k.Expand, k.ToggleRead, k.Star, k.Archive, k.Delete, k.Move, k.Refresh}},
+		{Title: "Search (thread list)", Keys: []key.Binding{
+			help("/", "search this folder"),
+			help("enter", "run the search"),
+			help("esc", "clear the search"),
+			help("ctrl+r", "run the search again"),
+			help("from: to: cc:", "match an address"),
+			help("subject: body:", "match a field"),
+			help("is:unread", "also is:read, is:starred"),
+			help("since: before:", "dates as YYYY-MM-DD"),
+			help("-word", "exclude a term"),
+			help(`"a phrase"`, "match exact words"),
+		}},
 		{Title: "Compose", Keys: []key.Binding{k.Reply, k.ReplyAll, k.Forward, k.Compose, help("enter", "edit draft (in Drafts)")}},
 		{Title: "Composer", Keys: []key.Binding{
 			help("ctrl+s", "send"),
@@ -79,7 +91,7 @@ func (k KeyMap) HelpSections() []popup.Section {
 			help("esc", "close, or save / discard"),
 			help("ctrl+c", "quit now"),
 		}},
-		{Title: "Accounts & view", Keys: []key.Binding{k.Picker, k.Filter, k.Search, k.Connect, k.EditAccount, k.ToggleView}},
+		{Title: "Accounts & view", Keys: []key.Binding{k.Picker, k.Filter, k.Connect, k.EditAccount, k.ToggleView}},
 		{Title: "General", Keys: []key.Binding{k.Help, k.Back, k.Quit, k.ForceQuit}},
 	}
 }

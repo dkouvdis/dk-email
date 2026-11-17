@@ -156,6 +156,7 @@ func New(cfg config.Config, connect Connector, log *slog.Logger) Model {
 	}
 	m.search.input = textinput.New()
 	m.search.input.Prompt = "/ "
+	m.search.input.Placeholder = "from:  subject:  is:unread  since:  -word"
 	for range names {
 		m.ids = append(m.ids, m.newID())
 	}

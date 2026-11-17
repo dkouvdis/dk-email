@@ -450,16 +450,30 @@ func TestSearch_TriageActsOnResults(t *testing.T) {
 
 func TestSearch_HelpAndHintsListIt(t *testing.T) {
 	m := send(t, New(testConfig(), nil, nil), size(200, 30))
-	if h := ansi.Strip(m.renderHints()); !strings.Contains(h, "search: /") && !strings.Contains(strings.ToLower(h), "search: /") {
+	if h := ansi.Strip(m.renderHints()); !strings.Contains(strings.ToLower(h), "search folder") {
 		t.Errorf("list hints = %q, want search", h)
 	}
 	found := false
 	for _, sec := range m.keys.HelpSections() {
 		for _, b := range sec.Keys {
-			found = found || (b.Help().Key == "/" && b.Help().Desc == "search")
+			found = found || (sec.Title == "Search (thread list)" && b.Help().Key == "/" && b.Help().Desc == "search this folder")
 		}
 	}
 	if !found {
 		t.Error("help doesn't list / search")
+	}
+}
+
+func TestSearch_PlaceholderShowsUntilTyping(t *testing.T) {
+	const hint = "from:  subject:  is:unread  since:  -word"
+	m := started(t, newFixture(), 160, 30)
+
+	m = send(t, m, press("/"))
+	if !strings.Contains(plain(m), hint) {
+		t.Errorf("empty prompt doesn't show the placeholder:\n%s", plain(m))
+	}
+	m = typeText(t, m, "a")
+	if strings.Contains(plain(m), hint) {
+		t.Errorf("placeholder still shown after typing:\n%s", plain(m))
 	}
 }

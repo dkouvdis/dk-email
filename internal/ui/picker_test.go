@@ -195,7 +195,7 @@ func TestFolderFilter_KeyIsInHelpAndSidebarHints(t *testing.T) {
 	for _, k := range []string{"?", "/", "f", "o", "l", "d"} {
 		m = pressSettled(t, m, k)
 	}
-	if !strings.Contains(plain(m), "filter folders") {
+	if !strings.Contains(plain(m), "filter folder names") {
 		t.Errorf("help popup doesn't list the folder filter:\n%s", plain(m))
 	}
 }
