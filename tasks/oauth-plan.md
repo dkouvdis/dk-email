@@ -25,7 +25,7 @@ Add first-class OAuth 2.0 (`XOAUTH2`) authentication for Microsoft 365 / Outlook
 - [ ] `go test -race ./internal/config ./internal/secret ./internal/oauth` passes; `go vet ./...` clean
 
 ### Phase 2: Transport (`XOAUTH2` SASL & Dynamic Reconnect Seam)
-- [ ] Task 4: `XOAUTH2` SASL client with 2-step error challenge handling
+- [x] Task 4: `XOAUTH2` SASL client with 2-step error challenge handling
 - [ ] Task 5: Dynamic per-session credential resolution in IMAP, SMTP, and root wiring
 
 ### Checkpoint: Transport

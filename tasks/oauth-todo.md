@@ -92,14 +92,14 @@ Plan: [oauth-plan.md](oauth-plan.md).
 **Description:** Implement a `sasl.Client` for the `XOAUTH2` mechanism used by Exchange Online and Gmail on both IMAP and SMTP, properly completing the 2-step base64 JSON error challenge required by `go-imap/v2` `Authenticate` and `go-smtp` `Auth`.
 
 **Acceptance criteria:**
-- [ ] `Start()` returns mechanism `"XOAUTH2"` and initial response `"user=" + email + "\x01auth=Bearer " + token + "\x01\x01"`.
-- [ ] On a server error challenge, `Next(challenge)` records the decoded JSON status/error without leaking the bearer token and returns `[]byte{}, nil` once so the transport sends the required empty `\r\n` response before reading tagged `NO` / `535`.
-- [ ] Unexpected subsequent challenges fail cleanly with an error instead of looping.
+- [x] `Start()` returns mechanism `"XOAUTH2"` and initial response `"user=" + email + "\x01auth=Bearer " + token + "\x01\x01"`.
+- [x] On a server error challenge, `Next(challenge)` records the decoded JSON status/error without leaking the bearer token and returns `[]byte{}, nil` once so the transport sends the required empty `\r\n` response before reading tagged `NO` / `535`.
+- [x] Unexpected subsequent challenges fail cleanly with an error instead of looping.
 
 **Verification:**
-- [ ] Tests pass: `go test -race ./internal/oauth -run TestXOAuth2`
-- [ ] Build succeeds: `go build -o bin/dk-email ./cmd/dk-email`
-- [ ] Manual check: None (protocol exchange verified in Task 5 transport tests).
+- [x] Tests pass: `go test -race ./internal/oauth -run TestXOAuth2`
+- [x] Build succeeds: `go build -o bin/dk-email ./cmd/dk-email`
+- [x] Manual check: None (protocol exchange verified in Task 5 transport tests).
 
 **Dependencies:** None
 
