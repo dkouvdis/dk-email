@@ -10,6 +10,7 @@ import (
 	"github.com/zalando/go-keyring"
 
 	"github.com/dkouvdis/dk-email/internal/config"
+	"github.com/dkouvdis/dk-email/internal/oauth"
 )
 
 const testPassword = "abcd-efgh-ijkl-mnop"
@@ -293,7 +294,7 @@ func TestCopy_NothingToCopyIsNotAnError(t *testing.T) {
 	}
 }
 
-var testToken = OAuthToken{
+var testToken = oauth.Token{
 	AccessToken:  "access-aaa",
 	RefreshToken: "refresh-rrr",
 	Expiry:       time.Date(2026, 11, 17, 12, 30, 0, 0, time.UTC),
@@ -430,7 +431,7 @@ func TestStoreToken_RejectsEmptyValues(t *testing.T) {
 	if err := StoreToken("", testToken); err == nil {
 		t.Error("StoreToken() with empty account name: error = nil")
 	}
-	if err := StoreToken("Work", OAuthToken{AccessToken: "a"}); err == nil {
+	if err := StoreToken("Work", oauth.Token{AccessToken: "a"}); err == nil {
 		t.Error("StoreToken() with empty refresh token: error = nil")
 	}
 }

@@ -18,7 +18,7 @@ import (
 
 	"github.com/dkouvdis/dk-email/internal/config"
 	"github.com/dkouvdis/dk-email/internal/mail"
-	"github.com/dkouvdis/dk-email/internal/oauth"
+	"github.com/dkouvdis/dk-email/internal/xoauth2"
 )
 
 // timeout bounds one whole Send or Verify call, including dialing.
@@ -173,11 +173,11 @@ func (t *Transport) handshake(ctx context.Context, raw net.Conn, tlsConfig *tls.
 // redacting the password and token from any error.
 func (t *Transport) auth(c *gosmtp.Client, login mail.Login) error {
 	var (
-		xc  *oauth.XOAuth2Client
+		xc  *xoauth2.Client
 		err error
 	)
 	if login.Token != "" {
-		xc = oauth.NewXOAuth2Client(t.acct.Username, login.Token)
+		xc = xoauth2.NewClient(t.acct.Username, login.Token)
 		err = c.Auth(xc)
 	} else {
 		err = c.Auth(sasl.NewPlainClient("", t.acct.Username, login.Password))

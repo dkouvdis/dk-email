@@ -22,7 +22,7 @@ import (
 
 	"github.com/dkouvdis/dk-email/internal/config"
 	"github.com/dkouvdis/dk-email/internal/mail"
-	"github.com/dkouvdis/dk-email/internal/oauth"
+	"github.com/dkouvdis/dk-email/internal/xoauth2"
 )
 
 // closeTimeout bounds how long Close waits for the server to acknowledge LOGOUT.
@@ -250,9 +250,9 @@ func (c *Client) handshake(ctx context.Context, raw net.Conn, login mail.Login) 
 		_ = conn.Close()
 		return nil, fmt.Errorf("waiting for greeting from %s: %w", c.acct.IMAPHost, err)
 	}
-	var xc *oauth.XOAuth2Client
+	var xc *xoauth2.Client
 	if login.Token != "" {
-		xc = oauth.NewXOAuth2Client(c.acct.Username, login.Token)
+		xc = xoauth2.NewClient(c.acct.Username, login.Token)
 		err = conn.Authenticate(xc)
 	} else {
 		err = conn.Login(c.acct.Username, login.Password).Wait()
@@ -287,7 +287,7 @@ func (c *Client) newTLSConfig() (*tls.Config, error) {
 
 // loginError describes a failed login, redacting the password and token from
 // server text. For XOAUTH2, xc adds the server's own rejection detail.
-func (c *Client) loginError(err error, login mail.Login, xc *oauth.XOAuth2Client) error {
+func (c *Client) loginError(err error, login mail.Login, xc *xoauth2.Client) error {
 	server := net.JoinHostPort(c.acct.IMAPHost, strconv.Itoa(c.acct.IMAPPort))
 	redact := func(s string) string {
 		for _, secret := range []string{login.Password, login.Token} {

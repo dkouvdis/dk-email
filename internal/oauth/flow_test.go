@@ -11,8 +11,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/dkouvdis/dk-email/internal/secret"
 )
 
 // browse simulates the browser: it GETs the redirect URI (on 127.0.0.1) with
@@ -37,7 +35,7 @@ func browse(t *testing.T, redirect string, q url.Values) (int, string) {
 }
 
 type loopResult struct {
-	tok secret.OAuthToken
+	tok Token
 	err error
 }
 

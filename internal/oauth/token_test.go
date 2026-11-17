@@ -9,8 +9,6 @@ import (
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/dkouvdis/dk-email/internal/secret"
 )
 
 func TestClean(t *testing.T) {
@@ -76,15 +74,15 @@ func okToken(w http.ResponseWriter, access, refresh string) {
 	writeJSON(w, 200, body)
 }
 
-func loader(tok secret.OAuthToken, err error) func() (secret.OAuthToken, error) {
-	return func() (secret.OAuthToken, error) { return tok, err }
+func loader(tok Token, err error) func() (Token, error) {
+	return func() (Token, error) { return tok, err }
 }
 
-func noSave(secret.OAuthToken) error { return nil }
+func noSave(Token) error { return nil }
 
 func TestTokenSource_CachedValid(t *testing.T) {
 	rec, cfg := newServer(t, func(int, url.Values, http.ResponseWriter) { t.Error("unexpected HTTP") })
-	tok := secret.OAuthToken{AccessToken: "cached", RefreshToken: "r", Expiry: fixedNow.Add(10 * time.Minute)}
+	tok := Token{AccessToken: "cached", RefreshToken: "r", Expiry: fixedNow.Add(10 * time.Minute)}
 	s := NewTokenSource(cfg, loader(tok, nil), noSave)
 	for range 2 {
 		got, err := s.Token(context.Background())
@@ -100,10 +98,10 @@ func TestTokenSource_CachedValid(t *testing.T) {
 func TestTokenSource_RefreshAndSave(t *testing.T) {
 	rec, cfg := newServer(t, func(_ int, _ url.Values, w http.ResponseWriter) { okToken(w, "new-access", "new-refresh") })
 	cfg.ClientSecret = "csecret"
-	old := secret.OAuthToken{AccessToken: "old", RefreshToken: "old-refresh", Expiry: fixedNow.Add(time.Minute)}
-	var saved []secret.OAuthToken
+	old := Token{AccessToken: "old", RefreshToken: "old-refresh", Expiry: fixedNow.Add(time.Minute)}
+	var saved []Token
 	returned := false
-	s := NewTokenSource(cfg, loader(old, nil), func(tok secret.OAuthToken) error {
+	s := NewTokenSource(cfg, loader(old, nil), func(tok Token) error {
 		if returned {
 			t.Error("save called after Token returned")
 		}
@@ -137,7 +135,7 @@ func TestTokenSource_RefreshAndSave(t *testing.T) {
 
 func TestTokenSource_NoClientSecretWhenEmpty(t *testing.T) {
 	rec, cfg := newServer(t, func(_ int, _ url.Values, w http.ResponseWriter) { okToken(w, "a", "r") })
-	s := NewTokenSource(cfg, loader(secret.OAuthToken{RefreshToken: "r0"}, nil), noSave)
+	s := NewTokenSource(cfg, loader(Token{RefreshToken: "r0"}, nil), noSave)
 	if _, err := s.Token(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -148,8 +146,8 @@ func TestTokenSource_NoClientSecretWhenEmpty(t *testing.T) {
 
 func TestTokenSource_KeepsOldRefreshToken(t *testing.T) {
 	_, cfg := newServer(t, func(_ int, _ url.Values, w http.ResponseWriter) { okToken(w, "a2", "") })
-	var saved secret.OAuthToken
-	s := NewTokenSource(cfg, loader(secret.OAuthToken{RefreshToken: "keep-me"}, nil), func(tok secret.OAuthToken) error {
+	var saved Token
+	s := NewTokenSource(cfg, loader(Token{RefreshToken: "keep-me"}, nil), func(tok Token) error {
 		saved = tok
 		return nil
 	})
@@ -165,8 +163,8 @@ func TestTokenSource_ExpiresInDefault(t *testing.T) {
 	_, cfg := newServer(t, func(_ int, _ url.Values, w http.ResponseWriter) {
 		writeJSON(w, 200, map[string]any{"access_token": "a"})
 	})
-	var saved secret.OAuthToken
-	s := NewTokenSource(cfg, loader(secret.OAuthToken{RefreshToken: "refresh-tok-1"}, nil), func(tok secret.OAuthToken) error {
+	var saved Token
+	s := NewTokenSource(cfg, loader(Token{RefreshToken: "refresh-tok-1"}, nil), func(tok Token) error {
 		saved = tok
 		return nil
 	})
@@ -180,9 +178,9 @@ func TestTokenSource_ExpiresInDefault(t *testing.T) {
 
 func TestTokenSource_LoadErrorPassesThrough(t *testing.T) {
 	_, cfg := newServer(t, func(int, url.Values, http.ResponseWriter) { t.Error("unexpected HTTP") })
-	s := NewTokenSource(cfg, loader(secret.OAuthToken{}, secret.ErrNoToken), noSave)
+	s := NewTokenSource(cfg, loader(Token{}, errNoToken), noSave)
 	_, err := s.Token(context.Background())
-	if !errors.Is(err, secret.ErrNoToken) {
+	if !errors.Is(err, errNoToken) {
 		t.Fatalf("err = %v", err)
 	}
 }
@@ -191,7 +189,7 @@ func TestTokenSource_InvalidGrant(t *testing.T) {
 	_, cfg := newServer(t, func(_ int, _ url.Values, w http.ResponseWriter) {
 		writeJSON(w, 400, map[string]any{"error": "invalid_grant", "error_description": "revoked"})
 	})
-	s := NewTokenSource(cfg, loader(secret.OAuthToken{RefreshToken: "refresh-tok-1"}, nil), noSave)
+	s := NewTokenSource(cfg, loader(Token{RefreshToken: "refresh-tok-1"}, nil), noSave)
 	_, err := s.Token(context.Background())
 	if !errors.Is(err, ErrInvalidGrant) {
 		t.Fatalf("err = %v", err)
@@ -208,7 +206,7 @@ func TestTokenSource_ErrorsNeverLeakSecrets(t *testing.T) {
 			http.Error(w, "boom refresh-secret-1 csecret-9", 500)
 		})
 		cfg.ClientSecret = "csecret-9"
-		s := NewTokenSource(cfg, loader(secret.OAuthToken{RefreshToken: "refresh-secret-1"}, nil), noSave)
+		s := NewTokenSource(cfg, loader(Token{RefreshToken: "refresh-secret-1"}, nil), noSave)
 		_, err := s.Token(context.Background())
 		if err == nil || !strings.Contains(err.Error(), "500") {
 			t.Fatalf("err = %v", err)
@@ -220,7 +218,7 @@ func TestTokenSource_ErrorsNeverLeakSecrets(t *testing.T) {
 			writeJSON(w, 400, map[string]any{"error": "invalid_request", "error_description": "bad refresh-secret-1 and csecret-9"})
 		})
 		cfg.ClientSecret = "csecret-9"
-		s := NewTokenSource(cfg, loader(secret.OAuthToken{RefreshToken: "refresh-secret-1"}, nil), noSave)
+		s := NewTokenSource(cfg, loader(Token{RefreshToken: "refresh-secret-1"}, nil), noSave)
 		_, err := s.Token(context.Background())
 		if err == nil || !strings.Contains(err.Error(), "[redacted]") {
 			t.Fatalf("err = %v", err)
@@ -231,7 +229,7 @@ func TestTokenSource_ErrorsNeverLeakSecrets(t *testing.T) {
 		_, cfg := newServer(t, func(_ int, _ url.Values, w http.ResponseWriter) {
 			writeJSON(w, 200, map[string]any{"refresh_token": "x"})
 		})
-		s := NewTokenSource(cfg, loader(secret.OAuthToken{RefreshToken: "refresh-tok-1"}, nil), noSave)
+		s := NewTokenSource(cfg, loader(Token{RefreshToken: "refresh-tok-1"}, nil), noSave)
 		_, err := s.Token(context.Background())
 		if err == nil || !strings.Contains(err.Error(), "no access_token") {
 			t.Fatalf("err = %v", err)
@@ -244,7 +242,7 @@ func TestTokenSource_SaveFailure(t *testing.T) {
 	saveErr := errors.New("keychain locked")
 	saves := 0
 	var saveResult error = saveErr
-	s := NewTokenSource(cfg, loader(secret.OAuthToken{RefreshToken: "refresh-tok-1"}, nil), func(secret.OAuthToken) error {
+	s := NewTokenSource(cfg, loader(Token{RefreshToken: "refresh-tok-1"}, nil), func(Token) error {
 		saves++
 		return saveResult
 	})
@@ -283,7 +281,7 @@ func TestTokenSource_Concurrent(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 		okToken(w, "fresh", "r2")
 	})
-	s := NewTokenSource(cfg, loader(secret.OAuthToken{RefreshToken: "r", Expiry: fixedNow.Add(-time.Hour)}, nil), noSave)
+	s := NewTokenSource(cfg, loader(Token{RefreshToken: "r", Expiry: fixedNow.Add(-time.Hour)}, nil), noSave)
 	var wg sync.WaitGroup
 	for range 10 {
 		wg.Add(1)
@@ -299,3 +297,5 @@ func TestTokenSource_Concurrent(t *testing.T) {
 		t.Errorf("refresh requests = %d, want 1", rec.count())
 	}
 }
+
+var errNoToken = errors.New("no token")

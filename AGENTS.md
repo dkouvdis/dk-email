@@ -53,7 +53,8 @@ Supporting modules:
 - `internal/compose`: pure drafting logic: reply/reply-all/forward/new drafts, composer fields (`Fields`/`FieldsOf`), MIME build (`Build` never writes Bcc; `BuildDraft` does), and `FromRaw` to reopen a saved draft.
 - `internal/send`: orchestration implementing `mail.Sender` (forward attachment fetch, build once, SMTP, Sent `APPEND`, `\Answered`, remove the replaced draft) and `mail.Drafter` (`SaveDraft`, `OpenDraft`).
 - `internal/secret`: password resolution from `password_cmd` or OS keychain, plus OAuth token bundles (`oauth:<account>`) and client secrets (`oauth-client-secret:<account>`) in the keychain.
-- `internal/oauth`: stdlib-only OAuth 2.0 for Microsoft and Google: loopback PKCE and Microsoft device code sign-in, and a serialized `TokenSource` that refreshes near expiry and saves rotated refresh tokens. Errors never carry tokens, codes or secrets.
+- `internal/oauth`: OAuth 2.0 for Microsoft and Google (standard library plus `internal/config`; the keychain stays in `internal/secret`): loopback PKCE and Microsoft device code sign-in, and a serialized `TokenSource` that refreshes near expiry and saves rotated refresh tokens. Errors never carry tokens, codes or secrets.
+- `internal/xoauth2`: stdlib-only XOAUTH2 SASL client used by IMAP and SMTP; errors never carry the token.
 - `internal/config`: strict TOML load/validate/defaults and append-account persistence.
 
 ## Key repository-specific conventions

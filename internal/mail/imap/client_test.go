@@ -18,7 +18,7 @@ import (
 
 	"github.com/dkouvdis/dk-email/internal/config"
 	"github.com/dkouvdis/dk-email/internal/mail"
-	"github.com/dkouvdis/dk-email/internal/oauth"
+	"github.com/dkouvdis/dk-email/internal/xoauth2"
 )
 
 var bg = context.Background()
@@ -245,7 +245,7 @@ func TestLoginError_NonServerErrorNamesHostAndPort(t *testing.T) {
 
 func TestLoginError_IMAPDisabledDropsTheTokenDetail(t *testing.T) {
 	c := New(config.Account{Name: "Work", IMAPHost: "imap.gmail.com", IMAPPort: 993}, "")
-	xc := oauth.NewXOAuth2Client("me@example.com", "tok-secret")
+	xc := xoauth2.NewClient("me@example.com", "tok-secret")
 	if _, err := xc.Next([]byte(`{"status":"400","schemes":"Bearer","scope":"https://mail.google.com/"}`)); err != nil {
 		t.Fatal(err)
 	}

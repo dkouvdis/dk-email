@@ -26,13 +26,13 @@ import (
 type signInStubs struct {
 	opened     []string
 	browserErr error
-	loopbackFn func(cfg oauth.Config, onURL func(string) error) (secret.OAuthToken, error)
+	loopbackFn func(cfg oauth.Config, onURL func(string) error) (oauth.Token, error)
 	deviceCfgs []oauth.Config
 	loopCfgs   []oauth.Config
 	progress   []popup.SignIn
 }
 
-var testToken = secret.OAuthToken{AccessToken: "access-1", RefreshToken: "refresh-1", Expiry: time.Now().Add(time.Hour)}
+var testToken = oauth.Token{AccessToken: "access-1", RefreshToken: "refresh-1", Expiry: time.Now().Add(time.Hour)}
 
 func stubSignIn(t *testing.T) *signInStubs {
 	t.Helper()
@@ -42,17 +42,17 @@ func stubSignIn(t *testing.T) *signInStubs {
 		s.opened = append(s.opened, u)
 		return s.browserErr
 	}
-	runLoopback = func(_ context.Context, cfg oauth.Config, onURL func(string) error) (secret.OAuthToken, error) {
+	runLoopback = func(_ context.Context, cfg oauth.Config, onURL func(string) error) (oauth.Token, error) {
 		s.loopCfgs = append(s.loopCfgs, cfg)
 		if s.loopbackFn != nil {
 			return s.loopbackFn(cfg, onURL)
 		}
 		if err := onURL("https://auth.example/authorize?s=1"); err != nil {
-			return secret.OAuthToken{}, fmt.Errorf("oauth: %w", err)
+			return oauth.Token{}, fmt.Errorf("oauth: %w", err)
 		}
 		return testToken, nil
 	}
-	runDeviceCode = func(_ context.Context, cfg oauth.Config, show func(oauth.DeviceAuth)) (secret.OAuthToken, error) {
+	runDeviceCode = func(_ context.Context, cfg oauth.Config, show func(oauth.DeviceAuth)) (oauth.Token, error) {
 		s.deviceCfgs = append(s.deviceCfgs, cfg)
 		show(oauth.DeviceAuth{UserCode: "ABCD-EFGH", VerificationURI: "https://microsoft.com/devicelogin"})
 		return testToken, nil
@@ -125,7 +125,7 @@ func TestSignIn_GoogleBrowserFailureKeepsWaitingForTheCallback(t *testing.T) {
 	s := stubSignIn(t)
 	s.browserErr = errors.New("no display")
 	var urlErr error
-	s.loopbackFn = func(_ oauth.Config, onURL func(string) error) (secret.OAuthToken, error) {
+	s.loopbackFn = func(_ oauth.Config, onURL func(string) error) (oauth.Token, error) {
 		urlErr = onURL("https://accounts.example/auth")
 		return testToken, nil // the user opened the address by hand
 	}
@@ -162,7 +162,7 @@ func TestSignIn_UseCodeGoesStraightToTheDeviceFlow(t *testing.T) {
 func TestSignIn_FlowErrorIsReturned(t *testing.T) {
 	s := stubSignIn(t)
 	want := errors.New("access_denied")
-	s.loopbackFn = func(oauth.Config, func(string) error) (secret.OAuthToken, error) { return secret.OAuthToken{}, want }
+	s.loopbackFn = func(oauth.Config, func(string) error) (oauth.Token, error) { return oauth.Token{}, want }
 
 	sess, err := signIn(stubResolver{})(context.Background(), oauthProviderAccount(), "", false, s.report)
 
@@ -192,7 +192,7 @@ func TestSignIn_SaveStoresTheTokenThenTheTypedClientSecret(t *testing.T) {
 	k := stubKeychain(t, nil)
 	var stored []string
 	oldStore := storeToken
-	storeToken = func(account string, tok secret.OAuthToken) error {
+	storeToken = func(account string, tok oauth.Token) error {
 		stored = append(stored, "store-token "+account+" "+tok.RefreshToken)
 		return nil
 	}
@@ -222,7 +222,7 @@ func TestSignIn_SaveWithoutTypedSecretLeavesTheSavedOneAlone(t *testing.T) {
 	stubSignIn(t)
 	k := stubKeychain(t, nil)
 	oldStore := storeToken
-	storeToken = func(string, secret.OAuthToken) error { return nil }
+	storeToken = func(string, oauth.Token) error { return nil }
 	t.Cleanup(func() { storeToken = oldStore })
 
 	sess, _ := signIn(csResolver{clientSecret: "saved"})(context.Background(), googleAccount(), "", false, func(popup.SignIn) {})
@@ -239,7 +239,7 @@ func TestSignIn_ClientSecretFailureRemovesTheToken(t *testing.T) {
 	k := stubKeychain(t, nil)
 	k.secretErr = errors.New("keychain locked")
 	oldStore := storeToken
-	storeToken = func(string, secret.OAuthToken) error { return nil }
+	storeToken = func(string, oauth.Token) error { return nil }
 	t.Cleanup(func() { storeToken = oldStore })
 
 	sess, _ := signIn(stubResolver{})(context.Background(), googleAccount(), "typed", false, func(popup.SignIn) {})
@@ -286,7 +286,7 @@ func refreshingSession(t *testing.T) (*oauthSession, *oauth.TokenSource) {
 		fmt.Fprintf(w, `{"access_token":"access-%d","refresh_token":"refresh-%d","expires_in":1}`, calls, calls)
 	}))
 	t.Cleanup(srv.Close)
-	s := &oauthSession{tok: secret.OAuthToken{AccessToken: "access-1", RefreshToken: "refresh-1", Expiry: time.Now().Add(-time.Hour)}}
+	s := &oauthSession{tok: oauth.Token{AccessToken: "access-1", RefreshToken: "refresh-1", Expiry: time.Now().Add(-time.Hour)}}
 	cfg := oauth.Config{Provider: oauth.Provider{TokenURL: srv.URL}, ClientID: "cid", HTTPClient: srv.Client()}
 	return s, oauth.NewTokenSource(cfg, s.load, s.saveRefreshed)
 }
@@ -294,7 +294,7 @@ func refreshingSession(t *testing.T) (*oauthSession, *oauth.TokenSource) {
 func TestSession_RefreshedTokensAreStoredUnderTheSavedNameOnly(t *testing.T) {
 	var stored []string
 	oldStore := storeToken
-	storeToken = func(account string, tok secret.OAuthToken) error {
+	storeToken = func(account string, tok oauth.Token) error {
 		stored = append(stored, account+" "+tok.AccessToken)
 		return nil
 	}
@@ -323,7 +323,7 @@ func TestNewConnector_WrapsMissingAndRevokedSignInsAsNeedsSignIn(t *testing.T) {
 	old := loadToken
 	t.Cleanup(func() { loadToken = old })
 	for _, cause := range []error{secret.ErrNoToken, oauth.ErrInvalidGrant, fmt.Errorf("oauth: refresh token: %w", oauth.ErrInvalidGrant)} {
-		loadToken = func(string) (secret.OAuthToken, error) { return secret.OAuthToken{}, cause }
+		loadToken = func(string) (oauth.Token, error) { return oauth.Token{}, cause }
 
 		conn, err := newConnector(stubResolver{}, slog.New(slog.DiscardHandler))(context.Background(), oauthProviderAccount())
 
@@ -334,7 +334,7 @@ func TestNewConnector_WrapsMissingAndRevokedSignInsAsNeedsSignIn(t *testing.T) {
 
 	// Other errors stay as they are.
 	other := errors.New("network down")
-	loadToken = func(string) (secret.OAuthToken, error) { return secret.OAuthToken{}, other }
+	loadToken = func(string) (oauth.Token, error) { return oauth.Token{}, other }
 	if _, err := newConnector(stubResolver{}, slog.New(slog.DiscardHandler))(context.Background(), oauthProviderAccount()); !errors.Is(err, other) || errors.Is(err, ui.ErrNeedsSignIn) {
 		t.Errorf("error = %v", err)
 	}

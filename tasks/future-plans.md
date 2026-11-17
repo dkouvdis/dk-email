@@ -61,14 +61,6 @@ must keep possible.
 
 ## Low Priority
 
-- **Keep `internal/oauth` free of the keychain**: `internal/oauth` imports
-  `internal/secret` only for the `OAuthToken` type, so it, and through the
-  `XOAuth2Client` import `internal/mail/imap` and `internal/mail/smtp`, now
-  depend on go-keyring, TOML and `internal/config`. Define the token type in
-  `oauth` (and have `secret` store it), and move `XOAuth2Client` to a leaf
-  package with no dependencies. Found in the OAuth architecture review;
-  a refactor, no behaviour change.
-
 - **Undo in the composer**: the Bubbles textarea has no undo history.
 - **Hard wrapping / format=flowed**: the body is sent exactly as typed;
   wrapping long lines or sending `format=flowed` would read better in some

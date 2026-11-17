@@ -12,8 +12,6 @@ import (
 	"sync"
 	"time"
 	"unicode"
-
-	"github.com/dkouvdis/dk-email/internal/secret"
 )
 
 const (
@@ -22,6 +20,13 @@ const (
 	refreshMargin   = 2 * time.Minute
 	defaultLifetime = time.Hour
 )
+
+// Token is an account's OAuth 2.0 sign-in.
+type Token struct {
+	AccessToken  string    `json:"access_token"`
+	RefreshToken string    `json:"refresh_token"`
+	Expiry       time.Time `json:"expiry"`
+}
 
 // ErrInvalidGrant means the stored sign-in is no longer accepted.
 var ErrInvalidGrant = errors.New("sign-in expired or was revoked: sign in again")
@@ -161,7 +166,7 @@ type tokenResponse struct {
 }
 
 // tokenRequest posts form to the token endpoint and returns the new token.
-func (c Config) tokenRequest(ctx context.Context, form url.Values, secrets ...string) (secret.OAuthToken, error) {
+func (c Config) tokenRequest(ctx context.Context, form url.Values, secrets ...string) (Token, error) {
 	form.Set("client_id", c.ClientID)
 	if c.ClientSecret != "" {
 		form.Set("client_secret", c.ClientSecret)
@@ -169,16 +174,16 @@ func (c Config) tokenRequest(ctx context.Context, form url.Values, secrets ...st
 	}
 	var tr tokenResponse
 	if err := c.post(ctx, c.Provider.TokenURL, form, &tr, secrets...); err != nil {
-		return secret.OAuthToken{}, err
+		return Token{}, err
 	}
 	if tr.AccessToken == "" {
-		return secret.OAuthToken{}, errors.New("oauth: token response has no access_token")
+		return Token{}, errors.New("oauth: token response has no access_token")
 	}
 	life := time.Duration(tr.ExpiresIn) * time.Second
 	if tr.ExpiresIn <= 0 {
 		life = defaultLifetime
 	}
-	return secret.OAuthToken{
+	return Token{
 		AccessToken:  tr.AccessToken,
 		RefreshToken: tr.RefreshToken,
 		Expiry:       c.now().Add(life),
@@ -201,18 +206,18 @@ func (f CommandSource) Token(ctx context.Context) (string, error) { return f(ctx
 // refresh token is never used twice.
 type TokenSource struct {
 	cfg  Config
-	load func() (secret.OAuthToken, error)
-	save func(secret.OAuthToken) error
+	load func() (Token, error)
+	save func(Token) error
 
 	mu  sync.Mutex
-	tok *secret.OAuthToken
+	tok *Token
 	// unsaved is set when tok was refreshed but could not be saved.
 	unsaved bool
 }
 
 // NewTokenSource returns a Source that loads the stored sign-in with load and
 // persists each refreshed one with save.
-func NewTokenSource(cfg Config, load func() (secret.OAuthToken, error), save func(secret.OAuthToken) error) *TokenSource {
+func NewTokenSource(cfg Config, load func() (Token, error), save func(Token) error) *TokenSource {
 	return &TokenSource{cfg: cfg, load: load, save: save}
 }
 

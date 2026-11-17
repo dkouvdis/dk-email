@@ -121,7 +121,8 @@ git tag -a v0.1.0-beta.1 -m "v0.1.0-beta.1" && git push origin v0.1.0-beta.1   #
 cmd/dk-email/          → main: flags, wiring, tea.NewProgram
 internal/config/       → paths (XDG), load/validate/append-account, writes config-dir .gitignore
 internal/secret/       → password resolution: password_cmd runner, keychain get/set; OAuth token bundles and client secrets in the keychain
-internal/oauth/        → stdlib-only OAuth 2.0: Microsoft/Google providers, loopback PKCE and device code sign-in, refreshing TokenSource, XOAUTH2 SASL client
+internal/oauth/        → OAuth 2.0 (no keychain): Microsoft/Google providers, loopback PKCE and device code sign-in, refreshing TokenSource
+internal/xoauth2/      → stdlib-only XOAUTH2 SASL client for IMAP and SMTP
 internal/mail/         → provider-agnostic domain types + Mailbox interface (no IMAP imports)
 internal/mail/imap/    → go-imap v2 implementation of mail.Mailbox
 internal/mail/smtp/    → go-smtp transport (implicit TLS / STARTTLS, AUTH PLAIN or XOAUTH2)

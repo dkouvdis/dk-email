@@ -9,7 +9,6 @@ import (
 
 	"github.com/dkouvdis/dk-email/internal/config"
 	"github.com/dkouvdis/dk-email/internal/oauth"
-	"github.com/dkouvdis/dk-email/internal/secret"
 	"github.com/dkouvdis/dk-email/internal/ui"
 	"github.com/dkouvdis/dk-email/internal/ui/popup"
 )
@@ -35,10 +34,10 @@ var openBrowser = func(url string) error {
 // runLoopback and runDeviceCode run the OAuth sign-in flows; tests replace
 // them to avoid the network.
 var (
-	runLoopback = func(ctx context.Context, cfg oauth.Config, onURL func(string) error) (secret.OAuthToken, error) {
+	runLoopback = func(ctx context.Context, cfg oauth.Config, onURL func(string) error) (oauth.Token, error) {
 		return cfg.Loopback(ctx, onURL)
 	}
-	runDeviceCode = func(ctx context.Context, cfg oauth.Config, show func(oauth.DeviceAuth)) (secret.OAuthToken, error) {
+	runDeviceCode = func(ctx context.Context, cfg oauth.Config, show func(oauth.DeviceAuth)) (oauth.Token, error) {
 		return cfg.DeviceCode(ctx, show)
 	}
 )
@@ -64,12 +63,12 @@ func signIn(pw secretResolver) func(ctx context.Context, acct config.Account, cl
 		}
 		cfg := oauth.Config{Provider: p, ClientID: acct.OAuthClientID, ClientSecret: clientSecret, LoginHint: acct.Email}
 
-		deviceCode := func() (secret.OAuthToken, error) {
+		deviceCode := func() (oauth.Token, error) {
 			return runDeviceCode(ctx, cfg, func(d oauth.DeviceAuth) {
 				progress(popup.SignIn{UserCode: d.UserCode, VerificationURI: d.VerificationURI})
 			})
 		}
-		var tok secret.OAuthToken
+		var tok oauth.Token
 		if useCode {
 			tok, err = deviceCode()
 		} else {
@@ -107,17 +106,17 @@ type oauthSession struct {
 	clientSecret string
 
 	mu      sync.Mutex
-	tok     secret.OAuthToken
+	tok     oauth.Token
 	savedAs string
 }
 
-func (s *oauthSession) load() (secret.OAuthToken, error) {
+func (s *oauthSession) load() (oauth.Token, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.tok, nil
 }
 
-func (s *oauthSession) saveRefreshed(t secret.OAuthToken) error {
+func (s *oauthSession) saveRefreshed(t oauth.Token) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.tok = t

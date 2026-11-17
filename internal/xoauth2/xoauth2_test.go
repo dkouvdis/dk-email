@@ -1,4 +1,4 @@
-package oauth
+package xoauth2
 
 import (
 	"errors"
@@ -8,10 +8,10 @@ import (
 	"github.com/emersion/go-sasl"
 )
 
-var _ sasl.Client = (*XOAuth2Client)(nil)
+var _ sasl.Client = (*Client)(nil)
 
 func TestXOAuth2_Start(t *testing.T) {
-	c := NewXOAuth2Client("me@example.com", "tok123")
+	c := NewClient("me@example.com", "tok123")
 	mech, ir, err := c.Start()
 	if err != nil {
 		t.Fatalf("Start error: %v", err)
@@ -26,7 +26,7 @@ func TestXOAuth2_Start(t *testing.T) {
 }
 
 func TestXOAuth2_ErrorChallenge(t *testing.T) {
-	c := NewXOAuth2Client("me@example.com", "tok123")
+	c := NewClient("me@example.com", "tok123")
 	resp, err := c.Next([]byte(`{"status":"400","schemes":"Bearer","scope":"https://mail.google.com/"}`))
 	if err != nil {
 		t.Fatalf("Next error: %v", err)
@@ -34,9 +34,9 @@ func TestXOAuth2_ErrorChallenge(t *testing.T) {
 	if resp == nil || len(resp) != 0 {
 		t.Errorf("resp = %#v, want non-nil empty", resp)
 	}
-	var xe *XOAuth2Error
+	var xe *Error
 	if !errors.As(c.Err(), &xe) {
-		t.Fatalf("Err() = %#v, want *XOAuth2Error", c.Err())
+		t.Fatalf("Err() = %#v, want *Error", c.Err())
 	}
 	if xe.Status != "400" || xe.Scope != "https://mail.google.com/" {
 		t.Errorf("failure = %+v", xe)
@@ -48,7 +48,7 @@ func TestXOAuth2_ErrorChallenge(t *testing.T) {
 }
 
 func TestXOAuth2_NonJSONChallenge(t *testing.T) {
-	c := NewXOAuth2Client("me@example.com", "tok123")
+	c := NewClient("me@example.com", "tok123")
 	resp, err := c.Next([]byte("secret-raw-garbage"))
 	if err != nil {
 		t.Fatalf("Next error: %v", err)
@@ -68,7 +68,7 @@ func TestXOAuth2_NonJSONChallenge(t *testing.T) {
 }
 
 func TestXOAuth2_SecondChallengeFails(t *testing.T) {
-	c := NewXOAuth2Client("me@example.com", "tok123")
+	c := NewClient("me@example.com", "tok123")
 	if _, err := c.Next([]byte(`{"status":"401"}`)); err != nil {
 		t.Fatalf("first Next error: %v", err)
 	}
@@ -85,7 +85,7 @@ func TestXOAuth2_SecondChallengeFails(t *testing.T) {
 }
 
 func TestXOAuth2_NoChallengeNoErr(t *testing.T) {
-	c := NewXOAuth2Client("me@example.com", "tok123")
+	c := NewClient("me@example.com", "tok123")
 	if c.Err() != nil {
 		t.Errorf("Err() = %#v, want nil", c.Err())
 	}
@@ -93,7 +93,7 @@ func TestXOAuth2_NoChallengeNoErr(t *testing.T) {
 
 func TestXOAuth2_ErrorNeverLeaksToken(t *testing.T) {
 	const tok = "supersecrettoken"
-	c := NewXOAuth2Client("me@example.com", tok)
+	c := NewClient("me@example.com", tok)
 	if _, err := c.Next([]byte(`{"status":"` + tok + `","scope":"x ` + tok + ` y"}`)); err != nil {
 		t.Fatalf("Next error: %v", err)
 	}

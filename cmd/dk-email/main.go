@@ -122,8 +122,8 @@ func credentials(ctx context.Context, pw secretResolver, acct config.Account) (m
 	}
 	ts := oauth.NewTokenSource(
 		oauth.Config{Provider: provider, ClientID: acct.OAuthClientID, ClientSecret: clientSecret, LoginHint: acct.Email},
-		func() (secret.OAuthToken, error) { return loadToken(acct.Name) },
-		func(t secret.OAuthToken) error { return storeToken(acct.Name, t) },
+		func() (oauth.Token, error) { return loadToken(acct.Name) },
+		func(t oauth.Token) error { return storeToken(acct.Name, t) },
 	)
 	return tokenCredentials(ts), nil
 }

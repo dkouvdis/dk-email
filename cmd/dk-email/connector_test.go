@@ -18,6 +18,7 @@ import (
 	"github.com/dkouvdis/dk-email/internal/config"
 	"github.com/dkouvdis/dk-email/internal/mail"
 	"github.com/dkouvdis/dk-email/internal/mail/mailtest"
+	"github.com/dkouvdis/dk-email/internal/oauth"
 	"github.com/dkouvdis/dk-email/internal/secret"
 	"github.com/dkouvdis/dk-email/internal/ui"
 )
@@ -693,9 +694,9 @@ func TestCredentials_OAuthProviderUsesStoredToken(t *testing.T) {
 	old := loadToken
 	t.Cleanup(func() { loadToken = old })
 	var loaded []string
-	loadToken = func(account string) (secret.OAuthToken, error) {
+	loadToken = func(account string) (oauth.Token, error) {
 		loaded = append(loaded, account)
-		return secret.OAuthToken{AccessToken: "stored-access", RefreshToken: "r", Expiry: time.Now().Add(time.Hour)}, nil
+		return oauth.Token{AccessToken: "stored-access", RefreshToken: "r", Expiry: time.Now().Add(time.Hour)}, nil
 	}
 
 	creds, err := credentials(context.Background(), stubResolver{}, oauthProviderAccount())
@@ -715,7 +716,7 @@ func TestCredentials_OAuthProviderUsesStoredToken(t *testing.T) {
 func TestCredentials_OAuthProviderWithoutSignInFailsOnUse(t *testing.T) {
 	old := loadToken
 	t.Cleanup(func() { loadToken = old })
-	loadToken = func(string) (secret.OAuthToken, error) { return secret.OAuthToken{}, secret.ErrNoToken }
+	loadToken = func(string) (oauth.Token, error) { return oauth.Token{}, secret.ErrNoToken }
 
 	creds, err := credentials(context.Background(), stubResolver{}, oauthProviderAccount())
 	if err != nil {

@@ -16,6 +16,7 @@ import (
 	"github.com/zalando/go-keyring"
 
 	"github.com/dkouvdis/dk-email/internal/config"
+	"github.com/dkouvdis/dk-email/internal/oauth"
 )
 
 const (
@@ -177,33 +178,26 @@ func Copy(oldName, newName string) error {
 func tokenKey(account string) string        { return "oauth:" + account }
 func clientSecretKey(account string) string { return "oauth-client-secret:" + account }
 
-// OAuthToken is an account's OAuth 2.0 sign-in, kept in the keychain as JSON.
-type OAuthToken struct {
-	AccessToken  string    `json:"access_token"`
-	RefreshToken string    `json:"refresh_token"`
-	Expiry       time.Time `json:"expiry"`
-}
-
 // LoadToken returns the account's OAuth sign-in from the OS keychain. A missing
 // or unreadable entry is ErrNoToken.
-func LoadToken(account string) (OAuthToken, error) {
+func LoadToken(account string) (oauth.Token, error) {
 	raw, err := keyring.Get(keychainService, tokenKey(account))
 	if errors.Is(err, keyring.ErrNotFound) || (err == nil && raw == "") {
-		return OAuthToken{}, fmt.Errorf("account %q: %w", account, ErrNoToken)
+		return oauth.Token{}, fmt.Errorf("account %q: %w", account, ErrNoToken)
 	}
 	if err != nil {
-		return OAuthToken{}, fmt.Errorf("read keychain OAuth token for account %q: %w", account, err)
+		return oauth.Token{}, fmt.Errorf("read keychain OAuth token for account %q: %w", account, err)
 	}
-	var tok OAuthToken
+	var tok oauth.Token
 	// The JSON error can quote token bytes, so it is dropped.
 	if json.Unmarshal([]byte(raw), &tok) != nil || tok.RefreshToken == "" {
-		return OAuthToken{}, fmt.Errorf("account %q: stored OAuth token is unreadable: %w", account, ErrNoToken)
+		return oauth.Token{}, fmt.Errorf("account %q: stored OAuth token is unreadable: %w", account, ErrNoToken)
 	}
 	return tok, nil
 }
 
 // StoreToken saves the account's OAuth sign-in in the OS keychain.
-func StoreToken(account string, tok OAuthToken) error {
+func StoreToken(account string, tok oauth.Token) error {
 	if strings.TrimSpace(account) == "" {
 		return errors.New("store OAuth token: account name is required")
 	}

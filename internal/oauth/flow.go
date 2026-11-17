@@ -14,8 +14,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/dkouvdis/dk-email/internal/secret"
 )
 
 const (
@@ -32,17 +30,17 @@ func randomString(n int) (string, error) {
 }
 
 type loopbackResult struct {
-	tok secret.OAuthToken
+	tok Token
 	err error
 }
 
 // Loopback signs in with the authorization code flow and PKCE. It listens on
 // the loopback interface for the redirect and calls onURL with the
 // authorization URL; the caller opens the browser and may show the URL.
-func (c Config) Loopback(ctx context.Context, onURL func(authURL string) error) (secret.OAuthToken, error) {
+func (c Config) Loopback(ctx context.Context, onURL func(authURL string) error) (Token, error) {
 	l4, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
-		return secret.OAuthToken{}, fmt.Errorf("oauth: %w", err)
+		return Token{}, fmt.Errorf("oauth: %w", err)
 	}
 	port := l4.Addr().(*net.TCPAddr).Port
 	// Browsers may resolve localhost to IPv6; best effort.
@@ -54,7 +52,7 @@ func (c Config) Loopback(ctx context.Context, onURL func(authURL string) error) 
 		if l6 != nil {
 			l6.Close()
 		}
-		return secret.OAuthToken{}, err
+		return Token{}, err
 	}
 	state, err := randomString(16)
 	if err != nil {
@@ -62,7 +60,7 @@ func (c Config) Loopback(ctx context.Context, onURL func(authURL string) error) 
 		if l6 != nil {
 			l6.Close()
 		}
-		return secret.OAuthToken{}, err
+		return Token{}, err
 	}
 	sum := sha256.Sum256([]byte(verifier))
 	challenge := base64.RawURLEncoding.EncodeToString(sum[:])
@@ -103,14 +101,14 @@ func (c Config) Loopback(ctx context.Context, onURL func(authURL string) error) 
 		q.Set(k, v)
 	}
 	if err := onURL(c.Provider.AuthURL + "?" + q.Encode()); err != nil {
-		return secret.OAuthToken{}, fmt.Errorf("oauth: %w", err)
+		return Token{}, fmt.Errorf("oauth: %w", err)
 	}
 
 	select {
 	case res := <-done:
 		return res.tok, res.err
 	case <-ctx.Done():
-		return secret.OAuthToken{}, ctx.Err()
+		return Token{}, ctx.Err()
 	}
 }
 
@@ -175,9 +173,9 @@ type deviceResponse struct {
 
 // DeviceCode signs in with the device code flow. show is called once with the
 // code and address the user must visit; the token is then polled for.
-func (c Config) DeviceCode(ctx context.Context, show func(DeviceAuth)) (secret.OAuthToken, error) {
+func (c Config) DeviceCode(ctx context.Context, show func(DeviceAuth)) (Token, error) {
 	if c.Provider.DeviceURL == "" {
-		return secret.OAuthToken{}, fmt.Errorf("oauth: %s has no device code sign-in", c.Provider.Name)
+		return Token{}, fmt.Errorf("oauth: %s has no device code sign-in", c.Provider.Name)
 	}
 	form := url.Values{"client_id": {c.ClientID}, "scope": {strings.Join(c.Provider.Scopes, " ")}}
 	secrets := []string(nil)
@@ -187,7 +185,7 @@ func (c Config) DeviceCode(ctx context.Context, show func(DeviceAuth)) (secret.O
 	}
 	var dr deviceResponse
 	if err := c.post(ctx, c.Provider.DeviceURL, form, &dr, secrets...); err != nil {
-		return secret.OAuthToken{}, err
+		return Token{}, err
 	}
 	uri := dr.VerificationURI
 	if uri == "" {
@@ -203,10 +201,10 @@ func (c Config) DeviceCode(ctx context.Context, show func(DeviceAuth)) (secret.O
 	start := c.now()
 	for {
 		if err := c.wait(ctx, interval); err != nil {
-			return secret.OAuthToken{}, err
+			return Token{}, err
 		}
 		if expires > 0 && c.now().Sub(start) >= expires {
-			return secret.OAuthToken{}, errors.New("oauth: device code expired")
+			return Token{}, errors.New("oauth: device code expired")
 		}
 		tok, err := c.tokenRequest(ctx, url.Values{
 			"grant_type":  {"urn:ietf:params:oauth:grant-type:device_code"},
@@ -225,6 +223,6 @@ func (c Config) DeviceCode(ctx context.Context, show func(DeviceAuth)) (secret.O
 				continue
 			}
 		}
-		return secret.OAuthToken{}, err
+		return Token{}, err
 	}
 }
