@@ -8,7 +8,7 @@ import (
 	"github.com/dkouvdis/dk-email/internal/mail"
 )
 
-const dateLayout = "2006-01-02"
+var dateLayouts = []string{"2006-01-02", "2006/01/02"}
 
 var fieldKinds = map[string]mail.SearchKind{
 	"from":    mail.SearchFrom,
@@ -105,7 +105,7 @@ func parseToken(tok token) (mail.SearchTerm, bool) {
 			return mail.SearchTerm{Kind: kind, Not: not}, true
 		}
 	case "since", "after", "before":
-		if d, err := time.Parse(dateLayout, val); err == nil {
+		if d, ok := parseDate(val); ok {
 			kind := mail.SearchSince
 			if key == "before" {
 				kind = mail.SearchBefore
@@ -114,4 +114,13 @@ func parseToken(tok token) (mail.SearchTerm, bool) {
 		}
 	}
 	return text, true
+}
+
+func parseDate(s string) (time.Time, bool) {
+	for _, layout := range dateLayouts {
+		if d, err := time.Parse(layout, s); err == nil {
+			return d, true
+		}
+	}
+	return time.Time{}, false
 }

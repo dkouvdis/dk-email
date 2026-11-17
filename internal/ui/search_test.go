@@ -12,6 +12,7 @@ import (
 	"github.com/dkouvdis/dk-email/internal/mail"
 	"github.com/dkouvdis/dk-email/internal/mail/mailtest"
 	"github.com/dkouvdis/dk-email/internal/search"
+	"github.com/dkouvdis/dk-email/internal/ui/sidebar"
 )
 
 func typeText(t *testing.T, m Model, text string) Model {
@@ -147,7 +148,7 @@ func TestSearch_StaleResultsAreDropped(t *testing.T) {
 	// Replaced by a newer search.
 	m, cmd = m.startSearch(search.Parse("lunch"))
 	m = send(t, m, stale)
-	if !m.open.loading || m.list.Count() != 3 {
+	if !m.open.loading || m.list.Count() != 0 {
 		t.Error("a replaced search's results were applied")
 	}
 	m = settle(t, m, cmd)
@@ -283,6 +284,154 @@ func TestSearch_FailedRefinementKeepsPreviousSearch(t *testing.T) {
 	m = tickSettled(t, m)
 	if len(summaryCalls(f.personal)) != summaries || m.list.Count() != 2 {
 		t.Error("a refresh touched the previous search's results")
+	}
+}
+
+func TestSearch_DeletingTheSearchedAccountThenCtrlRDoesNotPanic(t *testing.T) {
+	f, cfg := newEditFixture("Alpha", "Beta")
+	m := editModel(t, f, cfg)
+	m = searched(t, m, "hello")
+	box := f.boxes["alpha@example.com"]
+
+	cleared, _ := m.removeAccountAt(0)
+	if cleared.searching() {
+		t.Error("removing the account left the search active")
+	}
+	cleared = pressSettled(t, cleared, "ctrl+r")
+	if got := calls(box, mailtest.MethodSearch); len(got) != 1 {
+		t.Errorf("%d Search calls, want just the first", len(got))
+	}
+
+	if m.clearOpen().searching() {
+		t.Error("clearOpen left the search active")
+	}
+}
+
+func TestSearch_SearchStartedDuringAFolderPageDropsThePage(t *testing.T) {
+	m := started(t, bulkFixture(450), 160, 30)
+	opened, cmd := m.openFolder(0, "Bulk")
+	m = settle(t, opened, cmd)
+
+	next, cmd := m.Update(press("G"))
+	next, cmd = next.(Model).Update(cmd())
+	m = next.(Model)
+	if !m.list.LoadingMore() || cmd == nil {
+		t.Fatal("no folder page in flight")
+	}
+	page := cmd().(summariesMsg)
+	m, scmd := m.startSearch(search.Parse("bulk"))
+	m = send(t, m, page)
+	if m.list.Count() != 0 || !m.open.loading {
+		t.Fatal("the folder page landed while searching")
+	}
+	m = settle(t, m, scmd)
+	if m.list.Count() != 200 || m.search.total != 450 || m.open.loading {
+		t.Errorf("count %d total %d loading %v", m.list.Count(), m.search.total, m.open.loading)
+	}
+}
+
+func TestSearch_NewSearchWhileOneIsInFlight(t *testing.T) {
+	f := newFixture()
+	m := started(t, f, 160, 30)
+	m, first := m.startSearch(search.Parse("plan"))
+	stale := first().(searchMsg)
+
+	next, cmd := m.Update(press("ctrl+r"))
+	m = send(t, next.(Model), stale)
+	if !m.open.loading || m.list.Count() != 0 {
+		t.Fatal("the replaced search's results were shown")
+	}
+	m = settle(t, m, cmd)
+	if m.open.loading || m.list.Count() != 2 {
+		t.Errorf("loading %v count %d; want 2 results shown", m.open.loading, m.list.Count())
+	}
+}
+
+func TestSearch_KeysDoNothingWhileSearchLoads(t *testing.T) {
+	f := newFixture()
+	m := started(t, f, 160, 30)
+	m, _ = m.startSearch(search.Parse("plan"))
+
+	for _, k := range []string{"j", "G", "d", "s", "e"} {
+		m = pressSettled(t, m, k)
+	}
+	if m.list.Count() != 0 {
+		t.Errorf("list shows %d rows while loading", m.list.Count())
+	}
+	if len(calls(f.personal, mailtest.MethodSetFlag))+len(calls(f.personal, mailtest.MethodMove)) != 0 {
+		t.Error("a key acted on hidden mail")
+	}
+}
+
+func TestSearch_FirstPageAfterAWriteIsFetchedAgain(t *testing.T) {
+	f := newFixture()
+	m := started(t, f, 160, 30)
+	m, cmd := m.startSearch(search.Parse("plan"))
+	m.writes++ // a flag or move started after the search did
+
+	next, again := m.Update(cmd())
+	m = next.(Model)
+	if again == nil || !m.open.loading || m.list.Count() != 0 {
+		t.Fatalf("results predating a write were shown (cmd %v, loading %v, count %d)", again != nil, m.open.loading, m.list.Count())
+	}
+	m = settle(t, m, again)
+	if got := calls(f.personal, mailtest.MethodSearch); len(got) != 2 || m.list.Count() != 2 {
+		t.Errorf("%d Search calls, count %d; want 2 and 2", len(got), m.list.Count())
+	}
+}
+
+func TestSearch_RemovingAnEarlierAccountReissuesTheSearch(t *testing.T) {
+	f, cfg := newEditFixture("Alpha", "Beta", "Gamma")
+	m := editModel(t, f, cfg)
+	next, cmd := m.Update(sidebar.SelectedMsg{Account: 2, Folder: "INBOX"})
+	m = settle(t, next.(Model), cmd)
+	m, _ = m.startSearch(search.Parse("hello"))
+
+	shifted, cmd := m.removeAccountAt(1)
+	if cmd == nil || shifted.open.account != 1 {
+		t.Fatalf("open %+v cmd %v", shifted.open, cmd != nil)
+	}
+	shifted = settle(t, shifted, cmd)
+	if !shifted.searching() || shifted.open.loading || !strings.Contains(plain(shifted), "Hello Gamma") {
+		t.Errorf("search not reissued for the new index:\n%s", plain(shifted))
+	}
+	if got := calls(f.boxes["gamma@example.com"], mailtest.MethodSearch); len(got) != 1 {
+		t.Errorf("%d Search calls on Gamma, want 1", len(got))
+	}
+}
+
+func TestSearch_FailedFirstPageRestoresPreviousList(t *testing.T) {
+	f := newFixture()
+	m := started(t, f, 160, 30)
+	f.personal.Fail(mailtest.MethodSearch, errors.New("boom"))
+	m = searched(t, m, "plan")
+	if m.list.Count() != 3 || m.searching() || m.open.loading {
+		t.Errorf("count %d searching %v loading %v; want the folder's 3 threads back", m.list.Count(), m.searching(), m.open.loading)
+	}
+}
+
+func TestSearch_NoMoreWhenResultsFitExactlyOnePage(t *testing.T) {
+	f := bulkFixture(pageSize)
+	m := started(t, f, 160, 30)
+	opened, cmd := m.openFolder(0, "Bulk")
+	m = settle(t, opened, cmd)
+	m = searched(t, m, "bulk")
+	if m.list.Count() != pageSize {
+		t.Fatalf("count %d", m.list.Count())
+	}
+	m = pressSettled(t, m, "G")
+	if got := calls(f.personal, mailtest.MethodSearch); len(got) != 1 {
+		t.Errorf("%d Search calls, want 1: pageSize results with total pageSize has no more", len(got))
+	}
+}
+
+func TestSearch_ClickCancelsThePrompt(t *testing.T) {
+	m := started(t, newFixture(), 160, 30)
+	m = send(t, m, press("/"))
+	m = typeText(t, m, "abc")
+	m = sendSettled(t, m, click(100, 5))
+	if m.search.input.Focused() || m.search.input.Value() != "" {
+		t.Error("a click left the search prompt open")
 	}
 }
 

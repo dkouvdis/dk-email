@@ -199,12 +199,7 @@ func (m Model) openFolder(account int, folder string) (Model, tea.Cmd) {
 	}
 	m.open = openFolder{account: account, folder: folder, label: label, loading: true}
 	m.list = m.list.SetSummaries(nil, false)
-	m.search.gen++
-	m.search.query = mail.SearchQuery{}
-	m.search.total = 0
-	m.search.prev, m.search.prevTotal = mail.SearchQuery{}, 0
-	m.search.input.Reset()
-	m.search.input.Blur()
+	m.resetSearch()
 	m.read = m.read.Close()
 	m.readerPopup = false
 	m.side = m.side.SetOpen(account, folder)
@@ -238,6 +233,10 @@ func (m Model) handleSummaries(msg summariesMsg) (Model, tea.Cmd) {
 	// A slow response for a folder that's no longer open, or a page nobody
 	// is waiting for, is dropped.
 	if m.open.account != msg.account || m.open.folder != msg.folder {
+		return m, nil
+	}
+	// Folder pages never land in search results.
+	if m.searching() {
 		return m, nil
 	}
 	paging := msg.before != 0

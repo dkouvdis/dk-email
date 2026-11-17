@@ -566,7 +566,9 @@ func (m Model) listView(w, h int) string {
 	}
 	switch {
 	case m.search.input.Focused():
-		title = m.search.input.View()
+		in := m.search.input
+		in.SetWidth(max(w-lipgloss.Width(in.Prompt), 1))
+		title = in.View()
 	case m.open.account >= 0 && m.panes.Kind == KindNarrow:
 		title = m.styles.title.Render(m.open.label) + note
 	case m.open.account >= 0:

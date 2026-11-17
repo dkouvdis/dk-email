@@ -72,7 +72,7 @@ from Jane that mention an invoice. There is no OR and no grouping.
 ## Dates
 
 `since:` and `after:` include the day you give. `before:` excludes it. Write
-dates as `YYYY-MM-DD`.
+dates as `YYYY-MM-DD` or `YYYY/MM/DD` (Gmail's own format).
 
 IMAP compares the day the server received the message, in the server's time
 zone. A message that arrives near midnight can land on the neighbouring day.
@@ -86,7 +86,8 @@ text instead:
 - an empty value, such as `from:`;
 - an unknown `is:` value;
 - a malformed date, such as `before:yesterday`;
-- an unclosed quote: the rest of the line becomes the phrase.
+- an unclosed quote: the rest of the line becomes the phrase, or the
+  operator's value (`from:"jane doe` searches From for "jane doe").
 
 A quoted phrase is always plain text, so `"from:bob"` searches for that text
 and doesn't filter by sender.

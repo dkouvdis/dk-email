@@ -41,6 +41,8 @@ func TestParse(t *testing.T) {
 		{"is flagged", "IS:Flagged", "IS:Flagged", []mail.SearchTerm{{Kind: mail.SearchStarred}}},
 		{"since", "since:2026-03-04", "since:2026-03-04", []mail.SearchTerm{{Kind: mail.SearchSince, Date: day(2026, 3, 4)}}},
 		{"after", "after:2026-03-04", "after:2026-03-04", []mail.SearchTerm{{Kind: mail.SearchSince, Date: day(2026, 3, 4)}}},
+		{"since slashes", "since:2026/03/04", "since:2026/03/04", []mail.SearchTerm{{Kind: mail.SearchSince, Date: day(2026, 3, 4)}}},
+		{"before slashes", "before:2026/03/04", "before:2026/03/04", []mail.SearchTerm{{Kind: mail.SearchBefore, Date: day(2026, 3, 4)}}},
 		{"before", "before:2026-03-04", "before:2026-03-04", []mail.SearchTerm{{Kind: mail.SearchBefore, Date: day(2026, 3, 4)}}},
 		{"negated word", "-spam", "-spam", []mail.SearchTerm{notText("spam")}},
 		{"negated phrase", `-"a b"`, `-"a b"`, []mail.SearchTerm{notText("a b")}},

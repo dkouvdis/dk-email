@@ -122,4 +122,4 @@ Plan: [search-plan.md](search-plan.md).
 ## Checkpoint: Complete (After Tasks 11-12)
 - [x] Full test suite passes: `go test -race ./...`
 - [ ] Lint, format, build, and release config pass: `go vet ./... && gofmt -l . && go build -o bin/dk-email ./cmd/dk-email && goreleaser check`
-- [ ] `agent-skills:code-reviewer` diff review passed
+- [x] `agent-skills:code-reviewer` diff review passed (findings fixed)

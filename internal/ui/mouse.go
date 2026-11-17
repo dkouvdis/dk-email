@@ -12,6 +12,10 @@ func (m Model) handleClick(ms tea.Mouse) (Model, tea.Cmd) {
 	if ms.Button != tea.MouseLeft || m.popupOpen() || m.showConnect {
 		return m, nil
 	}
+	if m.search.input.Focused() {
+		m.search.input.Blur()
+		m.search.input.Reset()
+	}
 	p := m.panes
 	switch {
 	case p.Sidebar.contains(ms.X, ms.Y):

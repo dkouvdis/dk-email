@@ -13,6 +13,7 @@ import (
 
 	"github.com/dkouvdis/dk-email/internal/mail"
 	"github.com/dkouvdis/dk-email/internal/search"
+	"github.com/dkouvdis/dk-email/internal/ui/threadlist"
 )
 
 const searchTimeout = 60 * time.Second
@@ -20,14 +21,20 @@ const searchTimeout = 60 * time.Second
 // listSearch is the thread list's server search: input is the "/ " prompt
 // while it's being typed, query the search shown in the list (Raw == "" when
 // none). gen drops results of a search that was replaced or cleared. prev and
-// prevTotal are what the list showed before the search in flight, restored if
-// its first page fails.
+// prevTotal and prevList are what the list showed before the search in flight,
+// restored if its first page fails. writes and dirty are Model.writes when the
+// search started and whether a write was already in flight then: a first page
+// that arrives after either may predate an optimistic flag or move, so it is
+// fetched again instead of shown.
 type listSearch struct {
 	input     textinput.Model
 	query     mail.SearchQuery
 	total     int
 	prev      mail.SearchQuery
 	prevTotal int
+	prevList  threadlist.Model
+	writes    int
+	dirty     bool
 	gen       int
 }
 
@@ -86,11 +93,25 @@ func (m Model) handleSearchKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	return m, cmd
 }
 
-// startSearch runs q on the open folder. The list isn't cleared, so a
-// failed first page can fall back to the folder's threads.
+// startSearch runs q on the open folder. The list is cleared so no key acts
+// on threads the user can't see; what it showed is kept in prevList, so a
+// failed first page can fall back to it.
 func (m Model) startSearch(q mail.SearchQuery) (Model, tea.Cmd) {
+	if m.open.account < 0 || m.boxes[m.open.account] == nil {
+		return m, nil
+	}
 	m.search.gen++
-	m.search.prev, m.search.prevTotal = m.search.query, m.search.total
+	// A search already in flight keeps the fallback it saved: the list is
+	// empty now, so there is nothing newer to remember.
+	if !(m.open.loading && m.searching()) {
+		m.search.prev, m.search.prevTotal = m.search.query, m.search.total
+		m.search.prevList = m.list
+		if m.list.LoadingMore() {
+			m.search.prevList = m.list.PageFailed()
+		}
+	}
+	m.list = m.list.SetSummaries(nil, false)
+	m.search.writes, m.search.dirty = m.writes, m.inflight > 0
 	m.search.query = q
 	m.search.total = 0
 	m.open.loading = true
@@ -99,6 +120,16 @@ func (m Model) startSearch(q mail.SearchQuery) (Model, tea.Cmd) {
 	m.setStatus("Searching…")
 	m.log.Debug("search", "terms", len(q.Terms))
 	return m, runSearch(m.boxes[m.open.account], m.open.account, m.open.folder, q, 0, m.search.gen)
+}
+
+// resetSearch forgets the search and closes its prompt.
+func (m *Model) resetSearch() {
+	m.search.gen++
+	m.search.query, m.search.total = mail.SearchQuery{}, 0
+	m.search.prev, m.search.prevTotal = mail.SearchQuery{}, 0
+	m.search.prevList = threadlist.Model{}
+	m.search.input.Reset()
+	m.search.input.Blur()
 }
 
 // clearSearch goes back to the folder's threads.
@@ -115,17 +146,26 @@ func (m Model) handleSearch(msg searchMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 	name := m.accts[msg.account].Name
+	if !paging && msg.err == nil && (m.search.dirty || m.writes != m.search.writes) {
+		// A write may not be reflected in these results yet; ask again.
+		m.search.writes, m.search.dirty = m.writes, m.inflight > 0
+		return m, runSearch(m.boxes[msg.account], msg.account, msg.folder, m.search.query, 0, m.search.gen)
+	}
 	m.open.loading = false
-	more := len(msg.summaries) == pageSize
+	more := len(msg.summaries) < msg.total
 
 	switch {
 	case paging && errors.Is(msg.err, mail.ErrFolderChanged):
-		return m.reloadChanged(msg.account, msg.folder)
+		m, cmd := m.reloadChanged(msg.account, msg.folder)
+		m.open.notice = fmt.Sprintf("%s changed on the server; reloaded and search cleared.", m.open.label)
+		return m, cmd
 	case msg.err != nil:
 		if paging {
 			m.list = m.list.PageFailed()
 		} else {
 			m.search.query, m.search.total = m.search.prev, m.search.prevTotal
+			m.list = m.search.prevList
+			m.relayout() // the window may have been resized meanwhile
 		}
 		m.setError(fmt.Errorf("search %s/%s: %w", name, m.open.label, msg.err))
 		return m, nil
@@ -134,6 +174,7 @@ func (m Model) handleSearch(msg searchMsg) (Model, tea.Cmd) {
 	default:
 		m.list = m.list.SetSummaries(msg.summaries, more)
 		m.search.total = msg.total
+		m.search.prevList = threadlist.Model{}
 	}
 	m.setStatus("")
 	m.log.Debug("search results", "count", len(msg.summaries), "total", msg.total, "page", paging)

@@ -343,6 +343,7 @@ func (m Model) handleEdited(msg editedMsg) (Model, tea.Cmd) {
 // clearOpen closes the open folder, its threads and the reader.
 func (m Model) clearOpen() Model {
 	m.open = openFolder{account: -1}
+	m.resetSearch()
 	m.list = m.list.SetSummaries(nil, false)
 	m.read = m.read.Close()
 	m.readerPopup = false
@@ -417,6 +418,10 @@ func (m Model) removeAccountAt(i int) (Model, tea.Cmd) {
 		m.readerPopup = false
 		if m.list.LoadingMore() {
 			m.list = m.list.PageFailed()
+		}
+		if m.open.loading && m.searching() {
+			m.search.gen++
+			return m, runSearch(m.boxes[m.open.account], m.open.account, m.open.folder, m.search.query, 0, m.search.gen)
 		}
 		if m.open.loading {
 			return m, loadSummaries(m.boxes[m.open.account], m.open.account, m.open.folder, 0)

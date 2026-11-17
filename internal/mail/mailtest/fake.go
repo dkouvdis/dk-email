@@ -170,7 +170,8 @@ func (f *Fake) Summaries(ctx context.Context, name string, before mail.UID, limi
 }
 
 // Search matches case-insensitive substrings and flags in memory. Dates
-// compare by UTC calendar day.
+// compare the header Date by UTC calendar day, not the server's received
+// date, so don't write IMAP date-boundary tests against the Fake.
 func (f *Fake) Search(ctx context.Context, name string, q mail.SearchQuery, before mail.UID, limit int) ([]mail.Summary, int, error) {
 	if err := f.begin(ctx, Call{Method: MethodSearch, Folder: name, Query: q.Raw}); err != nil {
 		return nil, 0, err
