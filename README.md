@@ -97,14 +97,14 @@ password_cmd = "op read op://Personal/Gmail/app-password"   # omit to use the ke
 
 ### Colours
 
-By default dk-email uses your terminal's 16-colour palette, so it follows your terminal theme (Ghostty, iTerm2, etc.), light or dark. Change the terminal theme and dk-email changes with it.
+By default dk-email uses your terminal's 16-colour palette, so it follows your terminal theme (Ghostty, iTerm2, etc.), light or dark. Change the terminal theme and dk-email changes with it. The one exception is the text on the selected row, which is a fixed black: many dark themes make palette black a grey that barely shows on the accent.
 
 To override a colour, add a `[colors]` table. Every key is optional:
 
 ```toml
 [colors]
 accent    = 5          # focus, selected row background (default: magenta)
-on_accent = 0          # text on the accent colour (default: black)
+on_accent = 16         # text on the accent colour (default: black, fixed)
 muted     = "#808080"  # secondary text (default: the terminal's faint style)
 border    = 8          # pane borders, separators (default: bright black)
 unread    = 4          # unread markers and counts (default: blue)

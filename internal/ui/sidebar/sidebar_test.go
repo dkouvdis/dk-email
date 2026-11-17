@@ -289,7 +289,7 @@ func TestView_CursorFolderIsAccentNotReversed(t *testing.T) {
 		}
 	}
 
-	if !strings.Contains(row, "30;45m") {
+	if !strings.Contains(row, "38;5;16;45m") {
 		t.Errorf("cursor folder should be on_accent (black) on accent (magenta): %q", row)
 	}
 	if strings.Contains(row, "\x1b[7m") || strings.Contains(row, ";7m") {

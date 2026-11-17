@@ -522,7 +522,7 @@ func TestView_CursorRowIsAccentNotReversedAndKeepsStarColour(t *testing.T) {
 
 	row := strings.Split(m.View(60, 10), "\n")[0]
 
-	if !strings.Contains(row, "30;45m") {
+	if !strings.Contains(row, "38;5;16;45m") {
 		t.Errorf("cursor row should be on_accent (black) on accent (magenta): %q", row)
 	}
 	if strings.Contains(row, "\x1b[7m") || strings.Contains(row, ";7m") {

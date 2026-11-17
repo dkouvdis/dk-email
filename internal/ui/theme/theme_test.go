@@ -15,6 +15,14 @@ func TestDefault_MutedIsFaintNotAColour(t *testing.T) {
 	}
 }
 
+func TestDefault_CursorTextIsFixedBlack(t *testing.T) {
+	got := Default().Cursor.Render("x")
+
+	if !strings.Contains(got, "38;5;16") || !strings.Contains(got, "45") {
+		t.Errorf("cursor = %q, want 256-colour black (38;5;16) on ANSI magenta", got)
+	}
+}
+
 func TestNew_OverridesReplaceDefaults(t *testing.T) {
 	th := New(config.Colors{Accent: "#ff0000", OnAccent: "15", Muted: "8"})
 

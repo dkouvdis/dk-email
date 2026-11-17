@@ -36,16 +36,18 @@ type Theme struct {
 	Markdown gansi.StyleConfig
 }
 
-// defaults are ANSI 0-15 numbers, which the terminal maps to its own theme.
+// defaults are ANSI 0-15 numbers, which the terminal maps to its own theme,
+// except OnAccent: many dark themes make ANSI 0 a grey that barely shows on
+// the accent, so selected-row text uses the 256-colour palette's fixed black.
 var defaults = config.Colors{
-	Accent:   "5", // magenta
-	OnAccent: "0", // black
-	Border:   "8", // bright black
-	Unread:   "4", // blue
-	Star:     "3", // yellow
-	Error:    "1", // red
-	Hint:     "6", // cyan
-	Key:      "5", // magenta
+	Accent:   "5",  // magenta
+	OnAccent: "16", // black, not themed
+	Border:   "8",  // bright black
+	Unread:   "4",  // blue
+	Star:     "3",  // yellow
+	Error:    "1",  // red
+	Hint:     "6",  // cyan
+	Key:      "5",  // magenta
 }
 
 // Default is the theme with no overrides.
