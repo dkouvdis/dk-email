@@ -128,6 +128,7 @@ internal/mail/imap/    → go-imap v2 implementation of mail.Mailbox
 internal/mail/smtp/    → go-smtp transport (implicit TLS / STARTTLS, AUTH PLAIN or XOAUTH2)
 internal/compose/      → pure: reply / reply-all / forward / new drafts, composer fields, MIME build (send and draft mode), FromRaw to reopen a draft
 internal/send/         → implements mail.Sender and mail.Drafter: forward attachments, SMTP, Sent copy, \Answered, save / reopen / remove drafts
+internal/search/       → Gmail-style query parser (stdlib + internal/mail)
 internal/thread/       → builds threads from message summaries (pure, no I/O)
 internal/render/       → MIME → displayable text (plain preferred, HTML→text, attachment list)
 internal/ui/           → root Bubble Tea model, layout calculation, keymap, styles
@@ -149,6 +150,7 @@ package mail
 type Mailbox interface {
 	Folders(ctx context.Context) ([]Folder, error)              // includes special-use role and unread count
 	Summaries(ctx context.Context, folder string, before UID, limit int) ([]Summary, error) // newest first; ErrFolderChanged when paging after UIDVALIDITY changed
+	Search(ctx context.Context, folder string, q SearchQuery, before UID, limit int) ([]Summary, int, error) // newest first, plus the total match count; same paging and ErrFolderChanged as Summaries
 	Message(ctx context.Context, folder string, uid UID) (Message, error) // full parsed body
 	SetFlag(ctx context.Context, folder string, uids []UID, f Flag, on bool) error // Seen, Flagged
 	Move(ctx context.Context, from string, uids []UID, to string) error
@@ -228,11 +230,13 @@ password_cmd = "op read op://Personal/Gmail/app-password"   # omit to use the ke
 | `f` | forward | `c` | new message |
 | `a` | focus folders (narrow) / folder picker (list) | `A` | connect account |
 | `E` | edit or delete account | | |
-| `/` | filter folders | `v` | toggle split ↔ list + popup |
+| `/` | filter folders (sidebar) / server search (thread list) | `v` | toggle split ↔ list + popup |
 | `?` | full key help | `esc` | close popup / back |
 | `q` | close the open popup, otherwise quit | `ctrl+c` | quit, even with a popup open |
 
 Actions on a **collapsed thread** apply to every message in it. On an expanded row, or in the reader, they apply to the selected message. Opening a message marks it read.
+
+**Search:** `/` in the thread list opens a `/ ` prompt in the list header, and `enter` runs the query on the server (`Mailbox.Search`, `UID SEARCH`) for the open folder only. Results replace the folder's threads, the header reads `search: <query> (N)`, and 200 load at a time, with older matches loading at the last row. `esc` closes the prompt (an active search stays), or clears an active search from the thread list. `enter` on an empty prompt clears it too, and opening another folder clears it. Automatic refresh leaves results alone, while `ctrl+r` refreshes and re-runs the search. The query language and provider notes are in [docs/search.md](docs/search.md).
 
 **Composer:** `c`, `r`, `R` and `f` open a built-in plain-text composer in the ~90% popup, titled with the action, the subject and the selected From address. The terminal is never handed to another program. It has To, Cc, Bcc, Subject and body fields, plus a From row above To when the account has `aliases`:
 

@@ -277,6 +277,19 @@ save_sent    = false               # optional, save a copy to Sent; default: fal
 
 The connect-account popup has optional **SMTP host**, **SMTP port** and **SMTP TLS** fields. Gmail addresses pre-fill `smtp.gmail.com:465` with implicit TLS. When an SMTP host is filled in, the popup tests the SMTP login (connect and sign in, nothing is sent) before saving, and writes the `smtp_*` keys to the new `[[account]]` block. Leave the host empty if the account shouldn't send. Press `E` to edit or delete an existing account; see [Editing an account](docs/accounts.md#editing-an-account).
 
+## Searching
+
+Press `/` in the thread list to search the open folder on your mail server. Results replace the list, threaded as usual, and you can reply, forward, star, archive or move them like any other thread. `esc` clears the search, and `ctrl+r` runs it again. Queries use Gmail-style operators:
+
+```
+invoice
+from:jane since:2026-01-01
+is:unread -from:newsletter
+subject:"weekly report" before:2026-07-01
+```
+
+[Searching](docs/search.md) covers every operator, dates, provider differences and privacy.
+
 ## Keys
 
 | Key | Action | Key | Action |
@@ -291,7 +304,7 @@ The connect-account popup has optional **SMTP host**, **SMTP port** and **SMTP T
 | `f` | forward | `c` | new message |
 | `a` | focus folders (narrow) / folder picker (list) | `A` | connect account |
 | `E` | edit or delete account | | |
-| `/` | filter folders | `v` | toggle split ↔ list + popup |
+| `/` | filter folders (sidebar) / search (thread list) | `v` | toggle split ↔ list + popup |
 | `?` | key help | `esc` | close popup / back |
 | `q` | close the open popup, otherwise quit | `ctrl+c` | quit, even with a popup open |
 

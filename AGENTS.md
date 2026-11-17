@@ -48,6 +48,7 @@ Data/control flow:
 
 Supporting modules:
 
+- `internal/search`: pure parsing of Gmail-style filter input into `mail.SearchQuery`; it never errors, and unknown input falls back to plain text.
 - `internal/thread`: pure threading logic (union-find over Message-ID / References with constrained subject fallback).
 - `internal/render`: MIME parsing + HTML-to-markdown rendering (email cruft stripped first; junk text/plain parts fall back to HTML) + Glamour styling of HTML-derived bodies (plain text is only wrapped) + attachment extraction (it also exposes attachment `Parts` with bytes for forwarding).
 - `internal/compose`: pure drafting logic: reply/reply-all/forward/new drafts, composer fields (`Fields`/`FieldsOf`), MIME build (`Build` never writes Bcc; `BuildDraft` does), and `FromRaw` to reopen a saved draft.

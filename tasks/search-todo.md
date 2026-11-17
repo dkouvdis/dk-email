@@ -96,15 +96,15 @@ Plan: [search-plan.md](search-plan.md).
 **Description:** Add a read-only `Search` test to `internal/mail/imap/live_test.go` (behind `-tags=live`), run it against a Gmail account, and write the user guide `docs/search.md`, linked from `README.md` and `SPEC.md`.
 
 **Acceptance criteria:**
-- [ ] `internal/mail/imap/live_test.go` exercises read-only `Client.Search` against `DK_EMAIL_LIVE_ACCOUNT` without mutating flags or folders.
+- [x] `internal/mail/imap/live_test.go` exercises read-only `Client.Search` against `DK_EMAIL_LIVE_ACCOUNT` without mutating flags or folders.
 - [ ] The live test passes against Gmail and its sample queries match Gmail's web search.
-- [ ] `docs/search.md` (same style as `docs/accounts.md`) covers: `/` in the thread list, `enter` to run, `esc` to clear, `ctrl+r` to re-run, paging, and that search covers the open folder only (on Gmail, search All Mail for everything); every operator with an example (`from:`, `to:`, `cc:`, `subject:`, `body:`, `is:unread`/`read`/`starred`/`flagged`, `since:`/`after:`, `before:`, `-`, quotes, free text); that terms combine with AND and there is no OR; date-only `SINCE`/`BEFORE` behaviour; how malformed input falls back to text; and which providers are verified (Gmail, Dovecot), with Microsoft 365 caveats.
-- [ ] `README.md` has a short Search section linking to `docs/search.md`; `SPEC.md` lists the `/` key and the `Mailbox.Search` seam; `AGENTS.md` mentions `internal/search` under supporting modules.
+- [x] `docs/search.md` (same style as `docs/accounts.md`) covers: `/` in the thread list, `enter` to run, `esc` to clear, `ctrl+r` to re-run, paging, and that search covers the open folder only (on Gmail, search All Mail for everything); every operator with an example (`from:`, `to:`, `cc:`, `subject:`, `body:`, `is:unread`/`read`/`starred`/`flagged`, `since:`/`after:`, `before:`, `-`, quotes, free text); that terms combine with AND and there is no OR; date-only `SINCE`/`BEFORE` behaviour; how malformed input falls back to text; and which providers are verified (Gmail, Dovecot), with Microsoft 365 caveats.
+- [x] `README.md` has a short Search section linking to `docs/search.md`; `SPEC.md` lists the `/` key and the `Mailbox.Search` seam; `AGENTS.md` mentions `internal/search` under supporting modules.
 
 **Verification:**
-- [ ] Tests pass: `go test -race ./...`
+- [x] Tests pass: `go test -race ./...`
 - [ ] Build & release check succeed: `go build -o bin/dk-email ./cmd/dk-email && goreleaser check`
-- [ ] Manual check: Verify `go test -tags=live -c ./internal/mail/imap` compiles cleanly even without `DK_EMAIL_LIVE_ACCOUNT` set.
+- [x] Manual check: Verify `go test -tags=live -c ./internal/mail/imap` compiles cleanly even without `DK_EMAIL_LIVE_ACCOUNT` set.
 
 **Dependencies:** Task 11
 
@@ -120,6 +120,6 @@ Plan: [search-plan.md](search-plan.md).
 ---
 
 ## Checkpoint: Complete (After Tasks 11-12)
-- [ ] Full test suite passes: `go test -race ./...`
+- [x] Full test suite passes: `go test -race ./...`
 - [ ] Lint, format, build, and release config pass: `go vet ./... && gofmt -l . && go build -o bin/dk-email ./cmd/dk-email && goreleaser check`
 - [ ] `agent-skills:code-reviewer` diff review passed
