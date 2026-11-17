@@ -415,6 +415,12 @@ func TestAccount_SaveSentCopy(t *testing.T) {
 		{"other host defaults to true", Account{IMAPHost: "imap.example.com"}, true},
 		{"explicit true wins on gmail", Account{IMAPHost: "imap.gmail.com", SaveSent: &yes}, true},
 		{"explicit false wins elsewhere", Account{IMAPHost: "imap.example.com", SaveSent: &no}, false},
+		{"exchange online defaults to false", Account{IMAPHost: "outlook.office365.com"}, false},
+		{"outlook.com imap defaults to false", Account{IMAPHost: "imap-mail.outlook.com"}, false},
+		{"office365 smtp host defaults to false", Account{IMAPHost: "mail.example.com", SMTPHost: "smtp.office365.com"}, false},
+		{"outlook.com smtp host ignores case and spaces", Account{IMAPHost: "mail.example.com", SMTPHost: " SMTP-Mail.Outlook.com "}, false},
+		{"gmail smtp alone does not count", Account{IMAPHost: "mail.example.com", SMTPHost: "smtp.gmail.com"}, true},
+		{"explicit true wins on exchange online", Account{IMAPHost: "outlook.office365.com", SaveSent: &yes}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -510,5 +516,101 @@ func TestLoad_AliasValidationErrors(t *testing.T) {
 				t.Errorf("error = %q, want it to contain %q", err, tt.want)
 			}
 		})
+	}
+}
+
+func TestLoad_OAuth(t *testing.T) {
+	tests := []struct {
+		name       string
+		keys       string
+		wantAuth   string
+		wantOAuth  bool
+		wantTenant string
+	}{
+		{"microsoft defaults the tenant", "auth = \"oauth2\"\noauth_provider = \"microsoft\"\noauth_client_id = \"cid\"", AuthOAuth2, true, "common"},
+		{"microsoft keeps its tenant", "auth = \"oauth2\"\noauth_provider = \"microsoft\"\noauth_client_id = \"cid\"\noauth_tenant = \"contoso.onmicrosoft.com\"", AuthOAuth2, true, "contoso.onmicrosoft.com"},
+		{"google with a secret command", "auth = \"oauth2\"\noauth_provider = \"google\"\noauth_client_id = \"cid\"\noauth_client_secret_cmd = \"op read op://P/G/secret\"", AuthOAuth2, true, ""},
+		{"external token command", "auth = \"oauth2\"\npassword_cmd = \"oama access me@x.com\"", AuthOAuth2, true, ""},
+		{"explicit password auth", "auth = \"password\"", AuthPassword, false, ""},
+		{"no auth key", "", "", false, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg, err := Load(writeConfig(t, smtpBase+tt.keys+"\n"))
+
+			if err != nil {
+				t.Fatalf("Load() error = %v", err)
+			}
+			a := cfg.Accounts[0]
+			if a.Auth != tt.wantAuth {
+				t.Errorf("Auth = %q, want %q", a.Auth, tt.wantAuth)
+			}
+			if a.OAuth() != tt.wantOAuth {
+				t.Errorf("OAuth() = %v, want %v", a.OAuth(), tt.wantOAuth)
+			}
+			if a.OAuthTenant != tt.wantTenant {
+				t.Errorf("OAuthTenant = %q, want %q", a.OAuthTenant, tt.wantTenant)
+			}
+		})
+	}
+}
+
+func TestLoad_OAuthValidationErrors(t *testing.T) {
+	const ms = "auth = \"oauth2\"\noauth_provider = \"microsoft\"\noauth_client_id = \"cid\"\n"
+	tests := []struct {
+		name string
+		keys string
+		want []string
+	}{
+		{"unknown auth", `auth = "kerberos"`, []string{`account "A": auth must be "password" or "oauth2", got "kerberos"`}},
+		{"unknown auth skips other auth checks", "auth = \"kerberos\"\noauth_provider = \"google\"", []string{`auth must be "password" or "oauth2", got "kerberos"`}},
+		{"provider without oauth2", `oauth_provider = "google"`, []string{`account "A": oauth_provider is set but auth is not "oauth2"`}},
+		{"client id without oauth2", `oauth_client_id = "cid"`, []string{`oauth_client_id is set but auth is not "oauth2"`}},
+		{"tenant without oauth2", `oauth_tenant = "common"`, []string{`oauth_tenant is set but auth is not "oauth2"`}},
+		{"secret cmd without oauth2", `oauth_client_secret_cmd = "x"`, []string{`oauth_client_secret_cmd is set but auth is not "oauth2"`}},
+		{"orphan keys with explicit password auth", "auth = \"password\"\noauth_provider = \"google\"", []string{`oauth_provider is set but auth is not "oauth2"`}},
+		{"provider with password_cmd", "auth = \"oauth2\"\npassword_cmd = \"c\"\noauth_provider = \"google\"", []string{`oauth_provider is set with password_cmd: an oauth2 account takes its token from password_cmd or the oauth_* keys, not both`}},
+		{"client id with password_cmd", "auth = \"oauth2\"\npassword_cmd = \"c\"\noauth_client_id = \"cid\"", []string{`oauth_client_id is set with password_cmd: an oauth2 account takes its token from password_cmd or the oauth_* keys, not both`}},
+		{"tenant with password_cmd", "auth = \"oauth2\"\npassword_cmd = \"c\"\noauth_tenant = \"t\"", []string{`oauth_tenant is set with password_cmd: an oauth2 account takes its token from password_cmd or the oauth_* keys, not both`}},
+		{"secret cmd with password_cmd", "auth = \"oauth2\"\npassword_cmd = \"c\"\noauth_client_secret_cmd = \"x\"", []string{`oauth_client_secret_cmd is set with password_cmd: an oauth2 account takes its token from password_cmd or the oauth_* keys, not both`}},
+		{"missing provider", "auth = \"oauth2\"\noauth_client_id = \"cid\"", []string{`oauth_provider is required when auth is "oauth2" (or set password_cmd to an external token command)`}},
+		{"bad provider", "auth = \"oauth2\"\noauth_provider = \"yahoo\"\noauth_client_id = \"cid\"", []string{`oauth_provider must be "microsoft" or "google", got "yahoo"`}},
+		{"missing client id", "auth = \"oauth2\"\noauth_provider = \"google\"", []string{`oauth_client_id is required when auth is "oauth2"`}},
+		{"blank client id", "auth = \"oauth2\"\noauth_provider = \"google\"\noauth_client_id = \"  \"", []string{`oauth_client_id is required when auth is "oauth2"`}},
+		{"tenant with google", "auth = \"oauth2\"\noauth_provider = \"google\"\noauth_client_id = \"cid\"\noauth_tenant = \"common\"", []string{`oauth_tenant is only used with oauth_provider "microsoft"`}},
+		{"secret cmd with microsoft", ms + `oauth_client_secret_cmd = "x"`, []string{`oauth_client_secret_cmd is only used with oauth_provider "google"`}},
+		{"several errors reported", "auth = \"oauth2\"\noauth_provider = \"google\"\noauth_tenant = \"common\"", []string{
+			`oauth_client_id is required when auth is "oauth2"`, `oauth_tenant is only used with oauth_provider "microsoft"`}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := Load(writeConfig(t, smtpBase+tt.keys+"\n"))
+
+			if err == nil {
+				t.Fatalf("Load() error = nil, want %q", tt.want)
+			}
+			for _, want := range tt.want {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("error = %q, want it to contain %q", err, want)
+				}
+			}
+		})
+	}
+}
+
+func TestLoad_RejectsPlaintextOAuthClientSecretWithHint(t *testing.T) {
+	const secret = "GOCSPX-supersecretvalue"
+	path := writeConfig(t, smtpBase+"oauth_client_secret = \""+secret+"\"\n")
+
+	_, err := Load(path)
+
+	if err == nil {
+		t.Fatal("Load() error = nil, want error for oauth_client_secret key")
+	}
+	if !strings.Contains(err.Error(), "oauth_client_secret_cmd") {
+		t.Errorf("error = %q, want a hint to use oauth_client_secret_cmd", err)
+	}
+	if strings.Contains(err.Error(), secret) {
+		t.Errorf("error leaks the secret: %q", err)
 	}
 }

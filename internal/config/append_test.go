@@ -341,3 +341,55 @@ func TestAppendAccount_NoAliasesWritesNone(t *testing.T) {
 		t.Errorf("aliases written:\n%s", data)
 	}
 }
+
+func TestAppendAccount_OAuthKeys(t *testing.T) {
+	ms := Account{
+		Name: "Work", Email: "me@example.com", IMAPHost: "outlook.office365.com", Auth: AuthOAuth2,
+		OAuthProvider: ProviderMicrosoft, OAuthClientID: "cid", OAuthTenant: "common",
+	}
+	g := Account{
+		Name: "Home", Email: "me@gmail.com", IMAPHost: "imap.gmail.com", Auth: AuthOAuth2,
+		OAuthProvider: ProviderGoogle, OAuthClientID: "gid", OAuthClientSecretCmd: "op read op://P/G/secret",
+	}
+	tests := []struct {
+		name string
+		acct Account
+		want string
+	}{
+		{"microsoft", ms, "[[account]]\nname = \"Work\"\nemail = \"me@example.com\"\nimap_host = \"outlook.office365.com\"\n" +
+			"auth = \"oauth2\"\noauth_provider = \"microsoft\"\noauth_client_id = \"cid\"\noauth_tenant = \"common\"\n"},
+		{"google", g, "[[account]]\nname = \"Home\"\nemail = \"me@gmail.com\"\nimap_host = \"imap.gmail.com\"\n" +
+			"auth = \"oauth2\"\noauth_provider = \"google\"\noauth_client_id = \"gid\"\noauth_client_secret_cmd = \"op read op://P/G/secret\"\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			path, _ := copyFixture(t, "empty.toml")
+
+			if err := AppendAccount(path, tt.acct); err != nil {
+				t.Fatalf("AppendAccount() error = %v", err)
+			}
+
+			data, _ := os.ReadFile(path)
+			if !strings.HasSuffix(string(data), tt.want) {
+				t.Errorf("file = %q, want it to end with %q", data, tt.want)
+			}
+			cfg, err := Load(path)
+			if err != nil {
+				t.Fatalf("re-load error = %v", err)
+			}
+			if want := tt.acct.WithDefaults(); !reflect.DeepEqual(cfg.Accounts[0], want) {
+				t.Errorf("re-loaded %+v, want %+v", cfg.Accounts[0], want)
+			}
+		})
+	}
+
+	t.Run("password account writes none", func(t *testing.T) {
+		path, _ := copyFixture(t, "empty.toml")
+		if err := AppendAccount(path, work()); err != nil {
+			t.Fatal(err)
+		}
+		if got, _ := os.ReadFile(path); strings.Contains(string(got), "auth") || strings.Contains(string(got), "oauth") {
+			t.Errorf("unset OAuth keys written:\n%s", got)
+		}
+	})
+}

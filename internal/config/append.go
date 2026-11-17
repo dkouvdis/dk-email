@@ -93,6 +93,11 @@ func accountBlock(a Account) string {
 	}
 	str("tls", a.TLS)
 	str("password_cmd", a.PasswordCmd)
+	str("auth", a.Auth)
+	str("oauth_provider", a.OAuthProvider)
+	str("oauth_client_id", a.OAuthClientID)
+	str("oauth_tenant", a.OAuthTenant)
+	str("oauth_client_secret_cmd", a.OAuthClientSecretCmd)
 	str("archive_folder", a.ArchiveFolder)
 	str("tls_cert", a.TLSCert)
 	str("smtp_host", a.SMTPHost)

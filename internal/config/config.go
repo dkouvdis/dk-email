@@ -21,6 +21,12 @@ const (
 
 	TLSImplicit = "implicit"
 	TLSStartTLS = "starttls"
+
+	AuthPassword = "password"
+	AuthOAuth2   = "oauth2"
+
+	ProviderMicrosoft = "microsoft"
+	ProviderGoogle    = "google"
 )
 
 type Config struct {
@@ -44,17 +50,30 @@ type Alias struct {
 	Name string `toml:"name"`
 }
 
-// Account describes one IMAP account. There is deliberately no password field:
-// passwords come from PasswordCmd or the OS keychain.
+// Account describes one IMAP account. There is deliberately no password or
+// OAuth secret field: passwords come from PasswordCmd or the OS keychain, and
+// OAuth client secrets from OAuthClientSecretCmd or the OS keychain.
 type Account struct {
-	Name          string `toml:"name"`
-	Email         string `toml:"email"`
-	Username      string `toml:"username"`
-	IMAPHost      string `toml:"imap_host"`
-	IMAPPort      int    `toml:"imap_port"`
-	TLS           string `toml:"tls"`
-	PasswordCmd   string `toml:"password_cmd"`
-	ArchiveFolder string `toml:"archive_folder"`
+	Name        string `toml:"name"`
+	Email       string `toml:"email"`
+	Username    string `toml:"username"`
+	IMAPHost    string `toml:"imap_host"`
+	IMAPPort    int    `toml:"imap_port"`
+	TLS         string `toml:"tls"`
+	PasswordCmd string `toml:"password_cmd"`
+	// Auth is "password" (the default when empty) or "oauth2". An oauth2
+	// account signs in with XOAUTH2, taking its access token from the oauth_*
+	// keys below or, for external tools such as oama, from password_cmd.
+	Auth string `toml:"auth"`
+	// OAuthProvider is "microsoft" or "google"; OAuthClientID is the user's own
+	// app registration. OAuthTenant is Microsoft-only and defaults to "common".
+	// OAuthClientSecretCmd is Google-only; without it the secret, if any, comes
+	// from the OS keychain.
+	OAuthProvider        string `toml:"oauth_provider"`
+	OAuthClientID        string `toml:"oauth_client_id"`
+	OAuthTenant          string `toml:"oauth_tenant"`
+	OAuthClientSecretCmd string `toml:"oauth_client_secret_cmd"`
+	ArchiveFolder        string `toml:"archive_folder"`
 	// TLSCert is a PEM file of certificates to trust for this account instead
 	// of the system roots, e.g. Proton Mail Bridge's exported cert.pem. Load
 	// makes it absolute: "~/" is expanded and a relative path is resolved
@@ -79,14 +98,28 @@ type Account struct {
 
 // SaveSentCopy reports whether sent mail should be appended to the Sent
 // folder over IMAP. An explicit save_sent wins; otherwise it is false for
-// imap.gmail.com, because Gmail already files SMTP-submitted mail in Sent,
+// Gmail, Exchange Online and Outlook.com (by IMAP or SMTP host), because they
+// already file SMTP-submitted mail in Sent and appending would duplicate it,
 // and true everywhere else.
 func (a Account) SaveSentCopy() bool {
 	if a.SaveSent != nil {
 		return *a.SaveSent
 	}
-	return !strings.EqualFold(strings.TrimSpace(a.IMAPHost), "imap.gmail.com")
+	imap := strings.ToLower(strings.TrimSpace(a.IMAPHost))
+	smtp := strings.ToLower(strings.TrimSpace(a.SMTPHost))
+	switch imap {
+	case "imap.gmail.com", "outlook.office365.com", "imap-mail.outlook.com":
+		return false
+	}
+	switch smtp {
+	case "smtp.office365.com", "smtp-mail.outlook.com":
+		return false
+	}
+	return true
 }
+
+// OAuth reports whether the account signs in with OAuth 2.0 (XOAUTH2).
+func (a Account) OAuth() bool { return a.Auth == AuthOAuth2 }
 
 func (a Account) smtpEnabled() bool {
 	return strings.TrimSpace(a.SMTPHost) != ""
@@ -163,14 +196,19 @@ func checkUndecoded(keys []toml.Key) error {
 			errs = append(errs, errors.New(`"password" is not supported: passwords are never stored in the config file; set password_cmd (e.g. "op read op://…") or omit it to use the OS keychain`))
 			continue
 		}
+		if len(k) == 2 && k[0] == "account" && k[1] == "oauth_client_secret" {
+			errs = append(errs, errors.New(`"oauth_client_secret" is not supported: secrets are never stored in the config file; set oauth_client_secret_cmd or omit it to use the OS keychain`))
+			continue
+		}
 		errs = append(errs, fmt.Errorf("unknown key %q", k.String()))
 	}
 	return errors.Join(errs...)
 }
 
 // WithDefaults returns a with the defaults Load applies: implicit TLS, the
-// port for the TLS mode, and username = email, plus the SMTP TLS mode and
-// port when smtp_host is set. Used to dial an account before it's saved.
+// port for the TLS mode, username = email and the "common" tenant for a
+// Microsoft OAuth account, plus the SMTP TLS mode and port when smtp_host is
+// set. Used to dial an account before it's saved.
 func (a Account) WithDefaults() Account {
 	a.applyDefaults()
 	return a
@@ -190,6 +228,9 @@ func (a *Account) applyDefaults() {
 	}
 	if a.Username == "" {
 		a.Username = a.Email
+	}
+	if a.Auth == AuthOAuth2 && a.OAuthProvider == ProviderMicrosoft && a.OAuthTenant == "" {
+		a.OAuthTenant = "common"
 	}
 	if !a.smtpEnabled() {
 		return
@@ -257,11 +298,63 @@ func (a Account) validate() []error {
 	if a.IMAPPort < 1 || a.IMAPPort > 65535 {
 		errs = append(errs, fmt.Errorf("imap_port must be between 1 and 65535, got %d", a.IMAPPort))
 	}
+	errs = append(errs, a.validateAuth()...)
 	errs = append(errs, a.validateSMTP()...)
 	if a.TLSCert != "" {
 		if _, err := CertPool(a.TLSCert); err != nil {
 			errs = append(errs, fmt.Errorf("tls_cert: %w", err))
 		}
+	}
+	return errs
+}
+
+func (a Account) validateAuth() []error {
+	var errs []error
+	switch a.Auth {
+	case "", AuthPassword, AuthOAuth2:
+	default:
+		return append(errs, fmt.Errorf("auth must be %q or %q, got %q", AuthPassword, AuthOAuth2, a.Auth))
+	}
+	keys := []struct {
+		key string
+		set bool
+	}{
+		{"oauth_provider", a.OAuthProvider != ""},
+		{"oauth_client_id", a.OAuthClientID != ""},
+		{"oauth_tenant", a.OAuthTenant != ""},
+		{"oauth_client_secret_cmd", a.OAuthClientSecretCmd != ""},
+	}
+	if !a.OAuth() {
+		for _, k := range keys {
+			if k.set {
+				errs = append(errs, fmt.Errorf("%s is set but auth is not %q", k.key, AuthOAuth2))
+			}
+		}
+		return errs
+	}
+	if a.PasswordCmd != "" {
+		for _, k := range keys {
+			if k.set {
+				errs = append(errs, fmt.Errorf("%s is set with password_cmd: an oauth2 account takes its token from password_cmd or the oauth_* keys, not both", k.key))
+			}
+		}
+		return errs
+	}
+	switch a.OAuthProvider {
+	case ProviderMicrosoft, ProviderGoogle:
+	case "":
+		errs = append(errs, fmt.Errorf("oauth_provider is required when auth is %q (or set password_cmd to an external token command)", AuthOAuth2))
+	default:
+		errs = append(errs, fmt.Errorf("oauth_provider must be %q or %q, got %q", ProviderMicrosoft, ProviderGoogle, a.OAuthProvider))
+	}
+	if strings.TrimSpace(a.OAuthClientID) == "" {
+		errs = append(errs, fmt.Errorf("oauth_client_id is required when auth is %q", AuthOAuth2))
+	}
+	if a.OAuthTenant != "" && a.OAuthProvider == ProviderGoogle {
+		errs = append(errs, fmt.Errorf("oauth_tenant is only used with oauth_provider %q", ProviderMicrosoft))
+	}
+	if a.OAuthClientSecretCmd != "" && a.OAuthProvider == ProviderMicrosoft {
+		errs = append(errs, fmt.Errorf("oauth_client_secret_cmd is only used with oauth_provider %q", ProviderGoogle))
 	}
 	return errs
 }

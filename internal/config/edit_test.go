@@ -221,3 +221,40 @@ func TestRemoveAccount_StaleLeavesFile(t *testing.T) {
 		t.Errorf("file changed: %s", got)
 	}
 }
+
+func TestReplaceAccount_OAuth(t *testing.T) {
+	path := writeConfig(t, editBase)
+	if err := ReplaceAccount(path, 1, "B", func(a Account) Account {
+		a.Auth, a.OAuthProvider, a.OAuthClientID, a.OAuthClientSecretCmd = AuthOAuth2, ProviderGoogle, "gid", "op read op://P/G/secret"
+		return a
+	}); err != nil {
+		t.Fatal(err)
+	}
+	want := strings.Replace(editBase, `[[account]] # trailing
+name = "B"
+email = "b@example.com"
+imap_host = "imap.b.com"
+`, `[[account]]
+name = "B"
+email = "b@example.com"
+imap_host = "imap.b.com"
+auth = "oauth2"
+oauth_provider = "google"
+oauth_client_id = "gid"
+oauth_client_secret_cmd = "op read op://P/G/secret"
+`, 1)
+	got := readConfig(t, path)
+	if got != want {
+		t.Errorf("got:\n%s\nwant:\n%s", got, want)
+	}
+	if _, err := Load(path); err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if err := ReplaceAccount(path, 1, "B", func(a Account) Account { return a }); err != nil {
+		t.Fatal(err)
+	}
+	if again := readConfig(t, path); again != got {
+		t.Errorf("identity replace changed the file:\n%s\nwant:\n%s", again, got)
+	}
+}
