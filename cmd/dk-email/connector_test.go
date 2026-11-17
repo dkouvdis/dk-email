@@ -140,7 +140,7 @@ func TestOnboarding_DialResolvesWhenNoPasswordGiven(t *testing.T) {
 	want := errors.New("op read failed")
 	o := newOnboarding("", stubResolver{err: want}, nil, slog.New(slog.DiscardHandler))
 
-	if _, err := o.Dial(context.Background(), config.Account{Name: "Work", PasswordCmd: "op read x"}, ""); !errors.Is(err, want) {
+	if _, err := o.Dial(context.Background(), config.Account{Name: "Work", PasswordCmd: "op read x"}, nil); !errors.Is(err, want) {
 		t.Errorf("Dial() error = %v, want the resolver's error", err)
 	}
 
@@ -148,7 +148,7 @@ func TestOnboarding_DialResolvesWhenNoPasswordGiven(t *testing.T) {
 	ln, _ := net.Listen("tcp", "127.0.0.1:0")
 	port := ln.Addr().(*net.TCPAddr).Port
 	ln.Close()
-	conn, err := o.Dial(context.Background(), config.Account{Name: "Work", Email: "me@x", IMAPHost: "127.0.0.1", IMAPPort: port}, "typed")
+	conn, err := o.Dial(context.Background(), config.Account{Name: "Work", Email: "me@x", IMAPHost: "127.0.0.1", IMAPPort: port}, mail.StaticPassword("typed"))
 	if err == nil || errors.Is(err, want) || conn != (ui.Conn{}) {
 		t.Errorf("Dial() = %v, %v; want a connection error and a zero Conn", conn, err)
 	}
@@ -240,11 +240,11 @@ func TestOnboarding_DialBuildsSenderOnlyWithSMTPHost(t *testing.T) {
 	stubDial(t)
 	o := newOnboarding("", stubResolver{}, nil, slog.New(slog.DiscardHandler))
 
-	plain, err := o.Dial(context.Background(), config.Account{Name: "A", Email: "a@x.com"}, "typed")
+	plain, err := o.Dial(context.Background(), config.Account{Name: "A", Email: "a@x.com"}, mail.StaticPassword("typed"))
 	if err != nil || plain.Mailbox == nil || plain.Sender != nil {
 		t.Errorf("without smtp_host: %+v, %v; want a mailbox and no sender", plain, err)
 	}
-	full, err := o.Dial(context.Background(), config.Account{Name: "B", Email: "b@x.com", SMTPHost: "smtp.x.com"}, "typed")
+	full, err := o.Dial(context.Background(), config.Account{Name: "B", Email: "b@x.com", SMTPHost: "smtp.x.com"}, mail.StaticPassword("typed"))
 	if err != nil || full.Mailbox == nil || full.Sender == nil {
 		t.Errorf("with smtp_host: %+v, %v; want a mailbox and a sender", full, err)
 	}
@@ -272,12 +272,16 @@ func stubVerifySMTP(t *testing.T, err error) *[]string {
 // Dial and, with an SMTP host, VerifySMTP, and only if that works save it.
 func onboard(o ui.Onboarding, acct config.Account, password string) (ui.Conn, error) {
 	ctx := context.Background()
-	conn, err := o.Dial(ctx, acct, password)
+	var creds mail.Credentials
+	if password != "" {
+		creds = mail.StaticPassword(password)
+	}
+	conn, err := o.Dial(ctx, acct, creds)
 	if err != nil {
 		return conn, err
 	}
 	if o.VerifySMTP != nil && strings.TrimSpace(acct.SMTPHost) != "" {
-		if err := o.VerifySMTP(ctx, acct, password); err != nil {
+		if err := o.VerifySMTP(ctx, acct, creds); err != nil {
 			_ = conn.Mailbox.Close()
 			return ui.Conn{}, err
 		}
@@ -290,7 +294,7 @@ func TestOnboarding_DialNeverVerifiesSMTP(t *testing.T) {
 	calls := stubVerifySMTP(t, errors.New("must not be called"))
 	o := newOnboarding("", stubResolver{}, nil, slog.New(slog.DiscardHandler))
 
-	conn, err := o.Dial(context.Background(), config.Account{Name: "A", Email: "a@x.com", SMTPHost: "smtp.x.com"}, "pw")
+	conn, err := o.Dial(context.Background(), config.Account{Name: "A", Email: "a@x.com", SMTPHost: "smtp.x.com"}, mail.StaticPassword("pw"))
 
 	if err != nil || conn.Sender == nil || len(*calls) != 0 {
 		t.Errorf("Dial = %+v, %v, SMTP checks %v; want a sender and no SMTP check", conn, err, *calls)
@@ -301,7 +305,7 @@ func TestOnboarding_VerifySMTPUsesTheTypedPasswordAndDefaults(t *testing.T) {
 	calls := stubVerifySMTP(t, nil)
 	o := newOnboarding("", stubResolver{err: errors.New("must not resolve")}, nil, slog.New(slog.DiscardHandler))
 
-	err := o.VerifySMTP(context.Background(), config.Account{Name: "A", Email: "a@x.com", SMTPHost: "smtp.x.com", SMTPTLS: config.TLSStartTLS}, "typed")
+	err := o.VerifySMTP(context.Background(), config.Account{Name: "A", Email: "a@x.com", SMTPHost: "smtp.x.com", SMTPTLS: config.TLSStartTLS}, mail.StaticPassword("typed"))
 
 	if want := []string{"smtp.x.com:587 starttls typed"}; err != nil || !slices.Equal(*calls, want) {
 		t.Errorf("verified %v (%v), want %v", *calls, err, want)
@@ -314,7 +318,7 @@ func TestOnboarding_VerifySMTPResolvesPasswordCmdPassword(t *testing.T) {
 	log := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	o := newOnboarding("", stubResolver{password: "from-1password"}, nil, log)
 
-	err := o.VerifySMTP(context.Background(), config.Account{Name: "A", Email: "a@x.com", PasswordCmd: "op read x", SMTPHost: "smtp.x.com"}, "")
+	err := o.VerifySMTP(context.Background(), config.Account{Name: "A", Email: "a@x.com", PasswordCmd: "op read x", SMTPHost: "smtp.x.com"}, nil)
 
 	if want := []string{"smtp.x.com:465 implicit from-1password"}; err != nil || !slices.Equal(*calls, want) {
 		t.Errorf("verified %v (%v), want %v", *calls, err, want)
@@ -329,7 +333,7 @@ func TestOnboarding_VerifySMTPPasswordErrorSkipsTheCheck(t *testing.T) {
 	want := errors.New("op read failed")
 	o := newOnboarding("", stubResolver{err: want}, nil, slog.New(slog.DiscardHandler))
 
-	err := o.VerifySMTP(context.Background(), config.Account{Name: "A", SMTPHost: "smtp.x.com"}, "")
+	err := o.VerifySMTP(context.Background(), config.Account{Name: "A", SMTPHost: "smtp.x.com"}, nil)
 
 	if !errors.Is(err, want) || len(*calls) != 0 {
 		t.Errorf("error %v, checks %v; want the resolver's error and no check", err, *calls)
@@ -397,15 +401,40 @@ func TestOnboarding_GoodSMTPLoginSavesSMTPKeysAndBuildsSender(t *testing.T) {
 }
 
 // keychainCalls records the keychain changes Onboarding makes.
-type keychainCalls struct{ calls []string }
+type keychainCalls struct {
+	calls []string
+	// copyOAuthErr and secretErr make copyOAuth and storeClientSecret fail.
+	copyOAuthErr, secretErr error
+	// deleteTokenErr makes deleteToken fail (after recording the call).
+	deleteTokenErr error
+}
 
+// stubKeychain replaces every keychain hook, recording the calls in order, so
+// a test also proves which entries were left alone.
 func stubKeychain(t *testing.T, copyErr error) *keychainCalls {
 	t.Helper()
 	k := &keychainCalls{}
 	oldDelete, oldCopy := deleteSecret, copySecret
+	oldDT, oldDC, oldSC, oldCO := deleteToken, deleteClientSecret, storeClientSecret, copyOAuth
 	deleteSecret = func(account string) error { k.calls = append(k.calls, "delete "+account); return nil }
 	copySecret = func(from, to string) error { k.calls = append(k.calls, "copy "+from+"->"+to); return copyErr }
-	t.Cleanup(func() { deleteSecret, copySecret = oldDelete, oldCopy })
+	deleteToken = func(account string) error {
+		k.calls = append(k.calls, "delete-token "+account)
+		return k.deleteTokenErr
+	}
+	deleteClientSecret = func(account string) error { k.calls = append(k.calls, "delete-client-secret "+account); return nil }
+	storeClientSecret = func(account, _ string) error {
+		k.calls = append(k.calls, "store-client-secret "+account)
+		return k.secretErr
+	}
+	copyOAuth = func(from, to string) error {
+		k.calls = append(k.calls, "copy-oauth "+from+"->"+to)
+		return k.copyOAuthErr
+	}
+	t.Cleanup(func() {
+		deleteSecret, copySecret = oldDelete, oldCopy
+		deleteToken, deleteClientSecret, storeClientSecret, copyOAuth = oldDT, oldDC, oldSC, oldCO
+	})
 	return k
 }
 
@@ -439,7 +468,7 @@ func TestOnboarding_UpdateAccountRenameCopiesThenDropsOldKeychainPassword(t *tes
 	k := stubKeychain(t, nil)
 	o := newOnboarding(path, stubResolver{}, func(string, string) error { t.Error("password stored"); return nil }, slog.New(slog.DiscardHandler))
 
-	if err := o.UpdateAccount(0, "Work", rename("Job"), ""); err != nil {
+	if err := o.UpdateAccount(0, "Work", rename("Job"), "", false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -458,7 +487,7 @@ func TestOnboarding_UpdateAccountNewPasswordStoresUnderNewNameAndDropsOld(t *tes
 	stored := map[string]string{}
 	o := newOnboarding(path, stubResolver{}, func(a, p string) error { stored[a] = p; return nil }, slog.New(slog.DiscardHandler))
 
-	if err := o.UpdateAccount(0, "Work", rename("Job"), "secret"); err != nil {
+	if err := o.UpdateAccount(0, "Work", rename("Job"), "secret", false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -475,7 +504,7 @@ func TestOnboarding_UpdateAccountPasswordCmdAccountLeavesKeychainAlone(t *testin
 	k := stubKeychain(t, nil)
 	o := newOnboarding(path, stubResolver{}, nil, slog.New(slog.DiscardHandler))
 
-	if err := o.UpdateAccount(1, "Home", rename("House"), ""); err != nil {
+	if err := o.UpdateAccount(1, "Home", rename("House"), "", false); err != nil {
 		t.Fatal(err)
 	}
 	if len(k.calls) != 0 {
@@ -489,7 +518,7 @@ func TestOnboarding_UpdateAccountFailedWriteCleansUpAndKeepsConfig(t *testing.T)
 	o := newOnboarding(path, stubResolver{}, func(string, string) error { return nil }, slog.New(slog.DiscardHandler))
 
 	// "Home" is a duplicate name, so the config write is refused.
-	err := o.UpdateAccount(0, "Work", rename("Home"), "secret")
+	err := o.UpdateAccount(0, "Work", rename("Home"), "secret", false)
 
 	if err == nil {
 		t.Fatal("want an error")
@@ -507,7 +536,7 @@ func TestOnboarding_UpdateAccountFailedWriteRemovesTheCopy(t *testing.T) {
 	k := stubKeychain(t, nil)
 	o := newOnboarding(path, stubResolver{}, nil, slog.New(slog.DiscardHandler))
 
-	if err := o.UpdateAccount(0, "Work", rename("Home"), ""); err == nil {
+	if err := o.UpdateAccount(0, "Work", rename("Home"), "", false); err == nil {
 		t.Fatal("want an error")
 	}
 	if want := []string{"copy Work->Home", "delete Home"}; !reflect.DeepEqual(k.calls, want) {
@@ -520,7 +549,7 @@ func TestOnboarding_UpdateAccountStaleNameWritesNothing(t *testing.T) {
 	k := stubKeychain(t, nil)
 	o := newOnboarding(path, stubResolver{}, func(string, string) error { t.Error("password stored"); return nil }, slog.New(slog.DiscardHandler))
 
-	err := o.UpdateAccount(0, "Other", rename("Job"), "secret")
+	err := o.UpdateAccount(0, "Other", rename("Job"), "secret", false)
 
 	if err == nil || !strings.Contains(err.Error(), "config changed on disk") || len(k.calls) != 0 {
 		t.Errorf("error = %v, keychain = %v", err, k.calls)
@@ -532,7 +561,7 @@ func TestOnboarding_UpdateAccountCopyFailureLeavesConfigUntouched(t *testing.T) 
 	k := stubKeychain(t, errors.New("keychain locked"))
 	o := newOnboarding(path, stubResolver{}, nil, slog.New(slog.DiscardHandler))
 
-	err := o.UpdateAccount(0, "Work", rename("Job"), "")
+	err := o.UpdateAccount(0, "Work", rename("Job"), "", false)
 
 	if err == nil || !strings.Contains(err.Error(), "keychain locked") {
 		t.Errorf("error = %v", err)

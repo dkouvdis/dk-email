@@ -174,14 +174,14 @@ Plan: [oauth-plan.md](oauth-plan.md).
 **Description:** Wire `popup.Connect` OAuth submissions in `internal/ui` and `cmd/dk-email` `Onboarding` to run browser PKCE (with Microsoft Device Code fallback when browser open fails or is requested), verify IMAP + SMTP `XOAUTH2` login, persist tokens + config atomically, migrate/delete OAuth keychain entries on account edit/remove, and point users to `E` when refresh fails with `invalid_grant`.
 
 **Acceptance criteria:**
-- [ ] Submitting a new or edited OAuth account runs sign-in, verifies IMAP + SMTP `XOAUTH2`, stores the token bundle (and Google client secret, if provided) in the keychain, writes `config.toml`, and connects the account in place without restart (`esc` cancels in-flight auth).
-- [ ] Renaming an OAuth account moves its keychain token/secret entries before deleting old keys; deleting an account removes OAuth keychain entries when credential deletion is confirmed; editing with `Keep current` preserves existing OAuth tokens unless re-authenticated.
-- [ ] Expired/revoked refresh tokens (`invalid_grant`) surface an actionable status message instructing the user to press `E` to edit/re-authenticate the account.
+- [x] Submitting a new or edited OAuth account runs sign-in, verifies IMAP + SMTP `XOAUTH2`, stores the token bundle (and Google client secret, if provided) in the keychain, writes `config.toml`, and connects the account in place without restart (`esc` cancels in-flight auth).
+- [x] Renaming an OAuth account moves its keychain token/secret entries before deleting old keys; deleting an account removes OAuth keychain entries when credential deletion is confirmed; editing with `Keep current` preserves existing OAuth tokens unless re-authenticated.
+- [x] Expired/revoked refresh tokens (`invalid_grant`) surface an actionable status message instructing the user to press `E` to edit/re-authenticate the account.
 
 **Verification:**
-- [ ] Tests pass: `go test -race ./internal/ui/... ./cmd/dk-email`
-- [ ] Build succeeds: `go build -o bin/dk-email ./cmd/dk-email`
-- [ ] Manual check: Verify UI tests cover OAuth add, edit (`Keep current` & re-auth), rename, cancel, and `invalid_grant` status hint.
+- [x] Tests pass: `go test -race ./internal/ui/... ./cmd/dk-email`
+- [x] Build succeeds: `go build -o bin/dk-email ./cmd/dk-email`
+- [x] Manual check: Verify UI tests cover OAuth add, edit (`Keep current` & re-auth), rename, cancel, and `invalid_grant` status hint.
 
 **Dependencies:** Task 5, Task 6
 

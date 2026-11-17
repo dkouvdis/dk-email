@@ -90,6 +90,8 @@ type Model struct {
 	connectPop  popup.Connect
 	connectFor  int
 	connectGen  int
+	// connectCancel stops the connect or edit test now running, if any.
+	connectCancel context.CancelFunc
 	// editFor is the account the connect popup is editing, or -1.
 	editFor int
 	// ids gives each account a number that never changes or repeats, so a
@@ -220,6 +222,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleRefresh(msg)
 	case connectedMsg:
 		return m.handleConnected(msg)
+	case signInProgressMsg:
+		return m.handleSignInProgress(msg)
 	case editedMsg:
 		return m.handleEdited(msg)
 	case removedMsg:

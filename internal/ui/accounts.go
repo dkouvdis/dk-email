@@ -17,7 +17,10 @@ import (
 const (
 	// connectTimeout covers password_cmd (which may wait up to 60s for a
 	// 1Password prompt), login and listing folders.
-	connectTimeout   = 90 * time.Second
+	connectTimeout = 90 * time.Second
+	// signInTimeout is how long an OAuth sign-in waits for the user; the
+	// login test after it has connectTimeout.
+	signInTimeout    = 5 * time.Minute
 	summariesTimeout = 30 * time.Second
 	pageSize         = 200
 )
@@ -110,6 +113,14 @@ func (m Model) handleAccount(msg accountMsg) (Model, tea.Cmd) {
 	if errors.Is(msg.err, ErrNeedsPassword) {
 		m.needsPassword[msg.index] = true
 		m.setError(fmt.Errorf("%s needs a password: press A to enter it", name))
+		return m, nil
+	}
+	if errors.Is(msg.err, ErrNeedsSignIn) {
+		text := fmt.Sprintf("%s needs you to sign in again", name)
+		if m.onboard.UpdateAccount != nil {
+			text += ": press E, choose OAuth 2.0 and Sign in & save"
+		}
+		m.setError(errors.New(text))
 		return m, nil
 	}
 	if msg.err != nil {

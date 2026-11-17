@@ -24,12 +24,24 @@ type fakeOnboarding struct {
 	sender          mail.Sender
 	dialed          []string // passwords Dial was given
 	dialedAccts     []config.Account
+	dialedCreds     []mail.Credentials
+	verifiedCreds   []mail.Credentials
 	verifyErr       error
 	verified        []config.Account
 	verifiedPws     []string
 	added           []config.Account
 	addedPasswords  []string
 	stored          map[string]string
+}
+
+// credPassword is the password creds yields, or "" for nil creds (the
+// account's configured credentials).
+func credPassword(creds mail.Credentials) string {
+	if creds == nil {
+		return ""
+	}
+	l, _ := creds(context.Background())
+	return l.Password
 }
 
 func newOnboarding() *fakeOnboarding {
@@ -41,17 +53,19 @@ func newOnboarding() *fakeOnboarding {
 
 func (f *fakeOnboarding) onboarding() Onboarding {
 	return Onboarding{
-		Dial: func(_ context.Context, acct config.Account, password string) (Conn, error) {
-			f.dialed = append(f.dialed, password)
+		Dial: func(_ context.Context, acct config.Account, creds mail.Credentials) (Conn, error) {
+			f.dialed = append(f.dialed, credPassword(creds))
+			f.dialedCreds = append(f.dialedCreds, creds)
 			f.dialedAccts = append(f.dialedAccts, acct)
 			if f.dialErr != nil {
 				return Conn{}, f.dialErr
 			}
 			return Conn{Mailbox: f.box, Sender: f.sender}, nil
 		},
-		VerifySMTP: func(_ context.Context, acct config.Account, password string) error {
+		VerifySMTP: func(_ context.Context, acct config.Account, creds mail.Credentials) error {
 			f.verified = append(f.verified, acct)
-			f.verifiedPws = append(f.verifiedPws, password)
+			f.verifiedPws = append(f.verifiedPws, credPassword(creds))
+			f.verifiedCreds = append(f.verifiedCreds, creds)
 			return f.verifyErr
 		},
 		AddAccount: func(acct config.Account, password string) error {

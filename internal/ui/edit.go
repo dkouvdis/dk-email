@@ -107,13 +107,42 @@ func (m Model) handleEditResult(r popup.ConnectResult) (Model, tea.Cmd) {
 		}
 		return m, nil
 	}
-	m.connectPop.SetBusy(true)
-	m.connectGen++
 	req := m.connectPop.EditRequest()
 	if r == popup.ConnectSaveAnyway {
+		if editsOAuth(m.accts[i], req) {
+			m.connectPop.SetError("Sign in first: Sign in & save stores the sign-in.")
+			return m, nil
+		}
+		m.connectPop.SetBusy(true)
+		m.connectGen++
 		return m, saveEdit(m.onboard, m.connectGen, i, m.accts[i], req)
 	}
-	return m, testAndEdit(m.onboard, m.connectGen, i, m.accts[i], req)
+	return m.startEditTest(false)
+}
+
+// startEditTest tests and saves the edit in the popup, signing in first when
+// it chose OAuth 2.0.
+func (m Model) startEditTest(useCode bool) (Model, tea.Cmd) {
+	i := m.editFor
+	if i < 0 || i >= len(m.accts) {
+		return m, nil
+	}
+	req := m.connectPop.EditRequest()
+	if editsOAuth(m.accts[i], req) && m.onboard.SignIn == nil {
+		m.connectPop.SetError("OAuth sign-in isn't available.")
+		return m, nil
+	}
+	m.connectPop.SetBusy(true)
+	m.connectGen++
+	ctx := m.beginTest()
+	return m, testAndEdit(ctx, m.onboard, m.connectGen, i, m.accts[i], req, useCode)
+}
+
+// editsOAuth reports whether the edit asks for a new OAuth sign-in: OAuth 2.0
+// was chosen, with no password_cmd supplying tokens.
+func editsOAuth(old config.Account, req popup.EditRequest) bool {
+	acct := editedAccount(old, req)
+	return !req.KeepPassword && acct.OAuth() && acct.PasswordCmd == ""
 }
 
 // editedAccount is what the form's account becomes, from old (the loaded
@@ -124,68 +153,106 @@ func editedAccount(old config.Account, req popup.EditRequest) config.Account {
 
 // testAndEdit logs in with the edited account (IMAP, SMTP if it has a host,
 // and the folder list) and only if all of that works saves it. On any
-// failure nothing is saved.
-func testAndEdit(o Onboarding, gen, index int, old config.Account, req popup.EditRequest) tea.Cmd {
+// failure nothing is saved. With OAuth chosen it signs in first and stores
+// the sign-in under the edited name just before saving the account.
+func testAndEdit(parent context.Context, o Onboarding, gen, index int, old config.Account, req popup.EditRequest, useCode bool) tea.Cmd {
+	if o.SignIn != nil && editsOAuth(old, req) {
+		return withProgress(gen, func(progress func(popup.SignIn)) tea.Msg {
+			return editTest(parent, o, gen, index, old, req, true, useCode, progress)
+		})
+	}
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(context.Background(), connectTimeout)
-		defer cancel()
-		start := time.Now()
-		acct := editedAccount(old, req)
-		res := editedMsg{gen: gen, index: index, oldName: old.Name, acct: acct}
-		fail := func(err error) tea.Msg {
-			if res.conn.Mailbox != nil {
-				_ = res.conn.Mailbox.Close()
-				res.conn = Conn{}
-			}
-			res.err, res.took = err, time.Since(start)
-			return res
-		}
+		return editTest(parent, o, gen, index, old, req, false, false, nil)
+	}
+}
 
-		// The saved keychain password is still under the old name until the
-		// save, which moves it, so dial under that name.
-		dialAs := acct
-		if req.KeepPassword && acct.PasswordCmd == "" {
-			dialAs.Name = old.Name
+func editTest(parent context.Context, o Onboarding, gen, index int, old config.Account, req popup.EditRequest, oauth, useCode bool, progress func(popup.SignIn)) tea.Msg {
+	start := time.Now()
+	acct := editedAccount(old, req)
+	res := editedMsg{gen: gen, index: index, oldName: old.Name, acct: acct}
+	fail := func(err error) tea.Msg {
+		if res.conn.Mailbox != nil {
+			_ = res.conn.Mailbox.Close()
+			res.conn = Conn{}
 		}
-		conn, err := o.Dial(ctx, dialAs, req.Password)
-		if err == nil && conn.Mailbox == nil {
-			err = errors.New("connector returned no mailbox")
-		}
+		res.err, res.took = err, time.Since(start)
+		return res
+	}
+
+	var creds mail.Credentials
+	var sess OAuthSession
+	if oauth {
+		signCtx, cancel := context.WithTimeout(parent, signInTimeout)
+		var err error
+		// Sign in under the old name: a saved client secret is still there
+		// until the save moves the account.
+		signAs := acct
+		signAs.Name = old.Name
+		sess, err = o.SignIn(signCtx, signAs, req.ClientSecret, useCode, progress)
+		cancel()
 		if err != nil {
-			return fail(err)
+			return fail(fmt.Errorf("sign-in failed: %w", err))
 		}
-		res.conn = conn
-		if o.VerifySMTP != nil && strings.TrimSpace(acct.SMTPHost) != "" {
-			if err := o.VerifySMTP(ctx, dialAs, req.Password); err != nil {
-				return fail(fmt.Errorf("IMAP login worked, but SMTP failed: %w", err))
-			}
+		creds = sess.Creds
+	} else if req.Password != "" {
+		creds = mail.StaticPassword(req.Password)
+	}
+
+	ctx, cancel := context.WithTimeout(parent, connectTimeout)
+	defer cancel()
+	// The saved keychain password is still under the old name until the
+	// save, which moves it, so dial under that name.
+	dialAs := acct
+	if req.KeepPassword && acct.PasswordCmd == "" {
+		dialAs.Name = old.Name
+	}
+	conn, err := o.Dial(ctx, dialAs, creds)
+	if err == nil && conn.Mailbox == nil {
+		err = errors.New("connector returned no mailbox")
+	}
+	if err != nil {
+		return fail(err)
+	}
+	res.conn = conn
+	if o.VerifySMTP != nil && strings.TrimSpace(acct.SMTPHost) != "" {
+		if err := o.VerifySMTP(ctx, dialAs, creds); err != nil {
+			return fail(fmt.Errorf("IMAP login worked, but SMTP failed: %w", err))
 		}
-		if res.folders, err = conn.Mailbox.Folders(ctx); err != nil {
-			return fail(fmt.Errorf("list folders: %w", err))
-		}
-		if err := saveEditedAccount(o, index, old.Name, req); err != nil {
+	}
+	if res.folders, err = conn.Mailbox.Folders(ctx); err != nil {
+		return fail(fmt.Errorf("list folders: %w", err))
+	}
+	if oauth {
+		if err := sess.Save(acct.Name); err != nil {
 			res.saveErr = true
 			return fail(fmt.Errorf("connected, but saving failed: %w", err))
 		}
-		res.took = time.Since(start)
-		return res
 	}
+	if err := saveEditedAccount(o, index, old.Name, req, oauth); err != nil {
+		if oauth && acct.Name != old.Name {
+			sess.Forget(acct.Name) // under the same name the new token just replaced the old one
+		}
+		res.saveErr = true
+		return fail(fmt.Errorf("connected, but saving failed: %w", err))
+	}
+	res.took = time.Since(start)
+	return res
 }
 
 // saveEdit saves the edit without testing the login.
 func saveEdit(o Onboarding, gen, index int, old config.Account, req popup.EditRequest) tea.Cmd {
 	return func() tea.Msg {
 		res := editedMsg{gen: gen, index: index, oldName: old.Name, acct: editedAccount(old, req), anyway: true}
-		if err := saveEditedAccount(o, index, old.Name, req); err != nil {
+		if err := saveEditedAccount(o, index, old.Name, req, false); err != nil {
 			res.err, res.saveErr = err, true
 		}
 		return res
 	}
 }
 
-func saveEditedAccount(o Onboarding, index int, oldName string, req popup.EditRequest) error {
+func saveEditedAccount(o Onboarding, index int, oldName string, req popup.EditRequest, signedIn bool) error {
 	edit := func(raw config.Account) config.Account { return popup.ApplyEdit(raw, req) }
-	return o.UpdateAccount(index, oldName, edit, req.Password)
+	return o.UpdateAccount(index, oldName, edit, req.Password, signedIn)
 }
 
 func removeAccount(o Onboarding, gen, index int, acct config.Account, deletePassword bool) tea.Cmd {
@@ -195,6 +262,9 @@ func removeAccount(o Onboarding, gen, index int, acct config.Account, deletePass
 }
 
 func (m Model) handleEdited(msg editedMsg) (Model, tea.Cmd) {
+	if msg.gen == m.connectGen {
+		m.endTest()
+	}
 	live := msg.gen == m.connectGen && m.showConnect && m.editFor == msg.index
 	if msg.err != nil {
 		if msg.conn.Mailbox != nil {

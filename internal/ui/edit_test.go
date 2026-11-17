@@ -13,6 +13,7 @@ import (
 	"github.com/dkouvdis/dk-email/internal/config"
 	"github.com/dkouvdis/dk-email/internal/mail"
 	"github.com/dkouvdis/dk-email/internal/mail/mailtest"
+	"github.com/dkouvdis/dk-email/internal/ui/popup"
 	"github.com/dkouvdis/dk-email/internal/ui/sidebar"
 	"github.com/dkouvdis/dk-email/internal/ui/theme"
 	"github.com/dkouvdis/dk-email/internal/ui/threadlist"
@@ -21,12 +22,17 @@ import (
 // editFixture is accounts A, B and C (keyed by email, so renaming one keeps
 // its mailbox) and the Onboarding that edits and removes them.
 type editFixture struct {
-	boxes    map[string]*mailtest.Fake
-	dialErr  error
-	dialed   []string // account names Dial was given
-	updated  []string // "index/oldName"
-	edits    []config.Account
-	updPw    []string
+	boxes   map[string]*mailtest.Fake
+	dialErr error
+	dialed  []string // account names Dial was given
+	updated []string // "index/oldName"
+	edits   []config.Account
+	updPw   []string
+	// updSignedIn is the signedIn flag of each UpdateAccount call.
+	updSignedIn []bool
+	dialedCreds []mail.Credentials
+	// signIn, when set, is the Onboarding's SignIn.
+	signIn   func(ctx context.Context, acct config.Account, clientSecret string, useCode bool, progress func(popup.SignIn)) (OAuthSession, error)
 	updErr   error
 	removed  []string // "index/name/deletePassword"
 	removeEr error
@@ -56,8 +62,10 @@ func (f *editFixture) connector() Connector {
 
 func (f *editFixture) onboarding() Onboarding {
 	return Onboarding{
-		Dial: func(_ context.Context, acct config.Account, _ string) (Conn, error) {
+		SignIn: f.signIn,
+		Dial: func(_ context.Context, acct config.Account, creds mail.Credentials) (Conn, error) {
 			f.dialed = append(f.dialed, acct.Name)
+			f.dialedCreds = append(f.dialedCreds, creds)
 			if f.dialErr != nil {
 				return Conn{}, f.dialErr
 			}
@@ -65,13 +73,14 @@ func (f *editFixture) onboarding() Onboarding {
 		},
 		AddAccount:    func(config.Account, string) error { return nil },
 		StorePassword: func(string, string) error { return nil },
-		UpdateAccount: func(index int, oldName string, edit func(config.Account) config.Account, password string) error {
+		UpdateAccount: func(index int, oldName string, edit func(config.Account) config.Account, password string, signedIn bool) error {
 			if f.updErr != nil {
 				return f.updErr
 			}
 			f.updated = append(f.updated, fmt.Sprintf("%d/%s", index, oldName))
 			f.edits = append(f.edits, edit(config.Account{Name: oldName}))
 			f.updPw = append(f.updPw, password)
+			f.updSignedIn = append(f.updSignedIn, signedIn)
 			return nil
 		},
 		RemoveAccount: func(index int, acct config.Account, deletePassword bool) error {

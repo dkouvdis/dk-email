@@ -67,8 +67,9 @@ func startUI(cfg *config.Config) error {
 	defer closeLog()
 
 	resolver := secret.New()
-	model := ui.New(*cfg, newConnector(resolver, log), log).
-		WithOnboarding(newOnboarding(cfg.Path, resolver, secret.Store, log))
+	onboarding := newOnboarding(cfg.Path, resolver, secret.Store, log)
+	onboarding.SignIn = signIn(resolver)
+	model := ui.New(*cfg, newConnector(resolver, log), log).WithOnboarding(onboarding)
 	final, err := tea.NewProgram(model).Run()
 	if m, ok := final.(ui.Model); ok {
 		_ = m.Close()
@@ -124,13 +125,27 @@ func credentials(ctx context.Context, pw secretResolver, acct config.Account) (m
 		func() (secret.OAuthToken, error) { return loadToken(acct.Name) },
 		func(t secret.OAuthToken) error { return storeToken(acct.Name, t) },
 	)
+	return tokenCredentials(ts), nil
+}
+
+// tokenCredentials logs in with ts's access token, refreshed when needed.
+func tokenCredentials(ts *oauth.TokenSource) mail.Credentials {
 	return func(ctx context.Context) (mail.Login, error) {
 		tok, err := ts.Token(ctx)
 		if err != nil {
 			return mail.Login{}, err
 		}
 		return mail.Login{Token: tok}, nil
-	}, nil
+	}
+}
+
+// needsSignIn wraps an error that only a new OAuth sign-in fixes: no stored
+// sign-in, or one that expired or was revoked.
+func needsSignIn(err error) error {
+	if errors.Is(err, secret.ErrNoToken) || errors.Is(err, oauth.ErrInvalidGrant) {
+		return fmt.Errorf("%w: %w", ui.ErrNeedsSignIn, err)
+	}
+	return err
 }
 
 // newConnector builds each account's credentials, then logs in over IMAP
@@ -145,9 +160,10 @@ func newConnector(pw secretResolver, log *slog.Logger) ui.Connector {
 			return ui.Conn{}, fmt.Errorf("%w: %w", ui.ErrNeedsPassword, err)
 		}
 		if err != nil {
-			return ui.Conn{}, err
+			return ui.Conn{}, needsSignIn(err)
 		}
-		return dial(ctx, acct, creds, log)
+		conn, err := dial(ctx, acct, creds, log)
+		return conn, needsSignIn(err)
 	}
 }
 
@@ -197,23 +213,42 @@ var (
 	copySecret   = secret.Copy
 )
 
+// deleteToken, deleteClientSecret, storeClientSecret and copyOAuth change the
+// OAuth entries in the OS keychain; tests replace them.
+var (
+	deleteToken        = secret.DeleteToken
+	deleteClientSecret = secret.DeleteClientSecret
+	storeClientSecret  = secret.StoreClientSecret
+	copyOAuth          = secret.CopyOAuth
+)
+
+// deleteOAuth removes an account's OAuth token and client secret, trying both
+// and returning the first error.
+func deleteOAuth(name string) error {
+	err := deleteToken(name)
+	if err2 := deleteClientSecret(name); err == nil {
+		err = err2
+	}
+	return err
+}
+
 // newOnboarding lets the connect popup test and save accounts. A new
 // account's keychain password is stored before the account is appended to
 // configPath, so a saved account always has its password. VerifySMTP tests a
 // new account's SMTP login, resolving the password like Dial does.
 func newOnboarding(configPath string, pw secretResolver, store func(account, password string) error, log *slog.Logger) ui.Onboarding {
 	return ui.Onboarding{
-		Dial: func(ctx context.Context, acct config.Account, password string) (ui.Conn, error) {
+		Dial: func(ctx context.Context, acct config.Account, creds mail.Credentials) (ui.Conn, error) {
 			acct = acct.WithDefaults()
-			creds, err := onboardingCredentials(ctx, pw, acct, password)
+			creds, err := onboardingCredentials(ctx, pw, acct, creds)
 			if err != nil {
 				return ui.Conn{}, err
 			}
 			return dial(ctx, acct, creds, log)
 		},
-		VerifySMTP: func(ctx context.Context, acct config.Account, password string) error {
+		VerifySMTP: func(ctx context.Context, acct config.Account, creds mail.Credentials) error {
 			acct = acct.WithDefaults()
-			creds, err := onboardingCredentials(ctx, pw, acct, password)
+			creds, err := onboardingCredentials(ctx, pw, acct, creds)
 			if err != nil {
 				return err
 			}
@@ -231,10 +266,10 @@ func newOnboarding(configPath string, pw secretResolver, store func(account, pas
 			return config.AppendAccount(configPath, acct)
 		},
 		StorePassword: store,
-		UpdateAccount: func(index int, oldName string, edit func(config.Account) config.Account, password string) error {
-			// Learn the new name and password source up front: the keychain
-			// entry is written before the config, so a saved account always
-			// has its password.
+		UpdateAccount: func(index int, oldName string, edit func(config.Account) config.Account, password string, signedIn bool) error {
+			// Learn the new name and login source up front: the keychain
+			// entries are written before the config, so a saved account
+			// always has its login, and what it leaves behind goes after.
 			cfg, err := config.Load(configPath)
 			if err != nil {
 				return err
@@ -242,11 +277,16 @@ func newOnboarding(configPath string, pw secretResolver, store func(account, pas
 			if index < 0 || index >= len(cfg.Accounts) || cfg.Accounts[index].Name != oldName {
 				return fmt.Errorf("config changed on disk: account %q not found", oldName)
 			}
-			edited := edit(cfg.Accounts[index])
+			was := cfg.Accounts[index]
+			edited := edit(was)
 			renamed := edited.Name != oldName
-			keychain := renamed && edited.PasswordCmd == ""
+			wasOAuth := was.OAuth() && was.PasswordCmd == ""
+			isOAuth := edited.OAuth() && edited.PasswordCmd == ""
+			keychain := renamed && edited.PasswordCmd == "" && !edited.OAuth()
+			// A rename without a new sign-in moves the stored one.
+			copiedOAuth := isOAuth && renamed && !signedIn
 			switch {
-			case password != "":
+			case password != "" && !edited.OAuth():
 				if err := store(edited.Name, password); err != nil {
 					return err
 				}
@@ -256,15 +296,25 @@ func newOnboarding(configPath string, pw secretResolver, store func(account, pas
 				if err := copySecret(oldName, edited.Name); err != nil {
 					return err
 				}
+			case copiedOAuth:
+				if err := copyOAuth(oldName, edited.Name); err != nil {
+					return err
+				}
 			}
 			if err := config.ReplaceAccount(configPath, index, oldName, edit); err != nil {
-				if renamed && (password != "" || keychain) {
+				switch {
+				case renamed && (password != "" || keychain) && !edited.OAuth():
 					_ = deleteSecret(edited.Name) // best effort: don't leave an orphan
+				case copiedOAuth:
+					_ = deleteOAuth(edited.Name)
 				}
 				return err
 			}
 			if keychain {
 				_ = deleteSecret(oldName) // the old entry is just left over
+			}
+			if (isOAuth && renamed && (signedIn || copiedOAuth)) || (wasOAuth && !isOAuth) {
+				_ = deleteOAuth(oldName) // the old sign-in is just left over
 			}
 			return nil
 		},
@@ -273,6 +323,9 @@ func newOnboarding(configPath string, pw secretResolver, store func(account, pas
 				return err
 			}
 			if deletePassword && acct.PasswordCmd == "" {
+				if acct.OAuth() {
+					return deleteOAuth(acct.Name)
+				}
 				return deleteSecret(acct.Name)
 			}
 			return nil
@@ -280,11 +333,11 @@ func newOnboarding(configPath string, pw secretResolver, store func(account, pas
 	}
 }
 
-// onboardingCredentials uses a password typed in the connect popup, or else
-// the account's configured credentials.
-func onboardingCredentials(ctx context.Context, pw secretResolver, acct config.Account, password string) (mail.Credentials, error) {
-	if password != "" {
-		return mail.StaticPassword(password), nil
+// onboardingCredentials uses creds from the connect popup (a typed password
+// or a fresh sign-in), or else the account's configured credentials.
+func onboardingCredentials(ctx context.Context, pw secretResolver, acct config.Account, creds mail.Credentials) (mail.Credentials, error) {
+	if creds != nil {
+		return creds, nil
 	}
 	return credentials(ctx, pw, acct)
 }
