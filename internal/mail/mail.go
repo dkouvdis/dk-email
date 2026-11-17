@@ -210,3 +210,20 @@ type Mailbox interface {
 	Move(ctx context.Context, from string, uids []UID, to string) error
 	Close() error
 }
+
+// Login is what one connection authenticates with.
+type Login struct {
+	// Password is sent with LOGIN or AUTH PLAIN when Token is empty.
+	Password string
+	// Token is an OAuth 2.0 access token, sent with XOAUTH2.
+	Token string
+}
+
+// Credentials yields the Login for one connection attempt. Transports call
+// it on every dial, reconnect, send and verify, so OAuth tokens stay fresh.
+type Credentials func(ctx context.Context) (Login, error)
+
+// StaticPassword returns Credentials that always yield password.
+func StaticPassword(password string) Credentials {
+	return func(context.Context) (Login, error) { return Login{Password: password}, nil }
+}

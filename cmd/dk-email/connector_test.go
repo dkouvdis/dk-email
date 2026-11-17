@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dkouvdis/dk-email/internal/config"
 	"github.com/dkouvdis/dk-email/internal/mail"
@@ -30,6 +31,10 @@ func (s stubResolver) Resolve(context.Context, config.Account) (string, error) {
 	return s.password, s.err
 }
 
+func (s stubResolver) ResolveClientSecret(context.Context, config.Account) (string, error) {
+	return "", s.err
+}
+
 func TestNewConnector_PasswordErrorSkipsLogin(t *testing.T) {
 	var buf bytes.Buffer
 	log := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
@@ -40,8 +45,8 @@ func TestNewConnector_PasswordErrorSkipsLogin(t *testing.T) {
 	if !errors.Is(err, want) || conn != (ui.Conn{}) {
 		t.Fatalf("connect = %v, %v; want a zero Conn, %v", conn, err, want)
 	}
-	if !strings.Contains(buf.String(), "password resolved") || strings.Contains(buf.String(), "imap login") {
-		t.Errorf("log = %q, want a password step and no login step", buf.String())
+	if !strings.Contains(buf.String(), "credentials resolved") || strings.Contains(buf.String(), "imap login") {
+		t.Errorf("log = %q, want a credentials step and no login step", buf.String())
 	}
 }
 
@@ -160,6 +165,10 @@ func (c *countingResolver) Resolve(context.Context, config.Account) (string, err
 	return c.password, nil
 }
 
+func (c *countingResolver) ResolveClientSecret(context.Context, config.Account) (string, error) {
+	return "", nil
+}
+
 // fakeIMAP is an imapConn that never touches the network.
 type fakeIMAP struct{ *mailtest.Fake }
 
@@ -174,17 +183,21 @@ func (fakeIMAP) SetFlag(context.Context, string, []mail.UID, mail.Flag, bool) er
 	return nil
 }
 
-// stubDial replaces dialIMAP and records the passwords it was given.
-func stubDial(t *testing.T) *[]string {
+// stubDial replaces dialIMAP and records the logins its credentials yield.
+func stubDial(t *testing.T) *[]mail.Login {
 	t.Helper()
-	var passwords []string
+	var logins []mail.Login
 	old := dialIMAP
-	dialIMAP = func(_ context.Context, _ config.Account, password string) (imapConn, error) {
-		passwords = append(passwords, password)
+	dialIMAP = func(ctx context.Context, _ config.Account, creds mail.Credentials) (imapConn, error) {
+		login, err := creds(ctx)
+		if err != nil {
+			return nil, err
+		}
+		logins = append(logins, login)
 		return fakeIMAP{mailtest.New()}, nil
 	}
 	t.Cleanup(func() { dialIMAP = old })
-	return &passwords
+	return &logins
 }
 
 func TestNewConnector_NoSMTPHostMeansNoSender(t *testing.T) {
@@ -204,7 +217,7 @@ func TestNewConnector_NoSMTPHostMeansNoSender(t *testing.T) {
 }
 
 func TestNewConnector_SMTPHostBuildsSenderFromOnePasswordResolution(t *testing.T) {
-	passwords := stubDial(t)
+	logins := stubDial(t)
 	pw := &countingResolver{password: "hunter2-secret"}
 	var buf bytes.Buffer
 	log := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
@@ -215,8 +228,8 @@ func TestNewConnector_SMTPHostBuildsSenderFromOnePasswordResolution(t *testing.T
 	if err != nil || conn.Mailbox == nil || conn.Sender == nil {
 		t.Fatalf("connect = %+v, %v; want a mailbox and a sender", conn, err)
 	}
-	if pw.calls != 1 || len(*passwords) != 1 || (*passwords)[0] != "hunter2-secret" {
-		t.Errorf("password resolved %d times, dialed with %v; want once", pw.calls, *passwords)
+	if pw.calls != 1 || len(*logins) != 1 || (*logins)[0].Password != "hunter2-secret" {
+		t.Errorf("password resolved %d times, dialed with %v; want once", pw.calls, *logins)
 	}
 	if strings.Contains(buf.String(), "hunter2-secret") {
 		t.Error("password leaked into the log")
@@ -243,8 +256,12 @@ func stubVerifySMTP(t *testing.T, err error) *[]string {
 	t.Helper()
 	var calls []string
 	old := verifySMTP
-	verifySMTP = func(_ context.Context, acct config.Account, password string) error {
-		calls = append(calls, acct.SMTPHost+":"+strconv.Itoa(acct.SMTPPort)+" "+acct.SMTPTLS+" "+password)
+	verifySMTP = func(ctx context.Context, acct config.Account, creds mail.Credentials) error {
+		login, cerr := creds(ctx)
+		if cerr != nil {
+			return cerr
+		}
+		calls = append(calls, acct.SMTPHost+":"+strconv.Itoa(acct.SMTPPort)+" "+acct.SMTPTLS+" "+login.Password)
 		return err
 	}
 	t.Cleanup(func() { verifySMTP = old })
@@ -568,5 +585,109 @@ func TestOnboarding_RemoveAccountStaleKeepsPassword(t *testing.T) {
 
 	if err := o.RemoveAccount(0, config.Account{Name: "Gone"}, true); err == nil || len(k.calls) != 0 {
 		t.Errorf("error = %v, keychain = %v", err, k.calls)
+	}
+}
+
+// oauthResolver is a secretResolver with a counted token command.
+type oauthResolver struct {
+	token string
+	err   error
+	calls int
+}
+
+func (o *oauthResolver) Resolve(context.Context, config.Account) (string, error) {
+	o.calls++
+	return o.token, o.err
+}
+
+func (o *oauthResolver) ResolveClientSecret(context.Context, config.Account) (string, error) {
+	return "", nil
+}
+
+func TestCredentials_PasswordAccountResolvesOnce(t *testing.T) {
+	pw := &countingResolver{password: "hunter2"}
+
+	creds, err := credentials(context.Background(), pw, config.Account{Name: "Work"})
+	if err != nil {
+		t.Fatalf("credentials() error = %v", err)
+	}
+	for range 3 {
+		login, err := creds(context.Background())
+		if err != nil || login != (mail.Login{Password: "hunter2"}) {
+			t.Fatalf("creds() = %+v, %v; want the password", login, err)
+		}
+	}
+
+	if pw.calls != 1 {
+		t.Errorf("password resolved %d times, want 1", pw.calls)
+	}
+}
+
+func TestCredentials_OAuthWithPasswordCmdRunsTheCommandEveryTime(t *testing.T) {
+	pw := &oauthResolver{token: "tok-from-cmd"}
+	acct := config.Account{Name: "Work", Auth: config.AuthOAuth2, PasswordCmd: "oama access me"}
+
+	creds, err := credentials(context.Background(), pw, acct)
+	if err != nil {
+		t.Fatalf("credentials() error = %v", err)
+	}
+	if pw.calls != 0 {
+		t.Fatalf("command ran %d times before any connection, want 0", pw.calls)
+	}
+	for range 3 {
+		login, err := creds(context.Background())
+		if err != nil || login != (mail.Login{Token: "tok-from-cmd"}) {
+			t.Fatalf("creds() = %+v, %v; want the token", login, err)
+		}
+	}
+
+	if pw.calls != 3 {
+		t.Errorf("command ran %d times, want 3", pw.calls)
+	}
+}
+
+func oauthProviderAccount() config.Account {
+	return config.Account{
+		Name: "Work", Email: "me@work.com", Auth: config.AuthOAuth2,
+		OAuthProvider: config.ProviderMicrosoft, OAuthClientID: "client-id",
+	}
+}
+
+func TestCredentials_OAuthProviderUsesStoredToken(t *testing.T) {
+	old := loadToken
+	t.Cleanup(func() { loadToken = old })
+	var loaded []string
+	loadToken = func(account string) (secret.OAuthToken, error) {
+		loaded = append(loaded, account)
+		return secret.OAuthToken{AccessToken: "stored-access", RefreshToken: "r", Expiry: time.Now().Add(time.Hour)}, nil
+	}
+
+	creds, err := credentials(context.Background(), stubResolver{}, oauthProviderAccount())
+	if err != nil {
+		t.Fatalf("credentials() error = %v", err)
+	}
+	login, err := creds(context.Background())
+
+	if err != nil || login != (mail.Login{Token: "stored-access"}) {
+		t.Fatalf("creds() = %+v, %v; want the stored access token", login, err)
+	}
+	if !slices.Equal(loaded, []string{"Work"}) {
+		t.Errorf("loadToken called for %v, want [Work]", loaded)
+	}
+}
+
+func TestCredentials_OAuthProviderWithoutSignInFailsOnUse(t *testing.T) {
+	old := loadToken
+	t.Cleanup(func() { loadToken = old })
+	loadToken = func(string) (secret.OAuthToken, error) { return secret.OAuthToken{}, secret.ErrNoToken }
+
+	creds, err := credentials(context.Background(), stubResolver{}, oauthProviderAccount())
+	if err != nil {
+		t.Fatalf("credentials() error = %v", err)
+	}
+	_, err = creds(context.Background())
+
+	if !errors.Is(err, secret.ErrNoToken) {
+		t.Errorf("creds() error = %v, want secret.ErrNoToken", err)
 	}
 }

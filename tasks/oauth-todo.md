@@ -116,14 +116,14 @@ Plan: [oauth-plan.md](oauth-plan.md).
 **Description:** Support dynamic per-connection credential callbacks in `imap.Client.handshake()` and `smtp.Transport.session()`, enabling transparent OAuth access-token refresh across IMAP reconnects and subsequent SMTP sends while preserving `LOGIN` / `PLAIN` for password accounts.
 
 **Acceptance criteria:**
-- [ ] `imap.Client.handshake()` resolves fresh credentials on initial dial and on automatic reconnect, calling `conn.Login` for password accounts and `conn.Authenticate(xoauth2)` for OAuth accounts (surfacing any recorded `XOAUTH2` challenge detail alongside the server's `NO` error).
-- [ ] `smtp.Transport.session()` resolves fresh credentials on every `Send` and `Verify`, calling `sasl.NewPlainClient` for password accounts and `XOAUTH2` for OAuth accounts.
-- [ ] `cmd/dk-email/main.go` wires `oauth.TokenSource` for `auth = "oauth2"` accounts and preserves existing `secret.Resolve` behavior for `password_cmd` and `keychain` accounts.
+- [x] `imap.Client.handshake()` resolves fresh credentials on initial dial and on automatic reconnect, calling `conn.Login` for password accounts and `conn.Authenticate(xoauth2)` for OAuth accounts (surfacing any recorded `XOAUTH2` challenge detail alongside the server's `NO` error).
+- [x] `smtp.Transport.session()` resolves fresh credentials on every `Send` and `Verify`, calling `sasl.NewPlainClient` for password accounts and `XOAUTH2` for OAuth accounts.
+- [x] `cmd/dk-email/main.go` wires `oauth.TokenSource` for `auth = "oauth2"` accounts and preserves existing `secret.Resolve` behavior for `password_cmd` and `keychain` accounts.
 
 **Verification:**
-- [ ] Tests pass: `go test -race ./internal/mail/... ./cmd/dk-email`
-- [ ] Build succeeds: `go build -o bin/dk-email ./cmd/dk-email`
-- [ ] Manual check: Existing password/1Password test paths continue passing unchanged.
+- [x] Tests pass: `go test -race ./internal/mail/... ./cmd/dk-email`
+- [x] Build succeeds: `go build -o bin/dk-email ./cmd/dk-email`
+- [x] Manual check: Existing password/1Password test paths continue passing unchanged.
 
 **Dependencies:** Task 3, Task 4
 

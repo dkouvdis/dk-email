@@ -9,13 +9,16 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/json"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"io"
 	"math/big"
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -25,6 +28,7 @@ import (
 	gosmtp "github.com/emersion/go-smtp"
 
 	"github.com/dkouvdis/dk-email/internal/config"
+	"github.com/dkouvdis/dk-email/internal/mail"
 )
 
 const (
@@ -41,12 +45,16 @@ type received struct {
 	rcpts []string
 	data  []byte
 	mails int
+	// tokens are the XOAUTH2 tokens the server accepts; tokensSeen records
+	// the accepted ones in order.
+	tokens     map[string]bool
+	tokensSeen []string
 }
 
 func (r *received) snapshot() received {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return received{auths: r.auths, from: r.from, rcpts: append([]string(nil), r.rcpts...), data: r.data, mails: r.mails}
+	return received{auths: r.auths, from: r.from, rcpts: append([]string(nil), r.rcpts...), data: r.data, mails: r.mails, tokensSeen: append([]string(nil), r.tokensSeen...)}
 }
 
 type backend struct{ rec *received }
@@ -57,9 +65,47 @@ func (b backend) NewSession(*gosmtp.Conn) (gosmtp.Session, error) {
 
 type session struct{ rec *received }
 
-func (s *session) AuthMechanisms() []string { return []string{sasl.Plain} }
+func (s *session) AuthMechanisms() []string { return []string{sasl.Plain, "XOAUTH2"} }
 
-func (s *session) Auth(string) (sasl.Server, error) {
+// xoauth2Server is a test-only XOAUTH2 sasl.Server. A bad token gets the JSON
+// error challenge, and the client's empty answer then fails the login.
+type xoauth2Server struct {
+	rec        *received
+	challenged bool
+	token      string
+}
+
+func (x *xoauth2Server) Next(resp []byte) ([]byte, bool, error) {
+	if x.challenged {
+		return nil, false, &gosmtp.SMTPError{Code: 535, EnhancedCode: gosmtp.EnhancedCode{5, 7, 8}, Message: "bad token " + x.token}
+	}
+	var user, tok string
+	for _, p := range strings.Split(string(resp), "\x01") {
+		if v, ok := strings.CutPrefix(p, "user="); ok {
+			user = v
+		}
+		if v, ok := strings.CutPrefix(p, "auth=Bearer "); ok {
+			tok = v
+		}
+	}
+	x.rec.mu.Lock()
+	ok := user == testUser && x.rec.tokens[tok]
+	if ok {
+		x.rec.tokensSeen = append(x.rec.tokensSeen, tok)
+	}
+	x.rec.mu.Unlock()
+	if ok {
+		return nil, true, nil
+	}
+	x.challenged, x.token = true, tok
+	challenge, _ := json.Marshal(map[string]string{"status": "400", "schemes": "Bearer", "scope": "https://mail.example.com/"})
+	return challenge, false, nil
+}
+
+func (s *session) Auth(mech string) (sasl.Server, error) {
+	if mech == "XOAUTH2" {
+		return &xoauth2Server{rec: s.rec}, nil
+	}
 	return sasl.NewPlainServer(func(_, user, pass string) error {
 		s.rec.mu.Lock()
 		s.rec.auths++
@@ -386,4 +432,104 @@ func selfSignedCert(t *testing.T) (tls.Certificate, *x509.CertPool) {
 	pool := x509.NewCertPool()
 	pool.AddCert(leaf)
 	return tls.Certificate{Certificate: [][]byte{der}, PrivateKey: key}, pool
+}
+
+func tokenTransport(t *testing.T, pool *x509.CertPool, port int, creds mail.Credentials) *Transport {
+	t.Helper()
+	tr := NewWithCredentials(config.Account{
+		Name:     "Test",
+		Username: testUser,
+		SMTPHost: "127.0.0.1",
+		SMTPPort: port,
+		SMTPTLS:  config.TLSImplicit,
+	}, creds)
+	tr.tlsConfig = &tls.Config{RootCAs: pool}
+	return tr
+}
+
+func TestSendAndVerify_OAuthToken(t *testing.T) {
+	cert, pool := selfSignedCert(t)
+	port, rec := startServer(t, cert, true, false)
+	rec.tokens = map[string]bool{"tok-good": true}
+	tr := tokenTransport(t, pool, port, func(context.Context) (mail.Login, error) { return mail.Login{Token: "tok-good"}, nil })
+
+	if err := tr.Verify(context.Background()); err != nil {
+		t.Fatalf("Verify() error = %v", err)
+	}
+	if err := tr.Send(context.Background(), testUser, []string{"you@example.com"}, testMsg); err != nil {
+		t.Fatalf("Send() error = %v", err)
+	}
+
+	got := rec.snapshot()
+	if want := []string{"tok-good", "tok-good"}; !slices.Equal(got.tokensSeen, want) {
+		t.Errorf("server saw tokens %v, want %v", got.tokensSeen, want)
+	}
+	if got.mails != 1 {
+		t.Errorf("server saw %d MAIL commands, want 1", got.mails)
+	}
+}
+
+func TestSend_FetchesCredentialsForEverySend(t *testing.T) {
+	cert, pool := selfSignedCert(t)
+	port, rec := startServer(t, cert, true, false)
+	rec.tokens = map[string]bool{"tok-1": true, "tok-2": true}
+	var calls int
+	tr := tokenTransport(t, pool, port, func(context.Context) (mail.Login, error) {
+		calls++
+		return mail.Login{Token: fmt.Sprintf("tok-%d", calls)}, nil
+	})
+
+	for i := range 2 {
+		if err := tr.Send(context.Background(), testUser, []string{"you@example.com"}, testMsg); err != nil {
+			t.Fatalf("Send() #%d error = %v", i+1, err)
+		}
+	}
+
+	if calls != 2 {
+		t.Errorf("credentials called %d times, want 2", calls)
+	}
+	if want := []string{"tok-1", "tok-2"}; !slices.Equal(rec.snapshot().tokensSeen, want) {
+		t.Errorf("server saw tokens %v, want %v", rec.snapshot().tokensSeen, want)
+	}
+}
+
+func TestSend_OAuthRejectedTokenShowsDetailWithoutToken(t *testing.T) {
+	cert, pool := selfSignedCert(t)
+	port, rec := startServer(t, cert, true, false)
+	tr := tokenTransport(t, pool, port, func(context.Context) (mail.Login, error) { return mail.Login{Token: "tok-bad"}, nil })
+
+	err := tr.Send(context.Background(), testUser, []string{"you@example.com"}, testMsg)
+
+	if err == nil {
+		t.Fatal("Send() error = nil, want auth failure")
+	}
+	for _, want := range []string{"535", "xoauth2: server rejected the access token (status 400)"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not contain %q", err, want)
+		}
+	}
+	if strings.Contains(err.Error(), "tok-bad") {
+		t.Errorf("error %q leaks the token", err)
+	}
+	if got := rec.snapshot(); got.mails != 0 {
+		t.Errorf("server saw %d MAIL commands after failed auth", got.mails)
+	}
+}
+
+func TestSend_CredentialsErrorKeepsChain(t *testing.T) {
+	cert, pool := selfSignedCert(t)
+	port, _ := startServer(t, cert, true, false)
+	sentinel := errors.New("refresh failed")
+	tr := tokenTransport(t, pool, port, func(context.Context) (mail.Login, error) { return mail.Login{}, sentinel })
+
+	err := tr.Send(context.Background(), testUser, []string{"you@example.com"}, testMsg)
+
+	if !errors.Is(err, sentinel) {
+		t.Fatalf("Send() error = %v, want it to wrap the credentials error", err)
+	}
+	for _, want := range []string{"send via", `credentials for account "Test"`} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not contain %q", err, want)
+		}
+	}
 }

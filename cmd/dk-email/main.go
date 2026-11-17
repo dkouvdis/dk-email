@@ -17,6 +17,7 @@ import (
 	"github.com/dkouvdis/dk-email/internal/mail"
 	"github.com/dkouvdis/dk-email/internal/mail/imap"
 	"github.com/dkouvdis/dk-email/internal/mail/smtp"
+	"github.com/dkouvdis/dk-email/internal/oauth"
 	"github.com/dkouvdis/dk-email/internal/secret"
 	"github.com/dkouvdis/dk-email/internal/send"
 	"github.com/dkouvdis/dk-email/internal/ui"
@@ -75,26 +76,78 @@ func startUI(cfg *config.Config) error {
 	return err
 }
 
-// passwordResolver is the part of *secret.Resolver the connector uses.
-type passwordResolver interface {
+// secretResolver is the part of *secret.Resolver the connector uses: an
+// account's password (or token command output) and OAuth client secret.
+type secretResolver interface {
 	Resolve(ctx context.Context, acct config.Account) (string, error)
+	ResolveClientSecret(ctx context.Context, acct config.Account) (string, error)
 }
 
-// newConnector resolves each account's password once, then logs in over IMAP
+// loadToken and storeToken read and write the OAuth sign-in in the OS
+// keychain; tests replace them.
+var (
+	loadToken  = secret.LoadToken
+	storeToken = secret.StoreToken
+)
+
+// credentials returns acct's login source. A password account resolves its
+// password once, so 1Password asks once per connect. An oauth2 account with
+// password_cmd runs it for every connection, as a token command such as
+// oama; otherwise its stored sign-in is refreshed through oauth.TokenSource.
+func credentials(ctx context.Context, pw secretResolver, acct config.Account) (mail.Credentials, error) {
+	if !acct.OAuth() {
+		password, err := pw.Resolve(ctx, acct)
+		if err != nil {
+			return nil, err
+		}
+		return mail.StaticPassword(password), nil
+	}
+	if acct.PasswordCmd != "" {
+		return func(ctx context.Context) (mail.Login, error) {
+			tok, err := pw.Resolve(ctx, acct)
+			if err != nil {
+				return mail.Login{}, err
+			}
+			return mail.Login{Token: tok}, nil
+		}, nil
+	}
+	provider, err := oauth.ProviderFor(acct)
+	if err != nil {
+		return nil, err
+	}
+	clientSecret, err := pw.ResolveClientSecret(ctx, acct)
+	if err != nil {
+		return nil, err
+	}
+	ts := oauth.NewTokenSource(
+		oauth.Config{Provider: provider, ClientID: acct.OAuthClientID, ClientSecret: clientSecret, LoginHint: acct.Email},
+		func() (secret.OAuthToken, error) { return loadToken(acct.Name) },
+		func(t secret.OAuthToken) error { return storeToken(acct.Name, t) },
+	)
+	return func(ctx context.Context) (mail.Login, error) {
+		tok, err := ts.Token(ctx)
+		if err != nil {
+			return mail.Login{}, err
+		}
+		return mail.Login{Token: tok}, nil
+	}, nil
+}
+
+// newConnector builds each account's credentials, then logs in over IMAP
 // and, if the account has an smtp_host, sets up sending with the same
-// password. The debug log times both phases, never recording the password.
-func newConnector(pw passwordResolver, log *slog.Logger) ui.Connector {
+// credentials. The debug log times both phases, never recording a secret.
+func newConnector(pw secretResolver, log *slog.Logger) ui.Connector {
 	return func(ctx context.Context, acct config.Account) (ui.Conn, error) {
 		start := time.Now()
-		password, err := pw.Resolve(ctx, acct)
-		log.Debug("password resolved", "account", acct.Name, "ok", err == nil, "took", time.Since(start).Round(time.Millisecond))
+		creds, err := credentials(ctx, pw, acct)
+		log.Debug("credentials resolved", "account", acct.Name, "ok", err == nil, "took", time.Since(start).Round(time.Millisecond))
 		if errors.Is(err, secret.ErrNoPassword) {
 			return ui.Conn{}, fmt.Errorf("%w: %w", ui.ErrNeedsPassword, err)
 		}
 		if err != nil {
 			return ui.Conn{}, err
 		}
-		return dial(ctx, acct, password, log)
+		return dial(ctx, acct, creds, log)
 	}
 }
 
@@ -107,8 +160,8 @@ type imapConn interface {
 
 // dialIMAP logs in over IMAP; tests replace it to avoid the network. On
 // failure it returns a nil interface, never a typed nil.
-var dialIMAP = func(ctx context.Context, acct config.Account, password string) (imapConn, error) {
-	c, err := imap.Dial(ctx, acct, password)
+var dialIMAP = func(ctx context.Context, acct config.Account, creds mail.Credentials) (imapConn, error) {
+	c, err := imap.DialWithCredentials(ctx, acct, creds)
 	if err != nil {
 		return nil, err
 	}
@@ -116,26 +169,26 @@ var dialIMAP = func(ctx context.Context, acct config.Account, password string) (
 }
 
 // dial logs in over IMAP and, iff the account has an smtp_host, builds its
-// sender around the same connection and password. It returns a zero Conn on
+// sender around the same connection and credentials. It returns a zero Conn on
 // failure.
-func dial(ctx context.Context, acct config.Account, password string, log *slog.Logger) (ui.Conn, error) {
+func dial(ctx context.Context, acct config.Account, creds mail.Credentials, log *slog.Logger) (ui.Conn, error) {
 	start := time.Now()
-	c, err := dialIMAP(ctx, acct, password)
+	c, err := dialIMAP(ctx, acct, creds)
 	log.Debug("imap login", "account", acct.Name, "ok", err == nil, "took", time.Since(start).Round(time.Millisecond))
 	if err != nil {
 		return ui.Conn{}, err
 	}
 	conn := ui.Conn{Mailbox: c}
 	if strings.TrimSpace(acct.SMTPHost) != "" {
-		conn.Sender = send.New(acct, smtp.New(acct, password), c, log)
+		conn.Sender = send.New(acct, smtp.NewWithCredentials(acct, creds), c, log)
 	}
 	return conn, nil
 }
 
 // verifySMTP tests an SMTP login (connect and authenticate, nothing sent);
 // tests replace it to avoid the network.
-var verifySMTP = func(ctx context.Context, acct config.Account, password string) error {
-	return smtp.New(acct, password).Verify(ctx)
+var verifySMTP = func(ctx context.Context, acct config.Account, creds mail.Credentials) error {
+	return smtp.NewWithCredentials(acct, creds).Verify(ctx)
 }
 
 // deleteSecret and copySecret change the OS keychain; tests replace them.
@@ -148,28 +201,24 @@ var (
 // account's keychain password is stored before the account is appended to
 // configPath, so a saved account always has its password. VerifySMTP tests a
 // new account's SMTP login, resolving the password like Dial does.
-func newOnboarding(configPath string, pw passwordResolver, store func(account, password string) error, log *slog.Logger) ui.Onboarding {
+func newOnboarding(configPath string, pw secretResolver, store func(account, password string) error, log *slog.Logger) ui.Onboarding {
 	return ui.Onboarding{
 		Dial: func(ctx context.Context, acct config.Account, password string) (ui.Conn, error) {
 			acct = acct.WithDefaults()
-			if password == "" {
-				var err error
-				if password, err = pw.Resolve(ctx, acct); err != nil {
-					return ui.Conn{}, err
-				}
+			creds, err := onboardingCredentials(ctx, pw, acct, password)
+			if err != nil {
+				return ui.Conn{}, err
 			}
-			return dial(ctx, acct, password, log)
+			return dial(ctx, acct, creds, log)
 		},
 		VerifySMTP: func(ctx context.Context, acct config.Account, password string) error {
 			acct = acct.WithDefaults()
-			if password == "" {
-				var err error
-				if password, err = pw.Resolve(ctx, acct); err != nil {
-					return err
-				}
+			creds, err := onboardingCredentials(ctx, pw, acct, password)
+			if err != nil {
+				return err
 			}
 			start := time.Now()
-			err := verifySMTP(ctx, acct, password)
+			err = verifySMTP(ctx, acct, creds)
 			log.Debug("smtp login", "account", acct.Name, "ok", err == nil, "took", time.Since(start).Round(time.Millisecond))
 			return err
 		},
@@ -229,6 +278,15 @@ func newOnboarding(configPath string, pw passwordResolver, store func(account, p
 			return nil
 		},
 	}
+}
+
+// onboardingCredentials uses a password typed in the connect popup, or else
+// the account's configured credentials.
+func onboardingCredentials(ctx context.Context, pw secretResolver, acct config.Account, password string) (mail.Credentials, error) {
+	if password != "" {
+		return mail.StaticPassword(password), nil
+	}
+	return credentials(ctx, pw, acct)
 }
 
 // loadConfig loads the config from an explicit --config path, or from the

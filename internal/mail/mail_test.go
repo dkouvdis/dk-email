@@ -1,6 +1,7 @@
 package mail
 
 import (
+	"context"
 	"os/exec"
 	"strings"
 	"testing"
@@ -71,6 +72,19 @@ func TestFlag_String(t *testing.T) {
 	for flag, want := range tests {
 		if got := flag.String(); got != want {
 			t.Errorf("Flag(%d).String() = %q, want %q", flag, got, want)
+		}
+	}
+}
+
+func TestStaticPassword(t *testing.T) {
+	creds := StaticPassword("hunter2")
+	for range 2 {
+		got, err := creds(context.Background())
+		if err != nil {
+			t.Fatalf("creds() error = %v", err)
+		}
+		if got != (Login{Password: "hunter2"}) {
+			t.Errorf("creds() = %+v, want password only", got)
 		}
 	}
 }

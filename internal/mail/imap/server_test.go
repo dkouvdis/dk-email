@@ -7,7 +7,9 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"io"
 	"log"
 	"math/big"
@@ -23,6 +25,7 @@ import (
 	goimap "github.com/emersion/go-imap/v2"
 	"github.com/emersion/go-imap/v2/imapserver"
 	"github.com/emersion/go-imap/v2/imapserver/imapmemserver"
+	"github.com/emersion/go-sasl"
 
 	"github.com/dkouvdis/dk-email/internal/config"
 	"github.com/dkouvdis/dk-email/internal/mail"
@@ -95,6 +98,29 @@ type testServer struct {
 	// creates itself with addDrafts, with its \Drafts attribute.
 	withDrafts atomic.Bool
 	release    chan struct{}
+
+	// tokens are the access tokens XOAUTH2 accepts; loggedTokens records the
+	// accepted ones in order.
+	tokenMu      sync.Mutex
+	tokens       map[string]bool
+	loggedTokens []string
+}
+
+// acceptToken makes XOAUTH2 accept tok.
+func (s *testServer) acceptToken(tok string) {
+	s.tokenMu.Lock()
+	defer s.tokenMu.Unlock()
+	if s.tokens == nil {
+		s.tokens = map[string]bool{}
+	}
+	s.tokens[tok] = true
+}
+
+// acceptedTokens returns the tokens XOAUTH2 logins have succeeded with.
+func (s *testServer) acceptedTokens() []string {
+	s.tokenMu.Lock()
+	defer s.tokenMu.Unlock()
+	return slices.Clone(s.loggedTokens)
 }
 
 // startServer runs an in-memory IMAP server on 127.0.0.1 with the seeded mailboxes.
@@ -219,6 +245,59 @@ type testSession struct {
 	*imapmemserver.UserSession
 	user *imapmemserver.User
 	srv  *testServer
+}
+
+func (s *testSession) AuthenticateMechanisms() []string { return []string{sasl.Plain, "XOAUTH2"} }
+
+func (s *testSession) Authenticate(mech string) (sasl.Server, error) {
+	switch mech {
+	case sasl.Plain:
+		return sasl.NewPlainServer(func(_, user, pass string) error { return s.Login(user, pass) }), nil
+	case "XOAUTH2":
+		return &xoauth2Server{sess: s}, nil
+	}
+	return nil, &goimap.Error{Type: goimap.StatusResponseTypeNo, Text: "SASL mechanism not supported"}
+}
+
+// xoauth2Server is a test-only XOAUTH2 sasl.Server. A bad token gets the
+// JSON error challenge, and the client's empty answer then fails the login.
+type xoauth2Server struct {
+	sess       *testSession
+	challenged bool
+	token      string
+}
+
+func (x *xoauth2Server) Next(resp []byte) ([]byte, bool, error) {
+	if x.challenged {
+		return nil, false, &goimap.Error{Type: goimap.StatusResponseTypeNo, Text: "authentication failed for token " + x.token}
+	}
+	// user=<user>\x01auth=Bearer <token>\x01\x01
+	parts := strings.Split(string(resp), "\x01")
+	var user, tok string
+	for _, p := range parts {
+		if v, ok := strings.CutPrefix(p, "user="); ok {
+			user = v
+		}
+		if v, ok := strings.CutPrefix(p, "auth=Bearer "); ok {
+			tok = v
+		}
+	}
+	srv := x.sess.srv
+	srv.tokenMu.Lock()
+	ok := user == testUser && srv.tokens[tok]
+	if ok {
+		srv.loggedTokens = append(srv.loggedTokens, tok)
+	}
+	srv.tokenMu.Unlock()
+	if ok {
+		return nil, true, x.sess.UserSession.Login(testUser, testPassword)
+	}
+	x.challenged, x.token = true, tok
+	challenge, err := json.Marshal(map[string]string{"status": "400", "schemes": "Bearer", "scope": "https://mail.google.com/"})
+	if err != nil {
+		return nil, false, errors.New("marshal challenge")
+	}
+	return challenge, false, nil
 }
 
 func (s *testSession) List(w *imapserver.ListWriter, ref string, patterns []string, options *goimap.ListOptions) error {

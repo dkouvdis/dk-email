@@ -22,6 +22,7 @@ import (
 
 	"github.com/dkouvdis/dk-email/internal/config"
 	"github.com/dkouvdis/dk-email/internal/mail"
+	"github.com/dkouvdis/dk-email/internal/oauth"
 )
 
 // closeTimeout bounds how long Close waits for the server to acknowledge LOGOUT.
@@ -31,8 +32,8 @@ var _ mail.Mailbox = (*Client)(nil)
 
 // Client is a mail.Mailbox for one IMAP account.
 type Client struct {
-	acct     config.Account
-	password string
+	acct  config.Account
+	creds mail.Credentials
 
 	// tlsConfig is a base TLS configuration. It is only set from tests, to
 	// trust a self-signed certificate.
@@ -53,16 +54,28 @@ type finalError struct{ err error }
 func (e finalError) Error() string { return e.err.Error() }
 func (e finalError) Unwrap() error { return e.err }
 
-// New returns a Client for acct. It does no network I/O; the connection is
-// opened by the first call.
+// New returns a Client for acct that logs in with password. It does no
+// network I/O; the connection is opened by the first call.
 func New(acct config.Account, password string) *Client {
-	return &Client{acct: acct, password: password}
+	return NewWithCredentials(acct, mail.StaticPassword(password))
+}
+
+// NewWithCredentials is New with a login source. creds is called for every
+// connection, including reconnects, so OAuth tokens are fetched fresh.
+func NewWithCredentials(acct config.Account, creds mail.Credentials) *Client {
+	return &Client{acct: acct, creds: creds}
 }
 
 // Dial is New followed by an eager connect and login, so bad settings and
 // credentials surface immediately.
 func Dial(ctx context.Context, acct config.Account, password string) (*Client, error) {
-	return dial(ctx, New(acct, password))
+	return DialWithCredentials(ctx, acct, mail.StaticPassword(password))
+}
+
+// DialWithCredentials is NewWithCredentials followed by an eager connect and
+// login.
+func DialWithCredentials(ctx context.Context, acct config.Account, creds mail.Credentials) (*Client, error) {
+	return dial(ctx, NewWithCredentials(acct, creds))
 }
 
 func dial(ctx context.Context, c *Client) (*Client, error) {
@@ -181,6 +194,12 @@ func (c *Client) connectLocked(ctx context.Context) (conn *imapclient.Client, re
 }
 
 func (c *Client) open(ctx context.Context) (*imapclient.Client, net.Conn, error) {
+	// Fetch the login first, so a failed token refresh costs no connection.
+	login, err := c.creds(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("credentials for account %q: %w", c.acct.Name, err)
+	}
+
 	addr := net.JoinHostPort(c.acct.IMAPHost, strconv.Itoa(c.acct.IMAPPort))
 	raw, err := (&net.Dialer{}).DialContext(ctx, "tcp", addr)
 	if err != nil {
@@ -188,7 +207,7 @@ func (c *Client) open(ctx context.Context) (*imapclient.Client, net.Conn, error)
 	}
 
 	stop := context.AfterFunc(ctx, func() { raw.Close() })
-	conn, err := c.handshake(ctx, raw)
+	conn, err := c.handshake(ctx, raw, login)
 	if !stop() && err == nil {
 		err = ctx.Err()
 		_ = conn.Close()
@@ -200,9 +219,10 @@ func (c *Client) open(ctx context.Context) (*imapclient.Client, net.Conn, error)
 	return conn, raw, nil
 }
 
-// handshake upgrades raw to TLS, waits for the greeting and logs in. It
-// leaves raw open on failure; the caller closes it.
-func (c *Client) handshake(ctx context.Context, raw net.Conn) (*imapclient.Client, error) {
+// handshake upgrades raw to TLS, waits for the greeting and logs in with
+// XOAUTH2 when login has a token, LOGIN otherwise. It leaves raw open on
+// failure; the caller closes it.
+func (c *Client) handshake(ctx context.Context, raw net.Conn, login mail.Login) (*imapclient.Client, error) {
 	tlsConfig, err := c.newTLSConfig()
 	if err != nil {
 		return nil, err
@@ -230,9 +250,16 @@ func (c *Client) handshake(ctx context.Context, raw net.Conn) (*imapclient.Clien
 		_ = conn.Close()
 		return nil, fmt.Errorf("waiting for greeting from %s: %w", c.acct.IMAPHost, err)
 	}
-	if err := conn.Login(c.acct.Username, c.password).Wait(); err != nil {
+	var xc *oauth.XOAuth2Client
+	if login.Token != "" {
+		xc = oauth.NewXOAuth2Client(c.acct.Username, login.Token)
+		err = conn.Authenticate(xc)
+	} else {
+		err = conn.Login(c.acct.Username, login.Password).Wait()
+	}
+	if err != nil {
 		_ = conn.Close()
-		return nil, c.loginError(err)
+		return nil, c.loginError(err, login, xc)
 	}
 	return conn, nil
 }
@@ -258,17 +285,30 @@ func (c *Client) newTLSConfig() (*tls.Config, error) {
 	return cfg, nil
 }
 
-func (c *Client) loginError(err error) error {
+// loginError describes a failed login, redacting the password and token from
+// server text. For XOAUTH2, xc adds the server's own rejection detail.
+func (c *Client) loginError(err error, login mail.Login, xc *oauth.XOAuth2Client) error {
 	server := net.JoinHostPort(c.acct.IMAPHost, strconv.Itoa(c.acct.IMAPPort))
+	redact := func(s string) string {
+		for _, secret := range []string{login.Password, login.Token} {
+			if secret != "" {
+				s = strings.ReplaceAll(s, secret, "***")
+			}
+		}
+		return s
+	}
 	var serverErr *goimap.Error
 	if !errors.As(err, &serverErr) {
+		if text := err.Error(); redact(text) != text {
+			return fmt.Errorf("login to account %q (%s) failed: %s", c.acct.Name, server, redact(text))
+		}
 		return fmt.Errorf("login to account %q (%s) failed: %w", c.acct.Name, server, err)
 	}
-	text := serverErr.Text
-	if c.password != "" {
-		text = strings.ReplaceAll(text, c.password, "***")
-	}
+	text := redact(serverErr.Text)
 	msg := fmt.Sprintf("login to account %q (%s) failed: %s", c.acct.Name, server, text)
+	if xc != nil && xc.Err() != nil {
+		msg += " (" + xc.Err().Error() + ")"
+	}
 	if hint := loginHint(c.acct.IMAPHost, serverErr.Code, text); hint != "" {
 		msg += ". Hint: " + hint
 	}
@@ -287,7 +327,7 @@ func loginHint(host string, code goimap.ResponseCode, text string) string {
 		strings.Contains(lower, "invalid credentials")):
 		return "For Gmail use an app password from https://myaccount.google.com/apppasswords, " +
 			"not your Google password. Google Workspace (work/school) accounts don't allow app passwords " +
-			"and need OAuth, which dk-email doesn't support yet"
+			"and need OAuth: set auth = \"oauth2\" (see docs/oauth.md)"
 	case strings.Contains(lower, "web login required"):
 		return "sign in to this account once in a web browser to clear Google's security check, then retry"
 	}

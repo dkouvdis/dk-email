@@ -17,6 +17,8 @@ import (
 	gosmtp "github.com/emersion/go-smtp"
 
 	"github.com/dkouvdis/dk-email/internal/config"
+	"github.com/dkouvdis/dk-email/internal/mail"
+	"github.com/dkouvdis/dk-email/internal/oauth"
 )
 
 // timeout bounds one whole Send or Verify call, including dialing.
@@ -25,18 +27,24 @@ const timeout = 60 * time.Second
 // Transport sends mail for one account. It is safe for concurrent use: each
 // call opens its own connection.
 type Transport struct {
-	acct     config.Account
-	password string
+	acct  config.Account
+	creds mail.Credentials
 
 	// tlsConfig is a test hook merged into the TLS config, like
 	// imap.Client's.
 	tlsConfig *tls.Config
 }
 
-// New returns a Transport for acct. The caller applies config defaults, so
-// acct.SMTPHost, SMTPPort and SMTPTLS must be set.
+// New returns a Transport for acct that logs in with password. The caller
+// applies config defaults, so acct.SMTPHost, SMTPPort and SMTPTLS must be set.
 func New(acct config.Account, password string) *Transport {
-	return &Transport{acct: acct, password: password}
+	return NewWithCredentials(acct, mail.StaticPassword(password))
+}
+
+// NewWithCredentials is New with a login source. creds is called for every
+// Send and Verify, so OAuth tokens are fetched fresh.
+func NewWithCredentials(acct config.Account, creds mail.Credentials) *Transport {
+	return &Transport{acct: acct, creds: creds}
 }
 
 // Send delivers msg, a complete RFC 5322 message, from the envelope sender
@@ -100,6 +108,12 @@ func (t *Transport) session(ctx context.Context, fn func(*gosmtp.Client) error) 
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
+	// Fetch the login first, so a failed token refresh costs no connection.
+	login, err := t.creds(ctx)
+	if err != nil {
+		return fmt.Errorf("credentials for account %q: %w", t.acct.Name, err)
+	}
+
 	tlsConfig, err := t.newTLSConfig()
 	if err != nil {
 		return err
@@ -121,7 +135,7 @@ func (t *Transport) session(ctx context.Context, fn func(*gosmtp.Client) error) 
 	}
 	defer c.Close()
 
-	if err := t.auth(c); err != nil {
+	if err := t.auth(c, login); err != nil {
 		return err
 	}
 	if err := fn(c); err != nil {
@@ -155,15 +169,30 @@ func (t *Transport) handshake(ctx context.Context, raw net.Conn, tlsConfig *tls.
 	}
 }
 
-// auth logs in with SASL PLAIN, redacting the password from any error.
-func (t *Transport) auth(c *gosmtp.Client) error {
-	err := c.Auth(sasl.NewPlainClient("", t.acct.Username, t.password))
+// auth logs in with XOAUTH2 when login has a token, SASL PLAIN otherwise,
+// redacting the password and token from any error.
+func (t *Transport) auth(c *gosmtp.Client, login mail.Login) error {
+	var (
+		xc  *oauth.XOAuth2Client
+		err error
+	)
+	if login.Token != "" {
+		xc = oauth.NewXOAuth2Client(t.acct.Username, login.Token)
+		err = c.Auth(xc)
+	} else {
+		err = c.Auth(sasl.NewPlainClient("", t.acct.Username, login.Password))
+	}
 	if err == nil {
 		return nil
 	}
 	text := err.Error()
-	if t.password != "" {
-		text = strings.ReplaceAll(text, t.password, "***")
+	for _, secret := range []string{login.Password, login.Token} {
+		if secret != "" {
+			text = strings.ReplaceAll(text, secret, "***")
+		}
+	}
+	if xc != nil && xc.Err() != nil {
+		text += " (" + xc.Err().Error() + ")"
 	}
 	return fmt.Errorf("login to account %q (%s) failed: %s", t.acct.Name, t.addr(), text)
 }

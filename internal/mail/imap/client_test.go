@@ -214,7 +214,7 @@ func TestLoginError_RedactsPasswordEchoedByServer(t *testing.T) {
 	c := New(config.Account{Name: "Personal", IMAPHost: "imap.example.com", IMAPPort: 993}, "hunter2")
 	serverErr := &goimap.Error{Type: goimap.StatusResponseTypeNo, Text: "bad login for hunter2"}
 
-	got := c.loginError(serverErr).Error()
+	got := c.loginError(serverErr, mail.Login{Password: "hunter2"}, nil).Error()
 
 	if strings.Contains(got, "hunter2") {
 		t.Errorf("loginError() = %q, contains the password", got)
@@ -228,7 +228,7 @@ func TestLoginError_NonServerErrorNamesHostAndPort(t *testing.T) {
 	c := New(config.Account{Name: "Personal", IMAPHost: "imap.example.com", IMAPPort: 993}, "hunter2")
 	cause := errors.New("connection reset")
 
-	err := c.loginError(cause)
+	err := c.loginError(cause, mail.Login{Password: "hunter2"}, nil)
 
 	got := err.Error()
 	if strings.Contains(got, "hunter2") {
@@ -250,7 +250,7 @@ func TestLoginError_AppendsHintAfterMessageWithoutPassword(t *testing.T) {
 		Text: "Invalid credentials hunter2",
 	}
 
-	got := c.loginError(serverErr).Error()
+	got := c.loginError(serverErr, mail.Login{Password: "hunter2"}, nil).Error()
 
 	if strings.Contains(got, "hunter2") {
 		t.Errorf("loginError() = %q, contains the password", got)
@@ -268,7 +268,7 @@ func TestLoginHint(t *testing.T) {
 			"and point password_cmd at it (passkeys can't be used for IMAP)"
 		gmailHint = "For Gmail use an app password from https://myaccount.google.com/apppasswords, " +
 			"not your Google password. Google Workspace (work/school) accounts don't allow app passwords " +
-			"and need OAuth, which dk-email doesn't support yet"
+			"and need OAuth: set auth = \"oauth2\" (see docs/oauth.md)"
 		webLoginHint = "sign in to this account once in a web browser to clear Google's security check, then retry"
 	)
 	tests := []struct {
@@ -531,5 +531,100 @@ func TestDial_TLSCertErrors(t *testing.T) {
 		if err == nil || !strings.Contains(err.Error(), tt.want) {
 			t.Errorf("Dial() with %s error = %v, want %q", filepath.Base(tt.file), err, tt.want)
 		}
+	}
+}
+
+// oauthClient returns a lazily connecting Client that logs in through creds.
+func oauthClient(t *testing.T, srv *testServer, creds mail.Credentials) *Client {
+	t.Helper()
+	c := NewWithCredentials(srv.account(modeImplicit), creds)
+	c.tlsConfig = srv.clientTLS
+	t.Cleanup(func() { c.Close() })
+	return c
+}
+
+func tokenCreds(tok string) mail.Credentials {
+	return func(context.Context) (mail.Login, error) { return mail.Login{Token: tok}, nil }
+}
+
+func TestFolders_OAuthLoginWithValidToken(t *testing.T) {
+	srv := startServer(t, modeImplicit, capsListStatus)
+	srv.acceptToken("tok-good")
+	c := oauthClient(t, srv, tokenCreds("tok-good"))
+
+	got, err := c.Folders(timeoutCtx(t, 10*time.Second))
+
+	if err != nil {
+		t.Fatalf("Folders() error = %v", err)
+	}
+	if !slices.Equal(got, wantSeededFolders) {
+		t.Errorf("Folders() = %+v, want %+v", got, wantSeededFolders)
+	}
+	if toks := srv.acceptedTokens(); !slices.Equal(toks, []string{"tok-good"}) {
+		t.Errorf("server accepted tokens %v, want [tok-good]", toks)
+	}
+}
+
+func TestDial_OAuthRejectedTokenShowsServerTextAndDetailWithoutToken(t *testing.T) {
+	srv := startServer(t, modeImplicit, capsListStatus)
+	c := oauthClient(t, srv, tokenCreds("tok-bad"))
+
+	_, err := c.Folders(timeoutCtx(t, 10*time.Second))
+
+	if err == nil {
+		t.Fatal("Folders() error = nil, want a login failure")
+	}
+	for _, want := range []string{"authentication failed for token ***", "xoauth2: server rejected the access token (status 400)"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not contain %q", err, want)
+		}
+	}
+	if strings.Contains(err.Error(), "tok-bad") {
+		t.Errorf("error %q leaks the token", err)
+	}
+}
+
+func TestDial_CredentialsErrorKeepsChain(t *testing.T) {
+	srv := startServer(t, modeImplicit, capsListStatus)
+	sentinel := errors.New("refresh failed")
+	creds := func(context.Context) (mail.Login, error) { return mail.Login{}, sentinel }
+
+	_, err := DialWithCredentials(timeoutCtx(t, 10*time.Second), srv.account(modeImplicit), creds)
+
+	if !errors.Is(err, sentinel) {
+		t.Fatalf("DialWithCredentials() error = %v, want it to wrap the credentials error", err)
+	}
+	if want := `credentials for account "Test"`; !strings.Contains(err.Error(), want) {
+		t.Errorf("error %q does not contain %q", err, want)
+	}
+	if n := srv.ln.accepted(); n != 0 {
+		t.Errorf("accepted %d connections, want 0 after a credentials error", n)
+	}
+}
+
+func TestFolders_ReconnectFetchesFreshCredentials(t *testing.T) {
+	srv := startServer(t, modeImplicit, capsListStatus)
+	srv.acceptToken("tok-1")
+	srv.acceptToken("tok-2")
+	var calls int
+	creds := func(context.Context) (mail.Login, error) {
+		calls++
+		return mail.Login{Token: fmt.Sprintf("tok-%d", calls)}, nil
+	}
+	c := oauthClient(t, srv, creds)
+	if _, err := c.Folders(timeoutCtx(t, 10*time.Second)); err != nil {
+		t.Fatalf("first Folders() error = %v", err)
+	}
+
+	srv.ln.dropAll()
+	if _, err := c.Folders(timeoutCtx(t, 10*time.Second)); err != nil {
+		t.Fatalf("Folders() after drop error = %v", err)
+	}
+
+	if calls != 2 {
+		t.Errorf("credentials called %d times, want 2", calls)
+	}
+	if toks := srv.acceptedTokens(); !slices.Equal(toks, []string{"tok-1", "tok-2"}) {
+		t.Errorf("server accepted tokens %v, want [tok-1 tok-2]", toks)
 	}
 }
