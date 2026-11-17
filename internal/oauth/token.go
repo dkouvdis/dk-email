@@ -206,6 +206,8 @@ type TokenSource struct {
 
 	mu  sync.Mutex
 	tok *secret.OAuthToken
+	// unsaved is set when tok was refreshed but could not be saved.
+	unsaved bool
 }
 
 // NewTokenSource returns a Source that loads the stored sign-in with load and
@@ -226,6 +228,12 @@ func (s *TokenSource) Token(ctx context.Context) (string, error) {
 		}
 		s.tok = &tok
 	}
+	if s.unsaved {
+		if err := s.save(*s.tok); err != nil {
+			return "", fmt.Errorf("oauth: save refreshed token: %w", err)
+		}
+		s.unsaved = false
+	}
 	if s.tok.AccessToken != "" && s.tok.Expiry.After(s.cfg.now().Add(refreshMargin)) {
 		return s.tok.AccessToken, nil
 	}
@@ -244,6 +252,7 @@ func (s *TokenSource) Token(ctx context.Context) (string, error) {
 	}
 	s.tok = &tok
 	if err := s.save(tok); err != nil {
+		s.unsaved = true
 		return "", fmt.Errorf("oauth: save refreshed token: %w", err)
 	}
 	return tok.AccessToken, nil

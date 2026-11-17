@@ -627,3 +627,68 @@ func TestCopyOAuth_SkipsMissingAndSameName(t *testing.T) {
 		t.Errorf("CopyOAuth() same name error = %v", err)
 	}
 }
+
+func TestCopyClientSecret(t *testing.T) {
+	get := func(name string) string {
+		cs, _ := New().ResolveClientSecret(context.Background(), config.Account{Name: name})
+		return cs
+	}
+
+	t.Run("copies only the client secret and keeps old", func(t *testing.T) {
+		keyring.MockInit()
+		if err := StoreToken("Old", testToken); err != nil {
+			t.Fatal(err)
+		}
+		if err := StoreClientSecret("Old", "cs"); err != nil {
+			t.Fatal(err)
+		}
+		copied, err := CopyClientSecret("Old", "New")
+		if err != nil || !copied {
+			t.Fatalf("CopyClientSecret() = %v, %v", copied, err)
+		}
+		if get("New") != "cs" || get("Old") != "cs" {
+			t.Errorf("secrets New %q Old %q", get("New"), get("Old"))
+		}
+		if _, err := LoadToken("New"); !errors.Is(err, ErrNoToken) {
+			t.Errorf("a token appeared: %v", err)
+		}
+	})
+
+	t.Run("an existing secret under the new name wins", func(t *testing.T) {
+		keyring.MockInit()
+		if err := StoreClientSecret("Old", "old-cs"); err != nil {
+			t.Fatal(err)
+		}
+		if err := StoreClientSecret("New", "typed-cs"); err != nil {
+			t.Fatal(err)
+		}
+		copied, err := CopyClientSecret("Old", "New")
+		if err != nil || copied {
+			t.Fatalf("CopyClientSecret() = %v, %v", copied, err)
+		}
+		if get("New") != "typed-cs" {
+			t.Errorf("New = %q, want typed-cs", get("New"))
+		}
+	})
+
+	t.Run("missing old entry and same name copy nothing", func(t *testing.T) {
+		keyring.MockInit()
+		if copied, err := CopyClientSecret("Old", "New"); err != nil || copied {
+			t.Errorf("missing old: %v, %v", copied, err)
+		}
+		if err := StoreClientSecret("Old", "cs"); err != nil {
+			t.Fatal(err)
+		}
+		if copied, err := CopyClientSecret("Old", "Old"); err != nil || copied {
+			t.Errorf("same name: %v, %v", copied, err)
+		}
+	})
+
+	t.Run("keychain error", func(t *testing.T) {
+		keyring.MockInitWithError(errors.New("keychain locked"))
+		t.Cleanup(keyring.MockInit)
+		if _, err := CopyClientSecret("Old", "New"); err == nil || !strings.Contains(err.Error(), "keychain locked") {
+			t.Errorf("error = %v", err)
+		}
+	})
+}

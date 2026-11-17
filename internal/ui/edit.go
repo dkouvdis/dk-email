@@ -28,7 +28,10 @@ type editedMsg struct {
 	folders []mail.Folder
 	err     error
 	saveErr bool
-	took    time.Duration
+	// reconnect says conn was dialed under the account's old name, so its
+	// token store is bound to a name the save has moved away from.
+	reconnect bool
+	took      time.Duration
 }
 
 // removedMsg reports an account being deleted from the config.
@@ -205,6 +208,7 @@ func editTest(parent context.Context, o Onboarding, gen, index int, old config.A
 	dialAs := acct
 	if req.KeepPassword && acct.PasswordCmd == "" {
 		dialAs.Name = old.Name
+		res.reconnect = acct.OAuth() && acct.Name != old.Name
 	}
 	conn, err := o.Dial(ctx, dialAs, creds)
 	if err == nil && conn.Mailbox == nil {
@@ -311,9 +315,16 @@ func (m Model) handleEdited(msg editedMsg) (Model, tea.Cmd) {
 		m = m.clearOpen()
 	}
 
-	if msg.anyway {
+	if msg.anyway || msg.reconnect {
 		m.side = m.side.SetConnecting(i)
-		m.setStatus(fmt.Sprintf("Saved %s without a working login.", msg.acct.Name))
+		if msg.anyway {
+			m.setStatus(fmt.Sprintf("Saved %s without a working login.", msg.acct.Name))
+		} else {
+			// The tested connection saves tokens under the old name, so
+			// drop it and connect again under the new one.
+			_ = msg.conn.Mailbox.Close()
+			m.setStatus(fmt.Sprintf("Saved %s.", msg.acct.Name))
+		}
 		if m.connect == nil {
 			return m, nil
 		}

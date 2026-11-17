@@ -405,6 +405,9 @@ type keychainCalls struct {
 	calls []string
 	// copyOAuthErr and secretErr make copyOAuth and storeClientSecret fail.
 	copyOAuthErr, secretErr error
+	// copyClientSecretCopied is what copyClientSecret reports; the call is
+	// recorded either way.
+	copyClientSecretCopied bool
 	// deleteTokenErr makes deleteToken fail (after recording the call).
 	deleteTokenErr error
 }
@@ -415,7 +418,7 @@ func stubKeychain(t *testing.T, copyErr error) *keychainCalls {
 	t.Helper()
 	k := &keychainCalls{}
 	oldDelete, oldCopy := deleteSecret, copySecret
-	oldDT, oldDC, oldSC, oldCO := deleteToken, deleteClientSecret, storeClientSecret, copyOAuth
+	oldDT, oldDC, oldSC, oldCO, oldCCS := deleteToken, deleteClientSecret, storeClientSecret, copyOAuth, copyClientSecret
 	deleteSecret = func(account string) error { k.calls = append(k.calls, "delete "+account); return nil }
 	copySecret = func(from, to string) error { k.calls = append(k.calls, "copy "+from+"->"+to); return copyErr }
 	deleteToken = func(account string) error {
@@ -431,9 +434,13 @@ func stubKeychain(t *testing.T, copyErr error) *keychainCalls {
 		k.calls = append(k.calls, "copy-oauth "+from+"->"+to)
 		return k.copyOAuthErr
 	}
+	copyClientSecret = func(from, to string) (bool, error) {
+		k.calls = append(k.calls, "copy-client-secret "+from+"->"+to)
+		return k.copyClientSecretCopied, k.copyOAuthErr
+	}
 	t.Cleanup(func() {
 		deleteSecret, copySecret = oldDelete, oldCopy
-		deleteToken, deleteClientSecret, storeClientSecret, copyOAuth = oldDT, oldDC, oldSC, oldCO
+		deleteToken, deleteClientSecret, storeClientSecret, copyOAuth, copyClientSecret = oldDT, oldDC, oldSC, oldCO, oldCCS
 	})
 	return k
 }

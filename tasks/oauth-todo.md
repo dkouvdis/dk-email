@@ -82,8 +82,8 @@ Plan: [oauth-plan.md](oauth-plan.md).
 ---
 
 ## Checkpoint: After Tasks 1-3 (Foundation)
-- [ ] All tests pass: `go test -race ./internal/config ./internal/secret ./internal/oauth`
-- [ ] Application builds cleanly: `go vet ./... && gofmt -l . && go build -o bin/dk-email ./cmd/dk-email`
+- [x] All tests pass: `go test -race ./internal/config ./internal/secret ./internal/oauth`
+- [x] Application builds cleanly: `go vet ./... && gofmt -l . && go build -o bin/dk-email ./cmd/dk-email`
 
 ---
 
@@ -139,9 +139,9 @@ Plan: [oauth-plan.md](oauth-plan.md).
 ---
 
 ## Checkpoint: After Tasks 4-5 (Transport)
-- [ ] All tests pass: `go test -race ./internal/oauth ./internal/mail/... ./cmd/dk-email`
-- [ ] Reconnect after token expiry acquires a refreshed bearer token cleanly
-- [ ] `go vet ./...` and `gofmt -l .` clean
+- [x] All tests pass: `go test -race ./internal/oauth ./internal/mail/... ./cmd/dk-email`
+- [x] Reconnect after token expiry acquires a refreshed bearer token cleanly
+- [x] `go vet ./...` and `gofmt -l .` clean
 
 ---
 
@@ -222,6 +222,6 @@ Plan: [oauth-plan.md](oauth-plan.md).
 ---
 
 ## Checkpoint: Complete (After Tasks 6-8)
-- [ ] Full suite passes: `go test -race ./...`
-- [ ] Lint/format/build clean: `go vet ./... && gofmt -l . && go build -o bin/dk-email ./cmd/dk-email`
-- [ ] `@architect` diff review passed
+- [x] Full suite passes: `go test -race ./...`
+- [x] Lint/format/build clean: `go vet ./... && gofmt -l . && go build -o bin/dk-email ./cmd/dk-email`
+- [x] `@architect` diff review passed

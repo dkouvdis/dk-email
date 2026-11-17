@@ -242,14 +242,36 @@ func TestTokenSource_ErrorsNeverLeakSecrets(t *testing.T) {
 func TestTokenSource_SaveFailure(t *testing.T) {
 	rec, cfg := newServer(t, func(_ int, _ url.Values, w http.ResponseWriter) { okToken(w, "a", "r2") })
 	saveErr := errors.New("keychain locked")
-	s := NewTokenSource(cfg, loader(secret.OAuthToken{RefreshToken: "refresh-tok-1"}, nil), func(secret.OAuthToken) error { return saveErr })
+	saves := 0
+	var saveResult error = saveErr
+	s := NewTokenSource(cfg, loader(secret.OAuthToken{RefreshToken: "refresh-tok-1"}, nil), func(secret.OAuthToken) error {
+		saves++
+		return saveResult
+	})
 	got, err := s.Token(context.Background())
 	if got != "" || !errors.Is(err, saveErr) || !strings.Contains(err.Error(), "oauth: save refreshed token") {
 		t.Fatalf("got %q, %v", got, err)
 	}
+	// Still failing: the save is retried and the error returned again.
+	got, err = s.Token(context.Background())
+	if got != "" || !errors.Is(err, saveErr) || !strings.Contains(err.Error(), "oauth: save refreshed token") {
+		t.Fatalf("second call: %q, %v", got, err)
+	}
+	if saves != 2 {
+		t.Errorf("saves = %d, want 2", saves)
+	}
+	// Save works again: the cached token is returned without another refresh.
+	saveResult = nil
 	got, err = s.Token(context.Background())
 	if err != nil || got != "a" {
-		t.Fatalf("second call: %q, %v", got, err)
+		t.Fatalf("third call: %q, %v", got, err)
+	}
+	if saves != 3 {
+		t.Errorf("saves = %d, want 3", saves)
+	}
+	got, err = s.Token(context.Background())
+	if err != nil || got != "a" || saves != 3 {
+		t.Fatalf("fourth call: %q, %v, saves %d", got, err, saves)
 	}
 	if rec.count() != 1 {
 		t.Errorf("requests = %d", rec.count())

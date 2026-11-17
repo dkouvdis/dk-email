@@ -22,14 +22,14 @@ Add first-class OAuth 2.0 (`XOAUTH2`) authentication for Microsoft 365 / Outlook
 - [x] Task 3: OAuth 2.0 PKCE loopback, Device Code, and refreshing `TokenSource`
 
 ### Checkpoint: Foundation
-- [ ] `go test -race ./internal/config ./internal/secret ./internal/oauth` passes; `go vet ./...` clean
+- [x] `go test -race ./internal/config ./internal/secret ./internal/oauth` passes; `go vet ./...` clean
 
 ### Phase 2: Transport (`XOAUTH2` SASL & Dynamic Reconnect Seam)
 - [x] Task 4: `XOAUTH2` SASL client with 2-step error challenge handling
 - [x] Task 5: Dynamic per-session credential resolution in IMAP, SMTP, and root wiring
 
 ### Checkpoint: Transport
-- [ ] `go test -race ./internal/oauth ./internal/mail/... ./cmd/dk-email` passes; reconnect refreshes expired tokens
+- [x] `go test -race ./internal/oauth ./internal/mail/... ./cmd/dk-email` passes; reconnect refreshes expired tokens
 
 ### Phase 3: Onboarding UI & Documentation
 - [x] Task 6: `OAuth 2.0` option and provider presets in `popup.Connect`
@@ -37,8 +37,8 @@ Add first-class OAuth 2.0 (`XOAUTH2`) authentication for Microsoft 365 / Outlook
 - [x] Task 8: OAuth 2.0 and credential mode documentation
 
 ### Checkpoint: Complete
-- [ ] `go test -race ./...`, `go vet ./...`, `gofmt -l .`, and `go build -o bin/dk-email ./cmd/dk-email` clean
-- [ ] All acceptance criteria met; reviewed by `@architect`
+- [x] `go test -race ./...`, `go vet ./...`, `gofmt -l .`, and `go build -o bin/dk-email ./cmd/dk-email` clean
+- [x] All acceptance criteria met; reviewed by `@architect`
 
 ## Dependency Graph
 

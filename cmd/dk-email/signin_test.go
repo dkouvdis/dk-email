@@ -413,13 +413,93 @@ func TestOnboarding_UpdateAccountOAuthCopyFailureLeavesConfigUntouched(t *testin
 	}
 }
 
-func TestOnboarding_UpdateAccountSignedInRenameDropsOnlyTheOldSignIn(t *testing.T) {
+func TestOnboarding_UpdateAccountSignedInRenameCopiesOnlyTheClientSecretThenDropsTheOldSignIn(t *testing.T) {
 	k, err := updateOAuth(t, rename("Firm"), true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := []string{"delete-token Corp", "delete-client-secret Corp"}; !slices.Equal(k.calls, want) {
-		t.Errorf("keychain = %v, want %v (no copy: the new name has its own sign-in)", k.calls, want)
+	want := []string{"copy-client-secret Corp->Firm", "delete-token Corp", "delete-client-secret Corp"}
+	if !slices.Equal(k.calls, want) {
+		t.Errorf("keychain = %v, want %v (no token copy: the new sign-in has its own)", k.calls, want)
+	}
+}
+
+func TestOnboarding_UpdateAccountSignedInFailedWriteDeletesOnlyACopiedClientSecret(t *testing.T) {
+	for _, tc := range []struct {
+		copied bool
+		want   []string
+	}{
+		{true, []string{"copy-client-secret Corp->Work", "delete-client-secret Work"}},
+		{false, []string{"copy-client-secret Corp->Work"}}, // a typed secret is the UI's to forget
+	} {
+		path := writeOAuthConfig(t)
+		k := stubKeychain(t, nil)
+		k.copyClientSecretCopied = tc.copied
+		o := newOnboarding(path, stubResolver{}, nil, slog.New(slog.DiscardHandler))
+
+		// "Work" is a duplicate name, so the config write is refused.
+		if err := o.UpdateAccount(0, "Corp", rename("Work"), "", true); err == nil {
+			t.Fatal("want an error")
+		}
+		if !slices.Equal(k.calls, tc.want) {
+			t.Errorf("copied %v: keychain = %v, want %v", tc.copied, k.calls, tc.want)
+		}
+	}
+}
+
+func TestOnboarding_UpdateAccountSignedInClientSecretCopyFailureLeavesConfigUntouched(t *testing.T) {
+	path := writeOAuthConfig(t)
+	k := stubKeychain(t, nil)
+	k.copyOAuthErr = errors.New("keychain locked")
+	o := newOnboarding(path, stubResolver{}, nil, slog.New(slog.DiscardHandler))
+
+	err := o.UpdateAccount(0, "Corp", rename("Firm"), "", true)
+
+	if err == nil || err.Error() != "keychain locked" {
+		t.Errorf("error = %v", err)
+	}
+	if got, _ := os.ReadFile(path); string(got) != oauthConfigText {
+		t.Errorf("config changed: %s", got)
+	}
+}
+
+func TestOnboarding_UpdateAccountSwitchingPasswordAccountToOAuthDropsItsPassword(t *testing.T) {
+	toOAuth := func(a config.Account) config.Account {
+		a.Auth, a.OAuthProvider, a.OAuthClientID = config.AuthOAuth2, config.ProviderMicrosoft, "cid"
+		return a
+	}
+	path := writeOAuthConfig(t)
+	k := stubKeychain(t, nil)
+	o := newOnboarding(path, stubResolver{}, nil, slog.New(slog.DiscardHandler))
+
+	if err := o.UpdateAccount(1, "Work", toOAuth, "", true); err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"delete Work"}; !slices.Equal(k.calls, want) {
+		t.Errorf("keychain = %v, want %v", k.calls, want)
+	}
+}
+
+func TestOnboarding_UpdateAccountSwitchingPasswordAccountToOAuthFailedWriteDeletesNothing(t *testing.T) {
+	toOAuthAs := func(name string) func(config.Account) config.Account {
+		return func(a config.Account) config.Account {
+			a.Name = name
+			a.Auth, a.OAuthProvider, a.OAuthClientID = config.AuthOAuth2, config.ProviderMicrosoft, "cid"
+			return a
+		}
+	}
+	path := writeOAuthConfig(t)
+	k := stubKeychain(t, nil)
+	o := newOnboarding(path, stubResolver{}, nil, slog.New(slog.DiscardHandler))
+
+	// "Corp" is a duplicate name, so the config write is refused.
+	if err := o.UpdateAccount(1, "Work", toOAuthAs("Corp"), "", true); err == nil {
+		t.Fatal("want an error")
+	}
+	for _, c := range k.calls {
+		if c == "delete Work" {
+			t.Errorf("the old password was deleted: %v", k.calls)
+		}
 	}
 }
 
@@ -428,8 +508,8 @@ func TestOnboarding_UpdateAccountSignedInFailedWriteLeavesCleanupToTheUI(t *test
 	if err == nil {
 		t.Fatal("want an error")
 	}
-	if len(k.calls) != 0 {
-		t.Errorf("keychain = %v; the UI's Forget removes the new sign-in", k.calls)
+	if want := []string{"copy-client-secret Corp->Work"}; !slices.Equal(k.calls, want) {
+		t.Errorf("keychain = %v, want %v; the UI's Forget removes the new sign-in", k.calls, want)
 	}
 }
 

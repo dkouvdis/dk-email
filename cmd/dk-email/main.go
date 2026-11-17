@@ -213,13 +213,15 @@ var (
 	copySecret   = secret.Copy
 )
 
-// deleteToken, deleteClientSecret, storeClientSecret and copyOAuth change the
-// OAuth entries in the OS keychain; tests replace them.
+// deleteToken, deleteClientSecret, storeClientSecret, copyOAuth and
+// copyClientSecret change the OAuth entries in the OS keychain; tests replace
+// them.
 var (
 	deleteToken        = secret.DeleteToken
 	deleteClientSecret = secret.DeleteClientSecret
 	storeClientSecret  = secret.StoreClientSecret
 	copyOAuth          = secret.CopyOAuth
+	copyClientSecret   = secret.CopyClientSecret
 )
 
 // deleteOAuth removes an account's OAuth token and client secret, trying both
@@ -285,6 +287,10 @@ func newOnboarding(configPath string, pw secretResolver, store func(account, pas
 			keychain := renamed && edited.PasswordCmd == "" && !edited.OAuth()
 			// A rename without a new sign-in moves the stored one.
 			copiedOAuth := isOAuth && renamed && !signedIn
+			// A new sign-in under a new name still needs the saved client
+			// secret, unless one was typed during it.
+			copiedClientSecret := false
+			wasPassword := !was.OAuth() && was.PasswordCmd == ""
 			switch {
 			case password != "" && !edited.OAuth():
 				if err := store(edited.Name, password); err != nil {
@@ -300,6 +306,12 @@ func newOnboarding(configPath string, pw secretResolver, store func(account, pas
 				if err := copyOAuth(oldName, edited.Name); err != nil {
 					return err
 				}
+			case isOAuth && renamed && signedIn:
+				copied, err := copyClientSecret(oldName, edited.Name)
+				if err != nil {
+					return err
+				}
+				copiedClientSecret = copied
 			}
 			if err := config.ReplaceAccount(configPath, index, oldName, edit); err != nil {
 				switch {
@@ -307,6 +319,8 @@ func newOnboarding(configPath string, pw secretResolver, store func(account, pas
 					_ = deleteSecret(edited.Name) // best effort: don't leave an orphan
 				case copiedOAuth:
 					_ = deleteOAuth(edited.Name)
+				case copiedClientSecret:
+					_ = deleteClientSecret(edited.Name)
 				}
 				return err
 			}
@@ -315,6 +329,9 @@ func newOnboarding(configPath string, pw secretResolver, store func(account, pas
 			}
 			if (isOAuth && renamed && (signedIn || copiedOAuth)) || (wasOAuth && !isOAuth) {
 				_ = deleteOAuth(oldName) // the old sign-in is just left over
+			}
+			if wasPassword && isOAuth {
+				_ = deleteSecret(oldName) // the old keychain password is just left over
 			}
 			return nil
 		},

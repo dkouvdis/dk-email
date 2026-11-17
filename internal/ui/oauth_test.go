@@ -14,7 +14,10 @@ import (
 
 	"github.com/dkouvdis/dk-email/internal/config"
 	"github.com/dkouvdis/dk-email/internal/mail"
+	"github.com/dkouvdis/dk-email/internal/mail/mailtest"
 	"github.com/dkouvdis/dk-email/internal/ui/popup"
+	"github.com/dkouvdis/dk-email/internal/ui/theme"
+	"github.com/dkouvdis/dk-email/internal/ui/threadlist"
 )
 
 // fakeSignIn stands in for main's OAuth sign-in: it reports a progress URL (or
@@ -451,6 +454,51 @@ func TestOAuthEdit_KeepCurrentDialsUnderTheOldNameWithNilCreds(t *testing.T) {
 	}
 	if si.calls != 0 {
 		t.Error("keep current must not sign in")
+	}
+}
+
+func TestOAuthEdit_KeepCurrentRenameReconnectsUnderTheNewName(t *testing.T) {
+	f, cfg := newEditFixture("Alpha", "Beta")
+	cfg.Accounts[1].Auth, cfg.Accounts[1].OAuthProvider, cfg.Accounts[1].OAuthClientID = config.AuthOAuth2, config.ProviderMicrosoft, "client-id"
+	var connected []string
+	connector := func(_ context.Context, acct config.Account) (Conn, error) {
+		connected = append(connected, acct.Name)
+		box := mailtest.New() // fresh: the old live connection is closed by the save
+		box.AddFolder("INBOX", mail.RoleInbox)
+		return Conn{Mailbox: box}, nil
+	}
+	m := New(cfg, connector, nil)
+	m.every = func(time.Duration) tea.Cmd { return nil }
+	m.list = threadlist.New(theme.Default(), func() time.Time { return fixedNow })
+	m = send(t, m, size(140, 40))
+	m = settle(t, m, m.Init())
+	// The login test gets its own connection, bound to the old name.
+	testBox := mailtest.New()
+	testBox.AddFolder("INBOX", mail.RoleInbox)
+	o := f.onboarding()
+	o.Dial = func(_ context.Context, acct config.Account, _ mail.Credentials) (Conn, error) {
+		f.dialed = append(f.dialed, acct.Name)
+		return Conn{Mailbox: testBox}, nil
+	}
+	m = cursorOn(t, m.WithOnboarding(o), 1)
+	connected = nil
+	m = send(t, m, press("E"))
+	m = send(t, m, renameTo("Bee")...)
+	m = toSubmit(t, m)
+
+	m = pressSettled(t, m, "enter")
+
+	if len(f.dialed) != 1 || f.dialed[0] != "Beta" {
+		t.Errorf("dialed %v, want the old name", f.dialed)
+	}
+	if _, err := testBox.Folders(context.Background()); !errors.Is(err, mail.ErrClosed) {
+		t.Errorf("test connection still open: %v", err)
+	}
+	if !slices.Equal(connected, []string{"Bee"}) {
+		t.Errorf("connected %v, want [Bee]", connected)
+	}
+	if m.accts[1].Name != "Bee" || m.boxes[1] == nil || m.statusErr || !strings.Contains(m.status, "Saved Bee.") {
+		t.Errorf("account %q, box %v, status %q", m.accts[1].Name, m.boxes[1], m.status)
 	}
 }
 

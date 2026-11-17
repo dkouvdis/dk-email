@@ -282,6 +282,36 @@ func CopyOAuth(oldName, newName string) error {
 	return nil
 }
 
+// CopyClientSecret stores the keychain OAuth client secret kept under oldName
+// also under newName, leaving the old entry in place, for a renamed account
+// that signed in again. A client secret already under newName wins, so it is
+// not replaced. It reports whether it copied one; with no old entry, or the
+// same name, there is nothing to copy and it succeeds.
+func CopyClientSecret(oldName, newName string) (copied bool, err error) {
+	if oldName == newName {
+		return false, nil
+	}
+	existing, err := keyring.Get(keychainService, clientSecretKey(newName))
+	switch {
+	case errors.Is(err, keyring.ErrNotFound) || (err == nil && existing == ""):
+	case err != nil:
+		return false, fmt.Errorf("read keychain OAuth client secret for account %q: %w", newName, err)
+	default:
+		return false, nil
+	}
+	cs, err := keyring.Get(keychainService, clientSecretKey(oldName))
+	if errors.Is(err, keyring.ErrNotFound) || (err == nil && cs == "") {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("read keychain OAuth client secret for account %q: %w", oldName, err)
+	}
+	if err := StoreClientSecret(newName, cs); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 var ansiEscape = regexp.MustCompile(`\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\)|.)`)
 
 // sanitize makes stderr safe to show in the TUI: no escape sequences or
