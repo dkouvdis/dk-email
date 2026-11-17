@@ -237,6 +237,9 @@ type Mailbox interface {
 	// Summaries returns up to limit messages with UID below before (0 = newest), newest first.
 	// Paging (before != 0) fails with ErrFolderChanged if the folder's UIDs were reset.
 	Summaries(ctx context.Context, folder string, before UID, limit int) ([]Summary, error)
+	// Search returns up to limit messages in folder matching every term of q with UID below before
+	// (0 = newest), newest first, plus how many messages match below before (all matches when before is 0).
+	Search(ctx context.Context, folder string, q SearchQuery, before UID, limit int) ([]Summary, int, error)
 	// Message fetches and parses a full message without marking it seen.
 	Message(ctx context.Context, folder string, uid UID) (Message, error)
 	SetFlag(ctx context.Context, folder string, uids []UID, f Flag, on bool) error

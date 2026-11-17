@@ -492,3 +492,167 @@ func TestDraftSender_RecordsSavesAndServesStoredDrafts(t *testing.T) {
 		t.Error("OpenDraft of an unknown draft succeeded")
 	}
 }
+
+func searchFake() *Fake {
+	f := inbox()
+	day := func(d int) time.Time { return time.Date(2026, 11, d, 23, 30, 0, 0, time.UTC) }
+	f.AddMessage("INBOX", mail.Message{
+		Summary: mail.Summary{
+			From: mail.Address{Name: "Alice", Email: "alice@example.com"}, To: []mail.Address{{Email: "bob@example.com"}},
+			Subject: "Lunch plans", Date: day(1), Seen: true,
+		},
+		Cc: []mail.Address{{Email: "carol@example.com"}}, Body: "pizza at noon",
+	})
+	f.AddMessage("INBOX", mail.Message{
+		Summary: mail.Summary{
+			From: mail.Address{Email: "dave@example.com"}, To: []mail.Address{{Email: "alice@example.com"}},
+			Subject: "Invoice", Date: day(5), Flagged: true,
+		},
+		Body: "please pay",
+	})
+	f.AddMessage("INBOX", mail.Message{
+		Summary: mail.Summary{
+			From: mail.Address{Email: "erin@example.com"}, To: []mail.Address{{Email: "bob@example.com"}},
+			Subject: "Re: Lunch plans", Date: day(9),
+		},
+		Body: "sounds good",
+	})
+	return f
+}
+
+func TestSearch_MatchesEachKind(t *testing.T) {
+	f := searchFake()
+	d := func(day int) time.Time { return time.Date(2026, 11, day, 0, 0, 0, 0, time.UTC) }
+	tests := []struct {
+		name string
+		term mail.SearchTerm
+		want []mail.UID
+	}{
+		{"text in subject", mail.SearchTerm{Kind: mail.SearchText, Value: "LUNCH"}, []mail.UID{3, 1}},
+		{"text in body", mail.SearchTerm{Kind: mail.SearchText, Value: "pizza"}, []mail.UID{1}},
+		{"text in cc", mail.SearchTerm{Kind: mail.SearchText, Value: "carol"}, []mail.UID{1}},
+		{"text in from", mail.SearchTerm{Kind: mail.SearchText, Value: "dave"}, []mail.UID{2}},
+		{"text in to", mail.SearchTerm{Kind: mail.SearchText, Value: "bob@"}, []mail.UID{3, 1}},
+		{"from name", mail.SearchTerm{Kind: mail.SearchFrom, Value: "alice"}, []mail.UID{1}},
+		{"to", mail.SearchTerm{Kind: mail.SearchTo, Value: "alice"}, []mail.UID{2}},
+		{"cc", mail.SearchTerm{Kind: mail.SearchCc, Value: "carol"}, []mail.UID{1}},
+		{"subject", mail.SearchTerm{Kind: mail.SearchSubject, Value: "invoice"}, []mail.UID{2}},
+		{"subject ignores body", mail.SearchTerm{Kind: mail.SearchSubject, Value: "pizza"}, nil},
+		{"body", mail.SearchTerm{Kind: mail.SearchBody, Value: "noon"}, []mail.UID{1}},
+		{"body ignores subject", mail.SearchTerm{Kind: mail.SearchBody, Value: "invoice"}, nil},
+		{"unread", mail.SearchTerm{Kind: mail.SearchUnread}, []mail.UID{3, 2}},
+		{"read", mail.SearchTerm{Kind: mail.SearchRead}, []mail.UID{1}},
+		{"starred", mail.SearchTerm{Kind: mail.SearchStarred}, []mail.UID{2}},
+		{"since is inclusive", mail.SearchTerm{Kind: mail.SearchSince, Date: d(5)}, []mail.UID{3, 2}},
+		{"before is exclusive", mail.SearchTerm{Kind: mail.SearchBefore, Date: d(5)}, []mail.UID{1}},
+		{"negated field", mail.SearchTerm{Kind: mail.SearchSubject, Value: "lunch", Not: true}, []mail.UID{2}},
+		{"negated flag", mail.SearchTerm{Kind: mail.SearchUnread, Not: true}, []mail.UID{1}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, total, err := f.Search(ctx, "INBOX", mail.SearchQuery{Terms: []mail.SearchTerm{tt.term}}, 0, 10)
+
+			if err != nil {
+				t.Fatalf("Search() error = %v", err)
+			}
+			if !slices.Equal(uids(got), tt.want) && !(len(got) == 0 && len(tt.want) == 0) {
+				t.Errorf("UIDs = %v, want %v", uids(got), tt.want)
+			}
+			if total != len(tt.want) {
+				t.Errorf("total = %d, want %d", total, len(tt.want))
+			}
+		})
+	}
+}
+
+func TestSearch_DateIgnoresTimeOfDayAndZone(t *testing.T) {
+	f := inbox()
+	zone := time.FixedZone("x", 5*3600)
+	// 02:00 on Nov 6 in UTC+5 is 21:00 on Nov 5 UTC.
+	f.AddMessage("INBOX", mail.Message{Summary: mail.Summary{Subject: "a", Date: time.Date(2026, 11, 6, 2, 0, 0, 0, zone)}})
+	q := mail.SearchQuery{Terms: []mail.SearchTerm{{Kind: mail.SearchBefore, Date: time.Date(2026, 11, 6, 0, 0, 0, 0, time.UTC)}}}
+
+	got, total, err := f.Search(ctx, "INBOX", q, 0, 10)
+
+	if err != nil || len(got) != 1 || total != 1 {
+		t.Errorf("Search() = %v, %d, %v; want the message (Nov 5 UTC)", uids(got), total, err)
+	}
+}
+
+func TestSearch_TermsAreAnded(t *testing.T) {
+	f := searchFake()
+	q := mail.SearchQuery{Terms: []mail.SearchTerm{
+		{Kind: mail.SearchSubject, Value: "lunch"},
+		{Kind: mail.SearchUnread},
+	}}
+
+	got, total, err := f.Search(ctx, "INBOX", q, 0, 10)
+
+	if err != nil || !slices.Equal(uids(got), []mail.UID{3}) || total != 1 {
+		t.Errorf("Search() = %v, %d, %v; want [3], 1", uids(got), total, err)
+	}
+}
+
+func TestSearch_NoTermsMatchesEverything(t *testing.T) {
+	f := searchFake()
+
+	got, total, err := f.Search(ctx, "INBOX", mail.SearchQuery{}, 0, 10)
+
+	if err != nil || len(got) != 3 || total != 3 {
+		t.Errorf("Search() = %v, %d, %v; want all 3", uids(got), total, err)
+	}
+}
+
+func TestSearch_PagesNewestFirstWithTotal(t *testing.T) {
+	f := inbox()
+	for i := 0; i < 7; i++ {
+		f.AddMessage("INBOX", msg("hit", false))
+	}
+	q := mail.SearchQuery{Terms: []mail.SearchTerm{{Kind: mail.SearchSubject, Value: "hit"}}}
+
+	first, total, err := f.Search(ctx, "INBOX", q, 0, 3)
+	if err != nil || !slices.Equal(uids(first), []mail.UID{7, 6, 5}) || total != 7 {
+		t.Fatalf("first page = %v, %d, %v; want [7 6 5], 7", uids(first), total, err)
+	}
+	second, total, err := f.Search(ctx, "INBOX", q, 5, 3)
+	if err != nil || !slices.Equal(uids(second), []mail.UID{4, 3, 2}) || total != 4 {
+		t.Fatalf("second page = %v, %d, %v; want [4 3 2], 4", uids(second), total, err)
+	}
+	none, total, err := f.Search(ctx, "INBOX", q, 1, 3)
+	if err != nil || len(none) != 0 || total != 0 {
+		t.Errorf("below UID 1 = %v, %d, %v; want empty", uids(none), total, err)
+	}
+	zero, total, err := f.Search(ctx, "INBOX", q, 0, 0)
+	if err != nil || zero != nil || total != 0 {
+		t.Errorf("limit 0 = %v, %d, %v; want nil, 0, nil", zero, total, err)
+	}
+}
+
+func TestSearch_RecordsCallAndHonorsFail(t *testing.T) {
+	f := searchFake()
+	q := mail.SearchQuery{Raw: "from:alice", Terms: []mail.SearchTerm{{Kind: mail.SearchFrom, Value: "alice"}}}
+	if _, _, err := f.Search(ctx, "INBOX", q, 0, 10); err != nil {
+		t.Fatal(err)
+	}
+	boom := errors.New("boom")
+	f.Fail(MethodSearch, boom)
+
+	got, total, err := f.Search(ctx, "INBOX", q, 0, 10)
+
+	if !errors.Is(err, boom) || got != nil || total != 0 {
+		t.Errorf("Search() = %v, %d, %v; want nil, 0, boom", got, total, err)
+	}
+	calls := f.Calls()
+	want := Call{Method: MethodSearch, Folder: "INBOX", Query: "from:alice"}
+	if len(calls) != 2 || calls[0].Method != want.Method || calls[0].Folder != want.Folder || calls[0].Query != want.Query {
+		t.Errorf("Calls() = %+v, want %+v first", calls, want)
+	}
+}
+
+func TestSearch_UnknownFolder(t *testing.T) {
+	_, _, err := searchFake().Search(ctx, "Nope", mail.SearchQuery{}, 0, 10)
+
+	if !errors.Is(err, mail.ErrFolderNotFound) {
+		t.Errorf("error = %v, want ErrFolderNotFound", err)
+	}
+}

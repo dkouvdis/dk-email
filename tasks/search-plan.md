@@ -27,16 +27,16 @@ Add server-side IMAP folder search (`/` when the thread list is focused) so user
   ```
 - **Pure filter splitter (`internal/search`):** ~60–100 lines of stdlib Go split filter operators, flags, `YYYY-MM-DD` date bounds, `-` negations, quoted phrases, and bare words. Malformed dates or unclosed quotes degrade gracefully into literal `TEXT` terms instead of failing user input.
 - **Read-only `EXAMINE` + shared UID paging (`internal/mail/imap`):** `newestUIDs` (`summaries.go`) already runs `UID SEARCH NOT \Deleted` with the `before` ceiling and newest-`limit` slice. It gains a `*goimap.SearchCriteria` parameter and returns the total match count, so `Summaries` (empty criteria) and `Search` (compiled query) share one path, then both reuse `fetchSummaries` so search results thread identically to normal folder views.
-- **Threaded, non-destructive `/` list search UX (`internal/ui`):** `/` in `PaneList` opens an inline `/ ` prompt in the list header (`/ ` in `PaneSidebar` continues filtering folders). Results thread via `thread.Build`, preserve all triage/open/reply/paging operations, guard periodic 120s `refresh` (`internal/ui/refresh.go`) from overwriting active search results (`r`/`ctrl+r` re-runs the active search), and clear back to the folder's summaries on `esc`.
+- **Threaded, non-destructive `/` list search UX (`internal/ui`):** `/` in `PaneList` opens an inline `/ ` prompt in the list header (`/ ` in `PaneSidebar` continues filtering folders). Results thread via `thread.Build`, preserve all triage/open/reply/paging operations, guard periodic 120s `refresh` (`internal/ui/refresh.go`) from overwriting active search results (`ctrl+r` re-runs the active search; `r` is reply), and clear back to the folder's summaries on `esc`.
 
 ## Task List
 
 ### Phase 1: Search Query & IMAP Adapter
 - [x] Task 9: Search domain types and filter query splitter
-- [ ] Task 10: IMAP `UID SEARCH` adapter and `mailtest.Fake.Search`
+- [x] Task 10: IMAP `UID SEARCH` adapter and `mailtest.Fake.Search`
 
 ### Checkpoint: Search Backend
-- [ ] `go test -race ./internal/search ./internal/mail/...` passes against `imapmemserver` and `mailtest.Fake`
+- [x] `go test -race ./internal/search ./internal/mail/...` passes against `imapmemserver` and `mailtest.Fake`
 
 ### Phase 2: Search TUI & Documentation
 - [ ] Task 11: Inline `/` list search bar, threaded results, paging, and refresh guard
@@ -56,7 +56,7 @@ Task 9 (mail.SearchQuery + internal/search) ──► Task 10 (IMAP Search + Fak
 
 | Risk | Impact | Mitigation |
 |------|--------|------------|
-| Periodic 120s folder auto-refresh overwrites active search results | Med | `refresh.go` skips unfiltered `list.Merge` while a search is active; manual `r`/`ctrl+r` re-runs the active search (Task 11). |
+| Periodic 120s folder auto-refresh overwrites active search results | Med | `refresh.go` skips unfiltered `list.Merge` while a search is active; manual `ctrl+r` re-runs the active search (Task 11). |
 | Stale slow `UID SEARCH` response arrives after user cleared search or changed folders | Med | Guard `searchMsg` with a search generation counter + account/folder match, matching `fetchGen` (Task 11). |
 | Zero matching UIDs triggers invalid empty `UID FETCH` | Med | Short-circuit immediately when matched UID slice is empty and return `nil, 0, nil` (Task 10). |
 | IMAP `SINCE`/`BEFORE` compare dates only, in the server's time zone | Low | Pinned by a parser/adapter test; documented in `docs/search.md` (`before:2026-11-17` excludes that day). |

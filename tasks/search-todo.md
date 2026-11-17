@@ -34,15 +34,15 @@ Plan: [search-plan.md](search-plan.md).
 **Description:** Add `Mailbox.Search(ctx, folder, query, before, limit) ([]Summary, int, error)` to `internal/mail` and implement `Client.Search` in `internal/mail/imap` using read-only `EXAMINE`, `*goimap.SearchCriteria` compilation, descending UID pagination (`before` + `limit`), and `fetchSummaries`, plus matching in-memory filtering on `mailtest.Fake`.
 
 **Acceptance criteria:**
-- [ ] `newestUIDs` takes a `*goimap.SearchCriteria` (always plus `NOT \Deleted`) and returns the total match count; `Summaries` and `Search` both use it.
-- [ ] `imap.Client.Search` opens the folder read-only (`EXAMINE`), excludes `\Deleted`, compiles `mail.SearchQuery` to `*goimap.SearchCriteria`, restricts UIDs `< before` when paging, returns `total` matches (when `before == 0`, or total overall matching UIDs) and newest `limit` `[]mail.Summary` sorted newest-first, and skips `UID FETCH` when 0 UIDs match.
-- [ ] `mailtest.Fake.Search` evaluates the same `SearchQuery` fields, flags, dates, negations, and `before`/`limit` paging in memory for deterministic UI tests.
-- [ ] `imapmemserver` tests cover text, header, flag, date, negation, empty results, and multi-page UID slicing.
+- [x] `newestUIDs` takes a `*goimap.SearchCriteria` (always plus `NOT \Deleted`) and returns the total match count; `Summaries` and `Search` both use it.
+- [x] `imap.Client.Search` opens the folder read-only (`EXAMINE`), excludes `\Deleted`, compiles `mail.SearchQuery` to `*goimap.SearchCriteria`, restricts UIDs `< before` when paging, returns `total` matches (when `before == 0`, or total overall matching UIDs) and newest `limit` `[]mail.Summary` sorted newest-first, and skips `UID FETCH` when 0 UIDs match.
+- [x] `mailtest.Fake.Search` evaluates the same `SearchQuery` fields, flags, dates, negations, and `before`/`limit` paging in memory for deterministic UI tests.
+- [x] `imapmemserver` tests cover text, header, flag, date, negation, empty results, and multi-page UID slicing.
 
 **Verification:**
-- [ ] Tests pass: `go test -race ./internal/mail/...`
-- [ ] Build succeeds: `go build -o bin/dk-email ./cmd/dk-email`
-- [ ] Manual check: None (verified via `imapmemserver` and `mailtest`).
+- [x] Tests pass: `go test -race ./internal/mail/...`
+- [x] Build succeeds: `go build -o bin/dk-email ./cmd/dk-email`
+- [x] Manual check: None (verified via `imapmemserver` and `mailtest`).
 
 **Dependencies:** Task 9
 
@@ -59,8 +59,8 @@ Plan: [search-plan.md](search-plan.md).
 ---
 
 ## Checkpoint: After Tasks 9-10 (Search Backend)
-- [ ] All tests pass: `go test -race ./internal/search ./internal/mail/...`
-- [ ] `go vet ./...` and `gofmt -l .` clean
+- [x] All tests pass: `go test -race ./internal/search ./internal/mail/...`
+- [x] `go vet ./...` and `gofmt -l .` clean
 
 ---
 
@@ -71,7 +71,7 @@ Plan: [search-plan.md](search-plan.md).
 **Acceptance criteria:**
 - [ ] Pressing `/` in `PaneList` focuses an inline `/ ` input (`enter` runs `Mailbox.Search` guarded by a search generation counter; `esc` cancels the prompt or clears an active search back to the folder's summaries; `/` in `PaneSidebar` still filters folders; `?` help popup lists `/` search).
 - [ ] Search results render threaded via `thread.Build` with a `search: <query>` header indicator, support all normal open/reply/flag/move/archive/delete actions, and paginate older matches via `LoadMoreMsg` (`before` UID).
-- [ ] Periodic auto-refresh (`internal/ui/refresh.go`) does not overwrite active search results with unfiltered folder summaries, while manual `r` re-runs the active search.
+- [ ] Periodic auto-refresh (`internal/ui/refresh.go`) does not overwrite active search results with unfiltered folder summaries, while manual `ctrl+r` re-runs the active search.
 
 **Verification:**
 - [ ] Tests pass: `go test -race ./internal/ui/...`
@@ -98,7 +98,7 @@ Plan: [search-plan.md](search-plan.md).
 **Acceptance criteria:**
 - [ ] `internal/mail/imap/live_test.go` exercises read-only `Client.Search` against `DK_EMAIL_LIVE_ACCOUNT` without mutating flags or folders.
 - [ ] The live test passes against Gmail and its sample queries match Gmail's web search.
-- [ ] `docs/search.md` (same style as `docs/accounts.md`) covers: `/` in the thread list, `enter` to run, `esc` to clear, `r` to re-run, paging, and that search covers the open folder only (on Gmail, search All Mail for everything); every operator with an example (`from:`, `to:`, `cc:`, `subject:`, `body:`, `is:unread`/`read`/`starred`/`flagged`, `since:`/`after:`, `before:`, `-`, quotes, free text); that terms combine with AND and there is no OR; date-only `SINCE`/`BEFORE` behaviour; how malformed input falls back to text; and which providers are verified (Gmail, Dovecot), with Microsoft 365 caveats.
+- [ ] `docs/search.md` (same style as `docs/accounts.md`) covers: `/` in the thread list, `enter` to run, `esc` to clear, `ctrl+r` to re-run, paging, and that search covers the open folder only (on Gmail, search All Mail for everything); every operator with an example (`from:`, `to:`, `cc:`, `subject:`, `body:`, `is:unread`/`read`/`starred`/`flagged`, `since:`/`after:`, `before:`, `-`, quotes, free text); that terms combine with AND and there is no OR; date-only `SINCE`/`BEFORE` behaviour; how malformed input falls back to text; and which providers are verified (Gmail, Dovecot), with Microsoft 365 caveats.
 - [ ] `README.md` has a short Search section linking to `docs/search.md`; `SPEC.md` lists the `/` key and the `Mailbox.Search` seam; `AGENTS.md` mentions `internal/search` under supporting modules.
 
 **Verification:**

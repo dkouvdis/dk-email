@@ -32,7 +32,7 @@ func (c *Client) Summaries(ctx context.Context, folder string, before mail.UID, 
 		if err := c.openLocked(conn, folder, readOnly, before != 0); err != nil {
 			return err
 		}
-		uids, err := newestUIDs(conn, before, limit)
+		uids, _, err := newestUIDs(conn, &goimap.SearchCriteria{}, before, limit)
 		if err != nil {
 			return fmt.Errorf("search %q: %w", folder, err)
 		}
@@ -77,26 +77,29 @@ func (c *Client) openLocked(conn *imapclient.Client, folder string, readOnly, ch
 	return nil
 }
 
-// newestUIDs returns the highest limit UIDs below before, in ascending
-// order. Messages flagged \Deleted are skipped: they're on their way out,
-// e.g. moved without UIDPLUS to expunge them.
-func newestUIDs(conn *imapclient.Client, before mail.UID, limit int) ([]goimap.UID, error) {
-	criteria := &goimap.SearchCriteria{NotFlag: []goimap.Flag{goimap.FlagDeleted}}
+// newestUIDs returns the highest limit UIDs below before that match
+// criteria, in ascending order, plus how many UIDs matched below before.
+// Messages flagged \Deleted are skipped: they're on their way out, e.g.
+// moved without UIDPLUS to expunge them. criteria is modified.
+func newestUIDs(conn *imapclient.Client, criteria *goimap.SearchCriteria, before mail.UID, limit int) (uids []goimap.UID, total int, err error) {
+	extra := goimap.SearchCriteria{NotFlag: []goimap.Flag{goimap.FlagDeleted}}
 	if before != 0 {
 		var set goimap.UIDSet
 		set.AddRange(1, goimap.UID(before-1))
-		criteria.UID = []goimap.UIDSet{set}
+		extra.UID = []goimap.UIDSet{set}
 	}
+	criteria.And(&extra)
 	data, err := conn.UIDSearch(criteria, nil).Wait()
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	uids := data.AllUIDs()
+	uids = data.AllUIDs()
 	slices.Sort(uids)
+	total = len(uids)
 	if len(uids) > limit {
 		uids = uids[len(uids)-limit:]
 	}
-	return uids, nil
+	return uids, total, nil
 }
 
 var referencesSection = &goimap.FetchItemBodySection{

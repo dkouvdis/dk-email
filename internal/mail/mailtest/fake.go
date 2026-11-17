@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -17,6 +18,7 @@ type Method string
 const (
 	MethodFolders   Method = "Folders"
 	MethodSummaries Method = "Summaries"
+	MethodSearch    Method = "Search"
 	MethodMessage   Method = "Message"
 	MethodSetFlag   Method = "SetFlag"
 	MethodMove      Method = "Move"
@@ -30,6 +32,7 @@ type Call struct {
 	Flag   mail.Flag
 	On     bool
 	To     string
+	Query  string // Search's raw query
 }
 
 type folder struct {
@@ -164,6 +167,99 @@ func (f *Fake) Summaries(ctx context.Context, name string, before mail.UID, limi
 		out = append(out, cloneMessage(m).Summary)
 	}
 	return out, nil
+}
+
+// Search matches case-insensitive substrings and flags in memory. Dates
+// compare by UTC calendar day.
+func (f *Fake) Search(ctx context.Context, name string, q mail.SearchQuery, before mail.UID, limit int) ([]mail.Summary, int, error) {
+	if err := f.begin(ctx, Call{Method: MethodSearch, Folder: name, Query: q.Raw}); err != nil {
+		return nil, 0, err
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	fl, err := f.folder(name)
+	if err != nil {
+		return nil, 0, err
+	}
+	if limit <= 0 {
+		return nil, 0, nil
+	}
+	var out []mail.Summary
+	total := 0
+	for i := len(fl.messages) - 1; i >= 0; i-- {
+		m := fl.messages[i]
+		if before != 0 && m.UID >= before {
+			continue
+		}
+		if !matchesAll(m, q.Terms) {
+			continue
+		}
+		total++
+		if len(out) < limit {
+			out = append(out, cloneMessage(m).Summary)
+		}
+	}
+	return out, total, nil
+}
+
+func matchesAll(m mail.Message, terms []mail.SearchTerm) bool {
+	for _, t := range terms {
+		if matchesTerm(m, t) == t.Not {
+			return false
+		}
+	}
+	return true
+}
+
+func matchesTerm(m mail.Message, t mail.SearchTerm) bool {
+	has := func(fields ...string) bool {
+		needle := strings.ToLower(t.Value)
+		for _, f := range fields {
+			if strings.Contains(strings.ToLower(f), needle) {
+				return true
+			}
+		}
+		return false
+	}
+	addrs := func(as ...[]mail.Address) []string {
+		var out []string
+		for _, list := range as {
+			for _, a := range list {
+				out = append(out, a.String())
+			}
+		}
+		return out
+	}
+	switch t.Kind {
+	case mail.SearchText:
+		fields := append(addrs([]mail.Address{m.From}, m.To, m.Cc), m.Subject, m.Body)
+		return has(fields...)
+	case mail.SearchFrom:
+		return has(m.From.String())
+	case mail.SearchTo:
+		return has(addrs(m.To)...)
+	case mail.SearchCc:
+		return has(addrs(m.Cc)...)
+	case mail.SearchSubject:
+		return has(m.Subject)
+	case mail.SearchBody:
+		return has(m.Body)
+	case mail.SearchUnread:
+		return !m.Seen
+	case mail.SearchRead:
+		return m.Seen
+	case mail.SearchStarred:
+		return m.Flagged
+	case mail.SearchSince:
+		return !messageDay(m).Before(t.Date)
+	case mail.SearchBefore:
+		return messageDay(m).Before(t.Date)
+	}
+	return true
+}
+
+func messageDay(m mail.Message) time.Time {
+	return m.Date.UTC().Truncate(24 * time.Hour)
 }
 
 func (f *Fake) Message(ctx context.Context, name string, uid mail.UID) (mail.Message, error) {
