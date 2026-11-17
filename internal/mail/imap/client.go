@@ -306,25 +306,43 @@ func (c *Client) loginError(err error, login mail.Login, xc *oauth.XOAuth2Client
 	}
 	text := redact(serverErr.Text)
 	msg := fmt.Sprintf("login to account %q (%s) failed: %s", c.acct.Name, server, text)
-	if xc != nil && xc.Err() != nil {
+	hint := loginHint(c.acct.IMAPHost, serverErr.Code, text, login.Token != "")
+	// Gmail sends its token challenge even when policy, not the token, is
+	// why it refused, so the detail would only mislead there.
+	if xc != nil && xc.Err() != nil && hint != imapDisabledHint {
 		msg += " (" + xc.Err().Error() + ")"
 	}
-	if hint := loginHint(c.acct.IMAPHost, serverErr.Code, text); hint != "" {
+	if hint != "" {
 		msg += ". Hint: " + hint
 	}
 	return errors.New(msg)
 }
 
-// loginHint returns actionable advice for known Gmail login failures, or "".
-func loginHint(host string, code goimap.ResponseCode, text string) string {
+const (
+	imapDisabledHint = "your Google Workspace admin has turned off IMAP for your domain. Ask them to enable it in the " +
+		"Google Admin console under Apps > Google Workspace > Gmail > End User Access > POP and IMAP access, " +
+		"allowing any mail client or your OAuth client ID (see docs/oauth.md)"
+	oauthRefusedHint = "the server refused the access token: press E, choose OAuth 2.0 and Sign in & save again"
+)
+
+// loginHint returns actionable advice for known login failures, or "".
+// oauth reports an XOAUTH2 login, which never gets the app password advice.
+func loginHint(host string, code goimap.ResponseCode, text string, oauth bool) string {
 	lower := strings.ToLower(text)
+	refused := strings.EqualFold(string(code), string(goimap.ResponseCodeAuthenticationFailed)) ||
+		strings.Contains(lower, "invalid credentials")
 	switch {
+	case strings.Contains(lower, "imap access is disabled"):
+		return imapDisabledHint
+	case oauth && refused:
+		return oauthRefusedHint
+	case oauth:
+		// The hints below are about passwords.
 	case strings.Contains(lower, "application-specific password required"):
 		return "Gmail requires an app password when 2-Step Verification is on. " +
 			"Create one at https://myaccount.google.com/apppasswords, store it in 1Password, " +
 			"and point password_cmd at it (passkeys can't be used for IMAP)"
-	case isGmailHost(host) && (strings.EqualFold(string(code), string(goimap.ResponseCodeAuthenticationFailed)) ||
-		strings.Contains(lower, "invalid credentials")):
+	case isGmailHost(host) && refused:
 		return "For Gmail use an app password from https://myaccount.google.com/apppasswords, " +
 			"not your Google password. Google Workspace (work/school) accounts don't allow app passwords " +
 			"and need OAuth: set auth = \"oauth2\" (see docs/oauth.md)"

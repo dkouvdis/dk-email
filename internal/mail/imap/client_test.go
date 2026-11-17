@@ -18,6 +18,7 @@ import (
 
 	"github.com/dkouvdis/dk-email/internal/config"
 	"github.com/dkouvdis/dk-email/internal/mail"
+	"github.com/dkouvdis/dk-email/internal/oauth"
 )
 
 var bg = context.Background()
@@ -242,6 +243,22 @@ func TestLoginError_NonServerErrorNamesHostAndPort(t *testing.T) {
 	}
 }
 
+func TestLoginError_IMAPDisabledDropsTheTokenDetail(t *testing.T) {
+	c := New(config.Account{Name: "Work", IMAPHost: "imap.gmail.com", IMAPPort: 993}, "")
+	xc := oauth.NewXOAuth2Client("me@example.com", "tok-secret")
+	if _, err := xc.Next([]byte(`{"status":"400","schemes":"Bearer","scope":"https://mail.google.com/"}`)); err != nil {
+		t.Fatal(err)
+	}
+	serverErr := &goimap.Error{Type: goimap.StatusResponseTypeNo, Text: "IMAP access is disabled for your domain. (Failure)"}
+
+	got := c.loginError(serverErr, mail.Login{Token: "tok-secret"}, xc).Error()
+
+	want := `login to account "Work" (imap.gmail.com:993) failed: IMAP access is disabled for your domain. (Failure). Hint: ` + imapDisabledHint
+	if got != want {
+		t.Errorf("loginError() = %q, want %q", got, want)
+	}
+}
+
 func TestLoginError_AppendsHintAfterMessageWithoutPassword(t *testing.T) {
 	c := New(config.Account{Name: "Personal", IMAPHost: "imap.gmail.com", IMAPPort: 993}, "hunter2")
 	serverErr := &goimap.Error{
@@ -272,31 +289,37 @@ func TestLoginHint(t *testing.T) {
 		webLoginHint = "sign in to this account once in a web browser to clear Google's security check, then retry"
 	)
 	tests := []struct {
-		name string
-		host string
-		code goimap.ResponseCode
-		text string
-		want string
+		name  string
+		host  string
+		code  goimap.ResponseCode
+		text  string
+		want  string
+		oauth bool
 	}{
-		{"app password required on Gmail", "imap.gmail.com", "", "Application-specific password required: https://support.google.com/accounts/answer/185833 (Failure)", appPasswordHint},
-		{"app password required on any host", "mail.example.com", "ALERT", "Application-specific password required", appPasswordHint},
-		{"app password text is case-insensitive", "mail.example.com", "", "APPLICATION-SPECIFIC PASSWORD REQUIRED", appPasswordHint},
-		{"app password wins over invalid credentials", "imap.gmail.com", goimap.ResponseCodeAuthenticationFailed, "Invalid credentials: Application-specific password required", appPasswordHint},
-		{"Gmail with authentication failed code", "imap.gmail.com", goimap.ResponseCodeAuthenticationFailed, "Authentication failed", gmailHint},
-		{"Gmail with invalid credentials text", "imap.gmail.com", "", "Invalid credentials (Failure)", gmailHint},
-		{"Googlemail host", "imap.googlemail.com", goimap.ResponseCodeAuthenticationFailed, "nope", gmailHint},
-		{"Gmail host is case-insensitive", "IMAP.Gmail.COM", "", "invalid CREDENTIALS", gmailHint},
-		{"non-Gmail host with invalid credentials", "mail.example.com", "", "Invalid credentials", ""},
-		{"non-Gmail host with authentication failed code", "mail.example.com", goimap.ResponseCodeAuthenticationFailed, "Authentication failed", ""},
-		{"Gmail host with unrelated failure", "imap.gmail.com", "", "Too many simultaneous connections", ""},
-		{"web login required", "imap.gmail.com", "WEBALERT", "Web login required.", webLoginHint},
-		{"web login text is case-insensitive", "mail.example.com", "", "WEB LOGIN REQUIRED", webLoginHint},
-		{"no hint otherwise", "mail.example.com", "", "bad login", ""},
+		{"app password required on Gmail", "imap.gmail.com", "", "Application-specific password required: https://support.google.com/accounts/answer/185833 (Failure)", appPasswordHint, false},
+		{"app password required on any host", "mail.example.com", "ALERT", "Application-specific password required", appPasswordHint, false},
+		{"app password text is case-insensitive", "mail.example.com", "", "APPLICATION-SPECIFIC PASSWORD REQUIRED", appPasswordHint, false},
+		{"app password wins over invalid credentials", "imap.gmail.com", goimap.ResponseCodeAuthenticationFailed, "Invalid credentials: Application-specific password required", appPasswordHint, false},
+		{"Gmail with authentication failed code", "imap.gmail.com", goimap.ResponseCodeAuthenticationFailed, "Authentication failed", gmailHint, false},
+		{"Gmail with invalid credentials text", "imap.gmail.com", "", "Invalid credentials (Failure)", gmailHint, false},
+		{"Googlemail host", "imap.googlemail.com", goimap.ResponseCodeAuthenticationFailed, "nope", gmailHint, false},
+		{"Gmail host is case-insensitive", "IMAP.Gmail.COM", "", "invalid CREDENTIALS", gmailHint, false},
+		{"non-Gmail host with invalid credentials", "mail.example.com", "", "Invalid credentials", "", false},
+		{"non-Gmail host with authentication failed code", "mail.example.com", goimap.ResponseCodeAuthenticationFailed, "Authentication failed", "", false},
+		{"Gmail host with unrelated failure", "imap.gmail.com", "", "Too many simultaneous connections", "", false},
+		{"web login required", "imap.gmail.com", "WEBALERT", "Web login required.", webLoginHint, false},
+		{"web login text is case-insensitive", "mail.example.com", "", "WEB LOGIN REQUIRED", webLoginHint, false},
+		{"no hint otherwise", "mail.example.com", "", "bad login", "", false},
+		{"Workspace IMAP disabled", "imap.gmail.com", "", "IMAP access is disabled for your domain. Please contact your domain administrator for questions about this feature (Failure)", imapDisabledHint, false},
+		{"Workspace IMAP disabled with OAuth", "imap.gmail.com", "", "IMAP access is disabled for your domain. (Failure)", imapDisabledHint, true},
+		{"OAuth token refused on Gmail", "imap.gmail.com", "", "Invalid credentials (Failure)", oauthRefusedHint, true},
+		{"OAuth token refused by code", "outlook.office365.com", goimap.ResponseCodeAuthenticationFailed, "AUTHENTICATE failed.", oauthRefusedHint, true},
+		{"OAuth never gets the app password hint", "imap.gmail.com", "", "Application-specific password required", "", true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := loginHint(tt.host, tt.code, tt.text); got != tt.want {
-				t.Errorf("loginHint(%q, %q, %q) = %q, want %q", tt.host, tt.code, tt.text, got, tt.want)
+			if got := loginHint(tt.host, tt.code, tt.text, tt.oauth); got != tt.want {
+				t.Errorf("loginHint(%q, %q, %q, %v) = %q, want %q", tt.host, tt.code, tt.text, tt.oauth, got, tt.want)
 			}
 		})
 	}
