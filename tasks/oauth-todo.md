@@ -36,14 +36,14 @@ Plan: [oauth-plan.md](oauth-plan.md).
 **Description:** Add keychain helpers in `internal/secret` to store, load, and delete JSON OAuth token bundles (`oauth:<account>`) and Google client secrets (`oauth-client-secret:<account>`) without colliding with existing password keychain entries, plus `oauth_client_secret_cmd` execution.
 
 **Acceptance criteria:**
-- [ ] `secret` provides typed load/save/delete helpers for OAuth token bundles (`access_token`, `refresh_token`, `expiry`) and OAuth client secrets under distinct account-scoped keys, plus `ResolveClientSecret` supporting `oauth_client_secret_cmd` (60s timeout) or keychain fallback.
-- [ ] Deleting a missing OAuth keychain entry succeeds idempotently, matching `secret.Delete`.
-- [ ] Existing password keychain entries (`Resolve`/`SetPassword`/`DeletePassword`) remain byte-for-byte compatible.
+- [x] `secret` provides typed load/save/delete helpers for OAuth token bundles (`access_token`, `refresh_token`, `expiry`) and OAuth client secrets under distinct account-scoped keys, plus `ResolveClientSecret` supporting `oauth_client_secret_cmd` (60s timeout) or keychain fallback.
+- [x] Deleting a missing OAuth keychain entry succeeds idempotently, matching `secret.Delete`.
+- [x] Existing password keychain entries (`Resolve`/`SetPassword`/`DeletePassword`) remain byte-for-byte compatible.
 
 **Verification:**
-- [ ] Tests pass: `go test -race ./internal/secret`
-- [ ] Build succeeds: `go build -o bin/dk-email ./cmd/dk-email`
-- [ ] Manual check: None (unit-tested with mock keyring backend).
+- [x] Tests pass: `go test -race ./internal/secret`
+- [x] Build succeeds: `go build -o bin/dk-email ./cmd/dk-email`
+- [x] Manual check: None (unit-tested with mock keyring backend).
 
 **Dependencies:** None
 

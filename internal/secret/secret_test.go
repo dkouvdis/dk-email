@@ -292,3 +292,338 @@ func TestCopy_NothingToCopyIsNotAnError(t *testing.T) {
 		t.Errorf("an entry appeared: %v", err)
 	}
 }
+
+var testToken = OAuthToken{
+	AccessToken:  "access-aaa",
+	RefreshToken: "refresh-rrr",
+	Expiry:       time.Date(2026, 11, 17, 12, 30, 0, 0, time.UTC),
+}
+
+func clientSecretAccount() config.Account {
+	return config.Account{Name: "Work", OAuthClientSecretCmd: "op read op://Work/Google/client-secret"}
+}
+
+func TestResolve_PasswordCmdErrorMessageUnchanged(t *testing.T) {
+	r := &Resolver{Run: fakeRunner("", "boom", errors.New("exit status 1")), Timeout: time.Second}
+
+	_, err := r.Resolve(context.Background(), cmdAccount())
+
+	if err == nil || !strings.HasPrefix(err.Error(), `password_cmd for account "`) {
+		t.Errorf("Resolve() error = %v, want password_cmd prefix", err)
+	}
+}
+
+func TestToken_RoundTrip(t *testing.T) {
+	keyring.MockInit()
+
+	if err := StoreToken("Work", testToken); err != nil {
+		t.Fatalf("StoreToken() error = %v", err)
+	}
+	got, err := LoadToken("Work")
+
+	if err != nil {
+		t.Fatalf("LoadToken() error = %v", err)
+	}
+	if got.AccessToken != testToken.AccessToken || got.RefreshToken != testToken.RefreshToken || !got.Expiry.Equal(testToken.Expiry) {
+		t.Errorf("LoadToken() = %+v, want %+v", got, testToken)
+	}
+}
+
+func TestToken_NamespacedFromPassword(t *testing.T) {
+	keyring.MockInit()
+	if err := Store("Work", "pw"); err != nil {
+		t.Fatal(err)
+	}
+	if err := StoreToken("Work", testToken); err != nil {
+		t.Fatal(err)
+	}
+	if err := StoreClientSecret("Work", "cs"); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := New().Resolve(context.Background(), config.Account{Name: "Work"})
+	if err != nil || got != "pw" {
+		t.Errorf("Resolve() = %q, %v; want pw", got, err)
+	}
+	tok, err := LoadToken("Work")
+	if err != nil || tok.RefreshToken != testToken.RefreshToken {
+		t.Errorf("LoadToken() = %+v, %v", tok, err)
+	}
+	if raw, err := keyring.Get(keychainService, "Work"); err != nil || raw != "pw" {
+		t.Errorf("password entry = %q, %v; want exactly pw", raw, err)
+	}
+
+	if err := DeleteToken("Work"); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := New().Resolve(context.Background(), config.Account{Name: "Work"}); err != nil || got != "pw" {
+		t.Errorf("password after DeleteToken = %q, %v", got, err)
+	}
+	if got, err := New().ResolveClientSecret(context.Background(), config.Account{Name: "Work"}); err != nil || got != "cs" {
+		t.Errorf("client secret after DeleteToken = %q, %v", got, err)
+	}
+
+	if err := StoreToken("Work", testToken); err != nil {
+		t.Fatal(err)
+	}
+	if err := Delete("Work"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadToken("Work"); err != nil {
+		t.Errorf("token after Delete = %v", err)
+	}
+}
+
+func TestLoadToken_MissingIsErrNoToken(t *testing.T) {
+	keyring.MockInit()
+
+	_, err := LoadToken("Work")
+
+	if !errors.Is(err, ErrNoToken) {
+		t.Errorf("LoadToken() error = %v, want ErrNoToken", err)
+	}
+}
+
+func TestLoadToken_CorruptJSONIsErrNoTokenWithoutLeak(t *testing.T) {
+	keyring.MockInit()
+	if err := keyring.Set(keychainService, "oauth:Work", "{not json secret-xyz"); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := LoadToken("Work")
+
+	if !errors.Is(err, ErrNoToken) {
+		t.Fatalf("LoadToken() error = %v, want ErrNoToken", err)
+	}
+	if strings.Contains(err.Error(), "secret-xyz") {
+		t.Errorf("error leaks stored bytes: %q", err)
+	}
+}
+
+func TestLoadToken_NoRefreshTokenIsErrNoToken(t *testing.T) {
+	keyring.MockInit()
+	if err := keyring.Set(keychainService, "oauth:Work", `{"access_token":"a","refresh_token":""}`); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := LoadToken("Work")
+
+	if !errors.Is(err, ErrNoToken) {
+		t.Errorf("LoadToken() error = %v, want ErrNoToken", err)
+	}
+}
+
+func TestLoadToken_KeychainFailureIsNotErrNoToken(t *testing.T) {
+	keyring.MockInitWithError(errors.New("keychain locked"))
+	t.Cleanup(keyring.MockInit)
+
+	_, err := LoadToken("Work")
+
+	if err == nil || errors.Is(err, ErrNoToken) || !strings.Contains(err.Error(), "keychain locked") {
+		t.Errorf("LoadToken() error = %v, want the keychain error", err)
+	}
+}
+
+func TestStoreToken_RejectsEmptyValues(t *testing.T) {
+	keyring.MockInit()
+
+	if err := StoreToken("", testToken); err == nil {
+		t.Error("StoreToken() with empty account name: error = nil")
+	}
+	if err := StoreToken("Work", OAuthToken{AccessToken: "a"}); err == nil {
+		t.Error("StoreToken() with empty refresh token: error = nil")
+	}
+}
+
+func TestStoreToken_ErrorDoesNotLeakTokens(t *testing.T) {
+	keyring.MockInitWithError(errors.New("keychain locked"))
+	t.Cleanup(keyring.MockInit)
+
+	err := StoreToken("Work", testToken)
+
+	if err == nil {
+		t.Fatal("StoreToken() error = nil, want error")
+	}
+	for _, secret := range []string{testToken.AccessToken, testToken.RefreshToken} {
+		if strings.Contains(err.Error(), secret) {
+			t.Errorf("error leaks %q: %q", secret, err)
+		}
+	}
+}
+
+func TestDeleteToken_IgnoresMissingAndReportsFailure(t *testing.T) {
+	keyring.MockInit()
+	if err := DeleteToken("Work"); err != nil {
+		t.Errorf("DeleteToken() of a missing entry error = %v", err)
+	}
+	if err := DeleteClientSecret("Work"); err != nil {
+		t.Errorf("DeleteClientSecret() of a missing entry error = %v", err)
+	}
+
+	keyring.MockInitWithError(errors.New("keychain locked"))
+	t.Cleanup(keyring.MockInit)
+	if err := DeleteToken("Work"); err == nil || !strings.Contains(err.Error(), "keychain locked") {
+		t.Errorf("DeleteToken() error = %v", err)
+	}
+	if err := DeleteClientSecret("Work"); err == nil || !strings.Contains(err.Error(), "keychain locked") {
+		t.Errorf("DeleteClientSecret() error = %v", err)
+	}
+}
+
+func TestStoreClientSecret_RejectsEmptyValues(t *testing.T) {
+	keyring.MockInit()
+
+	if err := StoreClientSecret("", "cs"); err == nil {
+		t.Error("StoreClientSecret() with empty account name: error = nil")
+	}
+	if err := StoreClientSecret("Work", ""); err == nil {
+		t.Error("StoreClientSecret() with empty secret: error = nil")
+	}
+}
+
+func TestResolveClientSecret_CommandWinsOverKeychain(t *testing.T) {
+	keyring.MockInit()
+	if err := StoreClientSecret("Work", "from-keychain"); err != nil {
+		t.Fatal(err)
+	}
+	var gotCmd string
+	r := &Resolver{Timeout: time.Second, Run: func(_ context.Context, command string) ([]byte, []byte, error) {
+		gotCmd = command
+		return []byte("from-command\nextra\n"), nil, nil
+	}}
+
+	got, err := r.ResolveClientSecret(context.Background(), clientSecretAccount())
+
+	if err != nil || got != "from-command" {
+		t.Errorf("ResolveClientSecret() = %q, %v; want from-command", got, err)
+	}
+	if want := clientSecretAccount().OAuthClientSecretCmd; gotCmd != want {
+		t.Errorf("runner got %q, want %q", gotCmd, want)
+	}
+}
+
+func TestResolveClientSecret_CommandFailure(t *testing.T) {
+	r := &Resolver{
+		Run:     fakeRunner("stdout-secret\n", "not signed in\n", errors.New("exit status 1")),
+		Timeout: time.Second,
+	}
+
+	_, err := r.ResolveClientSecret(context.Background(), clientSecretAccount())
+
+	var cmdErr *CmdError
+	if !errors.As(err, &cmdErr) {
+		t.Fatalf("ResolveClientSecret() error = %v, want *CmdError", err)
+	}
+	if cmdErr.Key != "oauth_client_secret_cmd" {
+		t.Errorf("Key = %q, want oauth_client_secret_cmd", cmdErr.Key)
+	}
+	msg := err.Error()
+	if !strings.HasPrefix(msg, "oauth_client_secret_cmd for account") {
+		t.Errorf("error %q has the wrong prefix", msg)
+	}
+	if !strings.Contains(msg, "not signed in") {
+		t.Errorf("error %q should contain stderr", msg)
+	}
+	if strings.Contains(msg, "stdout-secret") {
+		t.Errorf("error leaks stdout: %q", msg)
+	}
+}
+
+func TestResolveClientSecret_EmptyOutputIsAnError(t *testing.T) {
+	r := &Resolver{Run: fakeRunner("\n", "", nil), Timeout: time.Second}
+
+	_, err := r.ResolveClientSecret(context.Background(), clientSecretAccount())
+
+	if !errors.Is(err, ErrEmptyOutput) {
+		t.Errorf("ResolveClientSecret() error = %v, want ErrEmptyOutput", err)
+	}
+}
+
+func TestResolveClientSecret_Keychain(t *testing.T) {
+	keyring.MockInit()
+	acct := config.Account{Name: "Work"}
+
+	got, err := New().ResolveClientSecret(context.Background(), acct)
+	if err != nil || got != "" {
+		t.Errorf("without an entry = %q, %v; want empty, nil", got, err)
+	}
+
+	if err := StoreClientSecret("Work", "cs"); err != nil {
+		t.Fatal(err)
+	}
+	got, err = New().ResolveClientSecret(context.Background(), acct)
+	if err != nil || got != "cs" {
+		t.Errorf("with an entry = %q, %v; want cs", got, err)
+	}
+}
+
+func TestResolveClientSecret_KeychainFailureIsAnError(t *testing.T) {
+	keyring.MockInitWithError(errors.New("keychain locked"))
+	t.Cleanup(keyring.MockInit)
+
+	_, err := New().ResolveClientSecret(context.Background(), config.Account{Name: "Work"})
+
+	if err == nil || !strings.Contains(err.Error(), "keychain locked") {
+		t.Errorf("ResolveClientSecret() error = %v, want the keychain error", err)
+	}
+}
+
+func TestCopyOAuth_CopiesBothAndKeepsOld(t *testing.T) {
+	keyring.MockInit()
+	if err := Store("Old", "pw"); err != nil {
+		t.Fatal(err)
+	}
+	if err := StoreToken("Old", testToken); err != nil {
+		t.Fatal(err)
+	}
+	if err := StoreClientSecret("Old", "cs"); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := CopyOAuth("Old", "New"); err != nil {
+		t.Fatalf("CopyOAuth() error = %v", err)
+	}
+
+	for _, name := range []string{"Old", "New"} {
+		if tok, err := LoadToken(name); err != nil || tok.RefreshToken != testToken.RefreshToken {
+			t.Errorf("token %s = %+v, %v", name, tok, err)
+		}
+		if cs, err := New().ResolveClientSecret(context.Background(), config.Account{Name: name}); err != nil || cs != "cs" {
+			t.Errorf("client secret %s = %q, %v", name, cs, err)
+		}
+	}
+	if _, err := keyring.Get(keychainService, "New"); !errors.Is(err, keyring.ErrNotFound) {
+		t.Errorf("password entry appeared under New: %v", err)
+	}
+	if pw, err := keyring.Get(keychainService, "Old"); err != nil || pw != "pw" {
+		t.Errorf("password under Old = %q, %v", pw, err)
+	}
+}
+
+func TestCopyOAuth_SkipsMissingAndSameName(t *testing.T) {
+	keyring.MockInit()
+
+	if err := CopyOAuth("Old", "New"); err != nil {
+		t.Errorf("CopyOAuth() of nothing error = %v", err)
+	}
+	if _, err := LoadToken("New"); !errors.Is(err, ErrNoToken) {
+		t.Errorf("a token appeared: %v", err)
+	}
+
+	if err := StoreClientSecret("Old", "cs"); err != nil {
+		t.Fatal(err)
+	}
+	if err := CopyOAuth("Old", "New"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadToken("New"); !errors.Is(err, ErrNoToken) {
+		t.Errorf("a token appeared: %v", err)
+	}
+	if cs, _ := New().ResolveClientSecret(context.Background(), config.Account{Name: "New"}); cs != "cs" {
+		t.Errorf("client secret = %q, want cs", cs)
+	}
+
+	if err := CopyOAuth("Old", "Old"); err != nil {
+		t.Errorf("CopyOAuth() same name error = %v", err)
+	}
+}

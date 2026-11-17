@@ -1,10 +1,11 @@
 // Package secret resolves account passwords from a password_cmd (e.g. the
-// 1Password CLI) or the OS keychain. Passwords are never logged or included
-// in errors.
+// 1Password CLI) or the OS keychain. It also keeps OAuth tokens and client
+// secrets in the keychain. None of them are logged or included in errors.
 package secret
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"regexp"
@@ -31,21 +32,25 @@ var (
 	ErrNoPassword = errors.New("no password: set password_cmd or store one in the keychain")
 	// ErrEmptyOutput means password_cmd succeeded but printed no password.
 	ErrEmptyOutput = errors.New("command printed no password")
+	// ErrNoToken means the keychain has no usable OAuth sign-in for the account.
+	ErrNoToken = errors.New("no OAuth sign-in: sign in to the account again")
 )
 
 // Runner executes a shell command and returns its stdout and stderr.
 type Runner func(ctx context.Context, command string) (stdout, stderr []byte, err error)
 
-// CmdError reports a failed password_cmd. It carries the command's stderr but
-// never its stdout, which may contain the password.
+// CmdError reports a failed password_cmd or oauth_client_secret_cmd. It carries
+// the command's stderr but never its stdout, which may contain the secret.
 type CmdError struct {
+	// Key is the config key that holds the command, e.g. "password_cmd".
+	Key     string
 	Account string
 	Stderr  string
 	Err     error
 }
 
 func (e *CmdError) Error() string {
-	msg := fmt.Sprintf("password_cmd for account %q failed: %v", e.Account, e.Err)
+	msg := fmt.Sprintf("%s for account %q failed: %v", e.Key, e.Account, e.Err)
 	if e.Stderr != "" {
 		msg += ": " + e.Stderr
 	}
@@ -68,16 +73,33 @@ func New() *Resolver {
 // otherwise from the OS keychain.
 func (r *Resolver) Resolve(ctx context.Context, acct config.Account) (string, error) {
 	if strings.TrimSpace(acct.PasswordCmd) != "" {
-		return r.fromCommand(ctx, acct)
+		return r.fromCommand(ctx, acct, acct.PasswordCmd, "password_cmd")
 	}
 	return fromKeychain(acct.Name)
 }
 
-func (r *Resolver) fromCommand(ctx context.Context, acct config.Account) (string, error) {
+// ResolveClientSecret returns the account's OAuth client secret: from
+// oauth_client_secret_cmd when set, otherwise from the OS keychain. A client
+// secret is optional, so no entry is an empty secret, not an error.
+func (r *Resolver) ResolveClientSecret(ctx context.Context, acct config.Account) (string, error) {
+	if strings.TrimSpace(acct.OAuthClientSecretCmd) != "" {
+		return r.fromCommand(ctx, acct, acct.OAuthClientSecretCmd, "oauth_client_secret_cmd")
+	}
+	cs, err := keyring.Get(keychainService, clientSecretKey(acct.Name))
+	if errors.Is(err, keyring.ErrNotFound) || (err == nil && cs == "") {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("read keychain OAuth client secret for account %q: %w", acct.Name, err)
+	}
+	return cs, nil
+}
+
+func (r *Resolver) fromCommand(ctx context.Context, acct config.Account, command, key string) (string, error) {
 	cmdCtx, cancel := context.WithTimeout(ctx, r.Timeout)
 	defer cancel()
 
-	stdout, stderr, err := r.Run(cmdCtx, acct.PasswordCmd)
+	stdout, stderr, err := r.Run(cmdCtx, command)
 	if err != nil {
 		switch {
 		case ctx.Err() != nil:
@@ -85,7 +107,7 @@ func (r *Resolver) fromCommand(ctx context.Context, acct config.Account) (string
 		case cmdCtx.Err() != nil:
 			err = fmt.Errorf("timed out after %s (is 1Password waiting for approval?): %w", r.Timeout, context.DeadlineExceeded)
 		}
-		return "", &CmdError{Account: acct.Name, Stderr: sanitize(string(stderr)), Err: err}
+		return "", &CmdError{Key: key, Account: acct.Name, Stderr: sanitize(string(stderr)), Err: err}
 	}
 
 	// Only the first line is the password, matching the `pass` convention of
@@ -93,7 +115,7 @@ func (r *Resolver) fromCommand(ctx context.Context, acct config.Account) (string
 	first, _, _ := strings.Cut(string(stdout), "\n")
 	pw := strings.TrimSuffix(first, "\r")
 	if pw == "" {
-		return "", &CmdError{Account: acct.Name, Stderr: sanitize(string(stderr)), Err: ErrEmptyOutput}
+		return "", &CmdError{Key: key, Account: acct.Name, Stderr: sanitize(string(stderr)), Err: ErrEmptyOutput}
 	}
 	return pw, nil
 }
@@ -148,6 +170,116 @@ func Copy(oldName, newName string) error {
 		return fmt.Errorf("read keychain for account %q: %w", oldName, err)
 	}
 	return Store(newName, pw)
+}
+
+// tokenKey and clientSecretKey keep OAuth entries apart from the password,
+// which is stored under the bare account name.
+func tokenKey(account string) string        { return "oauth:" + account }
+func clientSecretKey(account string) string { return "oauth-client-secret:" + account }
+
+// OAuthToken is an account's OAuth 2.0 sign-in, kept in the keychain as JSON.
+type OAuthToken struct {
+	AccessToken  string    `json:"access_token"`
+	RefreshToken string    `json:"refresh_token"`
+	Expiry       time.Time `json:"expiry"`
+}
+
+// LoadToken returns the account's OAuth sign-in from the OS keychain. A missing
+// or unreadable entry is ErrNoToken.
+func LoadToken(account string) (OAuthToken, error) {
+	raw, err := keyring.Get(keychainService, tokenKey(account))
+	if errors.Is(err, keyring.ErrNotFound) || (err == nil && raw == "") {
+		return OAuthToken{}, fmt.Errorf("account %q: %w", account, ErrNoToken)
+	}
+	if err != nil {
+		return OAuthToken{}, fmt.Errorf("read keychain OAuth token for account %q: %w", account, err)
+	}
+	var tok OAuthToken
+	// The JSON error can quote token bytes, so it is dropped.
+	if json.Unmarshal([]byte(raw), &tok) != nil || tok.RefreshToken == "" {
+		return OAuthToken{}, fmt.Errorf("account %q: stored OAuth token is unreadable: %w", account, ErrNoToken)
+	}
+	return tok, nil
+}
+
+// StoreToken saves the account's OAuth sign-in in the OS keychain.
+func StoreToken(account string, tok OAuthToken) error {
+	if strings.TrimSpace(account) == "" {
+		return errors.New("store OAuth token: account name is required")
+	}
+	if tok.RefreshToken == "" {
+		return errors.New("store OAuth token: refresh token is empty")
+	}
+	raw, err := json.Marshal(tok)
+	if err != nil {
+		return errors.New("store OAuth token: encode failed")
+	}
+	if err := keyring.Set(keychainService, tokenKey(account), string(raw)); err != nil {
+		return fmt.Errorf("save OAuth token to keychain for account %q: %w", account, err)
+	}
+	return nil
+}
+
+// DeleteToken removes the account's OAuth sign-in from the OS keychain. An
+// entry that doesn't exist is not an error.
+func DeleteToken(account string) error {
+	err := keyring.Delete(keychainService, tokenKey(account))
+	if err != nil && !errors.Is(err, keyring.ErrNotFound) {
+		return fmt.Errorf("delete keychain OAuth token for account %q: %w", account, err)
+	}
+	return nil
+}
+
+// StoreClientSecret saves the account's OAuth client secret in the OS keychain.
+func StoreClientSecret(account, secret string) error {
+	if strings.TrimSpace(account) == "" {
+		return errors.New("store OAuth client secret: account name is required")
+	}
+	if secret == "" {
+		return errors.New("store OAuth client secret: secret is empty")
+	}
+	if err := keyring.Set(keychainService, clientSecretKey(account), secret); err != nil {
+		return fmt.Errorf("save OAuth client secret to keychain for account %q: %w", account, err)
+	}
+	return nil
+}
+
+// DeleteClientSecret removes the account's OAuth client secret from the OS
+// keychain. An entry that doesn't exist is not an error.
+func DeleteClientSecret(account string) error {
+	err := keyring.Delete(keychainService, clientSecretKey(account))
+	if err != nil && !errors.Is(err, keyring.ErrNotFound) {
+		return fmt.Errorf("delete keychain OAuth client secret for account %q: %w", account, err)
+	}
+	return nil
+}
+
+// CopyOAuth stores the keychain OAuth token and client secret kept under
+// oldName also under newName, leaving the old entries in place, for a renamed
+// account. A missing entry is skipped.
+func CopyOAuth(oldName, newName string) error {
+	if oldName == newName {
+		return nil
+	}
+	tok, err := keyring.Get(keychainService, tokenKey(oldName))
+	switch {
+	case errors.Is(err, keyring.ErrNotFound) || (err == nil && tok == ""):
+	case err != nil:
+		return fmt.Errorf("read keychain OAuth token for account %q: %w", oldName, err)
+	default:
+		if err := keyring.Set(keychainService, tokenKey(newName), tok); err != nil {
+			return fmt.Errorf("save OAuth token to keychain for account %q: %w", newName, err)
+		}
+	}
+	cs, err := keyring.Get(keychainService, clientSecretKey(oldName))
+	switch {
+	case errors.Is(err, keyring.ErrNotFound) || (err == nil && cs == ""):
+	case err != nil:
+		return fmt.Errorf("read keychain OAuth client secret for account %q: %w", oldName, err)
+	default:
+		return StoreClientSecret(newName, cs)
+	}
+	return nil
 }
 
 var ansiEscape = regexp.MustCompile(`\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\)|.)`)
