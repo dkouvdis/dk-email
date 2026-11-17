@@ -25,15 +25,6 @@ must keep possible.
   design, so offer a short undo (e.g. `z` within a few seconds). The
   optimistic updates in `internal/ui/actions.go` already keep what's needed to
   reverse a move.
-- **OAuth 2.0 (XOAUTH2) for Microsoft 365 and Outlook.com**: Exchange Online
-  no longer accepts password (basic) auth for IMAP, and SMTP basic auth is off
-  by default for existing tenants from the end of December 2026, so these
-  accounts can't connect today. Needs an OAuth sign-in flow, token refresh and
-  storage in the keychain, used by both IMAP and SMTP. Once supported, check
-  whether Exchange already files SMTP-sent mail in Sent Items and set the
-  `save_sent` default to match.
-  Sources: [Deprecation of Basic authentication in Exchange Online](https://learn.microsoft.com/en-us/exchange/clients-and-mobile-in-exchange-online/deprecation-of-basic-authentication-exchange-online),
-  [SMTP AUTH deprecation timeline](https://techcommunity.microsoft.com/blog/exchange/updated-exchange-online-smtp-auth-basic-authentication-deprecation-timeline/4489835).
 
 ## Medium Priority
 
@@ -69,6 +60,14 @@ must keep possible.
   by hand.
 
 ## Low Priority
+
+- **Keep `internal/oauth` free of the keychain**: `internal/oauth` imports
+  `internal/secret` only for the `OAuthToken` type, so it, and through the
+  `XOAuth2Client` import `internal/mail/imap` and `internal/mail/smtp`, now
+  depend on go-keyring, TOML and `internal/config`. Define the token type in
+  `oauth` (and have `secret` store it), and move `XOAuth2Client` to a leaf
+  package with no dependencies. Found in the OAuth architecture review;
+  a refactor, no behaviour change.
 
 - **Undo in the composer**: the Bubbles textarea has no undo history.
 - **Hard wrapping / format=flowed**: the body is sent exactly as typed;
