@@ -25,7 +25,11 @@ const (
 	fPort
 	fTLS
 	fSource
-	fSecret // the 1Password reference or the keychain password
+	fSecret       // the 1Password reference or the keychain password
+	fProvider     // OAuth only: Microsoft or Google
+	fClientID     // OAuth only
+	fTenant       // OAuth with Microsoft only
+	fClientSecret // OAuth with Google only
 	fSMTPHost
 	fSMTPPort
 	fSMTPTLS
@@ -39,10 +43,11 @@ const (
 	sourceOnePassword = iota
 	sourceKeychain
 	sourceKeep // edit mode only: leave the password as it is
+	sourceOAuth
 )
 
 const (
-	connectInnerW = 58
+	connectInnerW = 67 // fits the edit form's Login row and the OAuth note
 	labelW        = 10
 )
 
@@ -55,24 +60,35 @@ const (
 	ConnectCancelled
 	ConnectDelete     // the edited account was deleted; see DeletePassword
 	ConnectSaveAnyway // save the edit without a working login test
+	ConnectUseCode    // during a Microsoft browser sign-in, the user asked for a device code instead
 )
 
 // ConnectRequest is a submitted form. Password is set only for the keychain
-// option; with 1Password the account's PasswordCmd reads it.
+// option; with 1Password the account's PasswordCmd reads it. ClientSecret is
+// the Google client secret typed in the form, for the keychain; empty
+// otherwise.
 type ConnectRequest struct {
-	Account  config.Account
-	Password string
+	Account      config.Account
+	Password     string
+	ClientSecret string
 }
 
 // EditRequest is a submitted edit form. Account holds the form's fields
 // only (alias emails without names); ApplyEdit merges it into the saved
 // account. Password is set only for the keychain option, and KeepPassword
-// means the password source wasn't touched.
+// means the password source wasn't touched. ClientSecret is the Google client
+// secret typed in the form, for the keychain; empty otherwise.
 type EditRequest struct {
 	Account      config.Account
 	Password     string
 	KeepPassword bool
+	ClientSecret string
 }
+
+// SignIn is what the form shows while an OAuth sign-in runs. URL is the
+// browser address, shown in case the browser didn't open; UserCode and
+// VerificationURI are set instead for a Microsoft device code sign-in.
+type SignIn struct{ URL, UserCode, VerificationURI string }
 
 // Connect is the connect-account form, or, from NewPasswordPrompt, a prompt
 // for a saved account's missing password.
@@ -81,11 +97,14 @@ type Connect struct {
 	focus    int
 	tls      string
 	source   int
-	autoHost bool // the host and port came from the Gmail pre-fill
+	autoHost bool // the host and port came from a provider preset
 
 	smtpTLS     string
-	autoSMTP    bool // the SMTP fields came from the Gmail pre-fill
-	smtpTouched bool // the user edited an SMTP field, so Gmail never fills it
+	autoSMTP    bool // the SMTP fields came from a provider preset
+	smtpTouched bool // the user edited an SMTP field, so a preset never fills it
+
+	provider        string // config.ProviderMicrosoft or ProviderGoogle, for OAuth
+	providerTouched bool   // the provider was chosen by hand, so the email never selects it
 
 	passwordOnly bool
 	account      config.Account // the saved account in password-only mode
@@ -98,11 +117,12 @@ type Connect struct {
 	deletePW   bool           // the delete was confirmed with y on a keychain account
 
 	busy       bool
+	signIn     SignIn // set while busy with an OAuth sign-in
 	err        string
 	maxW, maxH int
 
 	st   helpStyles
-	keys struct{ next, prev, submit, cancel, toggle, saveAnyway key.Binding }
+	keys struct{ next, prev, submit, cancel, toggle, saveAnyway, useCode key.Binding }
 }
 
 // NewConnect is an empty form for a new account. existing are the account
@@ -134,6 +154,7 @@ func NewEditAccount(th theme.Theme, acct config.Account, existing []string) Conn
 	c := NewConnect(th, existing)
 	c.editing, c.orig = true, acct
 	c.source = sourceKeep
+	c.autoHost = false // a saved host is never replaced by a preset
 	c.tls, c.smtpTLS = acct.TLS, config.TLSImplicit
 	c.inputs[fName].SetValue(acct.Name)
 	c.inputs[fEmail].SetValue(acct.Email)
@@ -154,7 +175,19 @@ func NewEditAccount(th theme.Theme, acct config.Account, existing []string) Conn
 		c.inputs[fAliases].SetValue(strings.Join(emails, ", "))
 	}
 	c.inputs[fSMTPPort].Placeholder = defaultPort(c.smtpTLS, "465", "587")
-	c.smtpTouched = true // the Gmail pre-fill never overwrites a saved account
+	c.smtpTouched = true // a preset never overwrites a saved account
+	if acct.OAuth() && acct.PasswordCmd == "" {
+		if acct.OAuthProvider == config.ProviderGoogle || acct.OAuthProvider == config.ProviderMicrosoft {
+			c.provider, c.providerTouched = acct.OAuthProvider, true
+		}
+		c.inputs[fClientID].SetValue(acct.OAuthClientID)
+		if !strings.EqualFold(acct.OAuthTenant, oauthDefaultTenant) {
+			c.inputs[fTenant].SetValue(acct.OAuthTenant) // the loaded account has the default applied
+		}
+	}
+	if acct.OAuth() && acct.OAuthProvider == config.ProviderGoogle {
+		c.inputs[fClientSecret].Placeholder = "leave empty to keep the saved one"
+	}
 	if ref, ok := opReference(acct.PasswordCmd); ok {
 		c.inputs[fSecret].SetValue(ref) // kept for when 1Password is chosen
 	}
@@ -183,13 +216,17 @@ func opReference(cmd string) (string, bool) {
 }
 
 func newForm(th theme.Theme) Connect {
-	c := Connect{tls: config.TLSImplicit, smtpTLS: config.TLSImplicit, st: newHelpStyles(th)}
+	c := Connect{tls: config.TLSImplicit, smtpTLS: config.TLSImplicit, provider: config.ProviderMicrosoft, st: newHelpStyles(th)}
 	placeholders := map[int]string{
 		fName:  "Personal",
 		fEmail: "me@example.com",
 		fUser:  "same as email",
 		fHost:  "imap.example.com",
 		fPort:  "993",
+
+		fClientID:     "your app's client ID",
+		fTenant:       oauthDefaultTenant,
+		fClientSecret: "client secret (Google Cloud)",
 
 		fSMTPHost: "optional, enables sending",
 		fSMTPPort: "465",
@@ -204,6 +241,7 @@ func newForm(th theme.Theme) Connect {
 		in.Placeholder = placeholders[i]
 		c.inputs[i] = in
 	}
+	c.inputs[fClientSecret].EchoMode = textinput.EchoPassword
 	c.updateSecretInput()
 	c.keys.next = key.NewBinding(key.WithKeys("tab", "down"))
 	c.keys.prev = key.NewBinding(key.WithKeys("shift+tab", "up"))
@@ -211,11 +249,12 @@ func newForm(th theme.Theme) Connect {
 	c.keys.cancel = key.NewBinding(key.WithKeys("esc"))
 	c.keys.toggle = key.NewBinding(key.WithKeys("left", "right", "space", "h", "l"))
 	c.keys.saveAnyway = key.NewBinding(key.WithKeys("ctrl+s"))
+	c.keys.useCode = key.NewBinding(key.WithKeys("ctrl+d"))
 	return c
 }
 
 func isInput(f int) bool {
-	return f != fTLS && f != fSource && f != fSMTPTLS && f != fSubmit && f != fDelete
+	return f != fTLS && f != fSource && f != fProvider && f != fSMTPTLS && f != fSubmit && f != fDelete
 }
 
 // PasswordOnly reports whether this is a password prompt for a saved account.
@@ -225,12 +264,25 @@ func (c Connect) PasswordOnly() bool { return c.passwordOnly }
 func (c *Connect) SetSize(maxW, maxH int) { c.maxW, c.maxH = maxW, maxH }
 
 // SetBusy shows that the connection is being tested; input is ignored meanwhile.
+// SetBusy(false) also clears any sign-in progress.
 func (c *Connect) SetBusy(busy bool) {
 	c.busy = busy
 	if busy {
 		c.err = ""
+	} else {
+		c.signIn = SignIn{}
 	}
 }
+
+// SetSignIn shows sign-in progress; it implies busy. SetBusy(false) clears it.
+func (c *Connect) SetSignIn(s SignIn) {
+	c.SetBusy(true)
+	c.signIn = s
+}
+
+// OAuth reports whether the OAuth 2.0 source is selected, so the caller runs
+// a sign-in instead of a password test.
+func (c Connect) OAuth() bool { return c.source == sourceOAuth }
 
 // SetError shows why testing or saving failed.
 func (c *Connect) SetError(msg string) {
@@ -246,7 +298,8 @@ func (c *Connect) SetTestFailed(msg string) {
 }
 
 // DeletePassword reports whether a ConnectDelete also removes the keychain
-// password: only for a keychain account, and not when kept with k.
+// password or OAuth sign-in: only for a keychain or OAuth account, and not
+// when kept with k.
 func (c Connect) DeletePassword() bool { return c.deletePW }
 
 func (c Connect) focusable() []int {
@@ -255,12 +308,29 @@ func (c Connect) focusable() []int {
 	}
 	all := make([]int, 0, fieldCount)
 	for i := range fieldCount {
-		if i == fDelete && !c.editing || i == fSecret && c.source == sourceKeep {
-			continue
+		if c.visible(i) {
+			all = append(all, i)
 		}
-		all = append(all, i)
 	}
 	return all
+}
+
+// visible reports whether form field f is shown for the chosen source.
+func (c Connect) visible(f int) bool {
+	oauth := c.source == sourceOAuth
+	switch f {
+	case fDelete:
+		return c.editing
+	case fSecret:
+		return c.source != sourceKeep && !oauth
+	case fProvider, fClientID:
+		return oauth
+	case fTenant:
+		return oauth && c.provider == config.ProviderMicrosoft
+	case fClientSecret:
+		return oauth && c.provider == config.ProviderGoogle
+	}
+	return true
 }
 
 func (c *Connect) setFocus(f int) {
@@ -296,6 +366,9 @@ func (c Connect) Update(msg tea.KeyPressMsg) (Connect, ConnectResult) {
 		return c, ConnectCancelled
 	}
 	if c.busy {
+		if key.Matches(msg, c.keys.useCode) && c.signIn.URL != "" && c.provider == config.ProviderMicrosoft {
+			return c, ConnectUseCode
+		}
 		return c, ConnectPending
 	}
 	switch {
@@ -323,7 +396,7 @@ func (c Connect) Update(msg tea.KeyPressMsg) (Connect, ConnectResult) {
 		c.confirming = true
 	case key.Matches(msg, c.keys.submit):
 		c.move(1)
-	case (c.focus == fTLS || c.focus == fSource || c.focus == fSMTPTLS) && key.Matches(msg, c.keys.toggle):
+	case (c.focus == fTLS || c.focus == fSource || c.focus == fProvider || c.focus == fSMTPTLS) && key.Matches(msg, c.keys.toggle):
 		c.toggle()
 		c.testFailed = false
 	case isInput(c.focus):
@@ -338,7 +411,8 @@ func (c Connect) Update(msg tea.KeyPressMsg) (Connect, ConnectResult) {
 }
 
 // confirm handles keys while asking whether to delete the account. No key
-// reaches the fields. A keychain account can keep its password with k.
+// reaches the fields. A keychain or OAuth account can keep its stored
+// secrets with k.
 func (c Connect) confirm(msg tea.KeyPressMsg) (Connect, ConnectResult) {
 	keychain := c.orig.PasswordCmd == ""
 	switch msg.String() {
@@ -397,16 +471,25 @@ func (c *Connect) toggle() {
 		c.edited(fSMTPTLS)
 	case fSource:
 		if c.editing {
-			// Keep current, 1Password, keychain, as shown.
-			c.source = map[int]int{sourceKeep: sourceOnePassword, sourceOnePassword: sourceKeychain, sourceKeychain: sourceKeep}[c.source]
+			// Keep current, 1Password, keychain, OAuth 2.0, as shown.
+			c.source = map[int]int{sourceKeep: sourceOnePassword, sourceOnePassword: sourceKeychain, sourceKeychain: sourceOAuth, sourceOAuth: sourceKeep}[c.source]
 		} else {
-			c.source = 1 - c.source
+			c.source = map[int]int{sourceOnePassword: sourceKeychain, sourceKeychain: sourceOAuth, sourceOAuth: sourceOnePassword}[c.source]
 		}
 		c.inputs[fSecret].SetValue("")
 		if ref, ok := opReference(c.orig.PasswordCmd); c.editing && c.source == sourceOnePassword && ok {
 			c.inputs[fSecret].SetValue(ref)
 		}
 		c.updateSecretInput()
+		c.applyPreset()
+	case fProvider:
+		if c.provider == config.ProviderMicrosoft {
+			c.provider = config.ProviderGoogle
+		} else {
+			c.provider = config.ProviderMicrosoft
+		}
+		c.providerTouched = true
+		c.applyPreset()
 	}
 }
 
@@ -421,10 +504,10 @@ func (c *Connect) updateSecretInput() {
 	}
 }
 
-// edited reacts to typing: a Gmail address fills in Gmail's servers unless
-// they were typed by hand, and leaving Gmail clears what it filled in. The
-// SMTP fields are pre-filled only until the user has touched one of them, so
-// clearing the filled-in host to opt out of sending sticks.
+// edited reacts to typing: a known mail domain fills in its provider's
+// servers unless they were typed by hand. The SMTP fields are pre-filled only
+// until the user has touched one of them, so clearing the filled-in host to
+// opt out of sending sticks.
 func (c *Connect) edited(f int) {
 	switch f {
 	case fHost, fPort:
@@ -432,33 +515,73 @@ func (c *Connect) edited(f int) {
 	case fSMTPHost, fSMTPPort, fSMTPTLS:
 		c.autoSMTP, c.smtpTouched = false, true
 	case fEmail:
-		email := strings.ToLower(strings.TrimSpace(c.inputs[fEmail].Value()))
-		_, domain, _ := strings.Cut(email, "@")
-		gmail := domain == "gmail.com" || domain == "googlemail.com"
-		switch {
-		case gmail && (c.autoHost || c.inputs[fHost].Value() == ""):
-			c.inputs[fHost].SetValue("imap.gmail.com")
-			c.inputs[fPort].SetValue("993")
-			c.tls = config.TLSImplicit
-			c.inputs[fPort].Placeholder = "993"
-			c.autoHost = true
-		case !gmail && c.autoHost:
-			c.inputs[fHost].SetValue("")
-			c.inputs[fPort].SetValue("")
-			c.autoHost = false
-		}
-		switch {
-		case gmail && (c.autoSMTP || !c.smtpTouched):
-			c.inputs[fSMTPHost].SetValue("smtp.gmail.com")
-			c.inputs[fSMTPPort].SetValue("465")
-			c.smtpTLS = config.TLSImplicit
-			c.inputs[fSMTPPort].Placeholder = "465"
-			c.autoSMTP = true
-		case !gmail && c.autoSMTP:
-			c.inputs[fSMTPHost].SetValue("")
-			c.inputs[fSMTPPort].SetValue("")
-			c.autoSMTP = false
-		}
+		c.applyPreset()
+	}
+}
+
+// oauthDefaultTenant is Microsoft's multi-tenant endpoint, the config default.
+const oauthDefaultTenant = "common"
+
+// serverPreset is the server settings a provider's accounts use.
+type serverPreset struct {
+	imapHost, smtpHost, smtpPort, smtpTLS string
+}
+
+var presets = map[string]serverPreset{
+	config.ProviderGoogle:    {"imap.gmail.com", "smtp.gmail.com", "465", config.TLSImplicit},
+	config.ProviderMicrosoft: {"outlook.office365.com", "smtp.office365.com", "587", config.TLSStartTLS},
+}
+
+// domainProviders maps the mail domains of each provider's consumer accounts.
+var domainProviders = map[string]string{
+	"gmail.com":      config.ProviderGoogle,
+	"googlemail.com": config.ProviderGoogle,
+	"outlook.com":    config.ProviderMicrosoft,
+	"hotmail.com":    config.ProviderMicrosoft,
+	"live.com":       config.ProviderMicrosoft,
+	"msn.com":        config.ProviderMicrosoft,
+	"office365.com":  config.ProviderMicrosoft,
+}
+
+// applyPreset fills in, replaces or clears the servers of the provider the
+// email domain names, or, for a custom domain with OAuth chosen, the selected
+// provider. It never touches a host the user typed, and it follows the email
+// to select the provider until the user picks one.
+func (c *Connect) applyPreset() {
+	email := strings.ToLower(strings.TrimSpace(c.inputs[fEmail].Value()))
+	_, domain, _ := strings.Cut(email, "@")
+	detected := domainProviders[domain]
+	if detected != "" && !c.providerTouched {
+		c.provider = detected
+	}
+	want := detected
+	if want == "" && c.source == sourceOAuth {
+		want = c.provider
+	}
+	p, ok := presets[want]
+	switch {
+	case ok && (c.autoHost || c.inputs[fHost].Value() == ""):
+		c.inputs[fHost].SetValue(p.imapHost)
+		c.inputs[fPort].SetValue("993")
+		c.tls = config.TLSImplicit
+		c.inputs[fPort].Placeholder = "993"
+		c.autoHost = true
+	case !ok && c.autoHost:
+		c.inputs[fHost].SetValue("")
+		c.inputs[fPort].SetValue("")
+		c.autoHost = false
+	}
+	switch {
+	case ok && (c.autoSMTP || !c.smtpTouched):
+		c.inputs[fSMTPHost].SetValue(p.smtpHost)
+		c.inputs[fSMTPPort].SetValue(p.smtpPort)
+		c.smtpTLS = p.smtpTLS
+		c.inputs[fSMTPPort].Placeholder = p.smtpPort
+		c.autoSMTP = true
+	case !ok && c.autoSMTP:
+		c.inputs[fSMTPHost].SetValue("")
+		c.inputs[fSMTPPort].SetValue("")
+		c.autoSMTP = false
 	}
 }
 
@@ -505,8 +628,18 @@ func (c Connect) validate() string {
 		return "1Password reference is required, e.g. op://Vault/Item/password"
 	case c.source == sourceKeychain && c.inputs[fSecret].Value() == "":
 		return "Password is required"
+	case c.source == sourceOAuth && c.value(fClientID) == "":
+		return "Client ID is required: register an app first (see docs/oauth.md)"
+	case c.source == sourceOAuth && c.provider == config.ProviderGoogle && c.inputs[fClientSecret].Value() == "" && !c.savedGoogleSecret():
+		return "Google needs the client secret from your OAuth client"
 	}
 	return ""
+}
+
+// savedGoogleSecret reports whether the edited account already signs in to
+// Google, so an empty client secret field means keep the saved one.
+func (c Connect) savedGoogleSecret() bool {
+	return c.editing && c.orig.OAuth() && c.orig.OAuthProvider == config.ProviderGoogle
 }
 
 // aliases parses the Aliases field: comma-separated, trimmed, empties dropped.
@@ -561,9 +694,22 @@ func (c Connect) Request() ConnectRequest {
 		a.SMTPTLS = c.smtpTLS
 		a.Aliases = c.aliases()
 	}
-	if c.source == sourceOnePassword {
+	switch c.source {
+	case sourceOnePassword:
 		a.PasswordCmd = "op read " + shellQuote(c.value(fSecret))
 		return ConnectRequest{Account: a}
+	case sourceOAuth:
+		a.Auth, a.OAuthProvider, a.OAuthClientID = config.AuthOAuth2, c.provider, c.value(fClientID)
+		req := ConnectRequest{Account: a}
+		switch c.provider {
+		case config.ProviderMicrosoft:
+			if t := c.value(fTenant); t != "" && !strings.EqualFold(t, oauthDefaultTenant) {
+				req.Account.OAuthTenant = t
+			}
+		case config.ProviderGoogle:
+			req.ClientSecret = c.inputs[fClientSecret].Value()
+		}
+		return req
 	}
 	return ConnectRequest{Account: a, Password: c.inputs[fSecret].Value()}
 }
@@ -571,7 +717,7 @@ func (c Connect) Request() ConnectRequest {
 // EditRequest is the submitted edit form.
 func (c Connect) EditRequest() EditRequest {
 	r := c.Request()
-	return EditRequest{Account: r.Account, Password: r.Password, KeepPassword: c.source == sourceKeep}
+	return EditRequest{Account: r.Account, Password: r.Password, KeepPassword: c.source == sourceKeep, ClientSecret: r.ClientSecret}
 }
 
 // ApplyEdit returns old with the form's fields applied, for writing back to
@@ -623,6 +769,15 @@ func ApplyEdit(old config.Account, r EditRequest) config.Account {
 
 	if !r.KeepPassword {
 		a.PasswordCmd = f.PasswordCmd
+		a.Auth, a.OAuthProvider, a.OAuthClientID, a.OAuthTenant = f.Auth, f.OAuthProvider, f.OAuthClientID, f.OAuthTenant
+		if a.Auth == "" && old.Auth == config.AuthPassword {
+			a.Auth = config.AuthPassword
+		}
+		if f.Auth == config.AuthOAuth2 && f.OAuthProvider == config.ProviderGoogle && r.ClientSecret == "" {
+			a.OAuthClientSecretCmd = old.OAuthClientSecretCmd
+		} else {
+			a.OAuthClientSecretCmd = ""
+		}
 	}
 	return a
 }
@@ -660,16 +815,23 @@ func (c Connect) View() string {
 		}
 		lines = append(lines, c.choiceRow(fTLS, "TLS", []string{"implicit", "starttls"}, map[bool]int{true: 0, false: 1}[c.tls == config.TLSImplicit]))
 		if c.editing {
-			lines = append(lines, c.choiceRow(fSource, "Password", []string{"keep current", "1Password", "keychain"}, map[int]int{sourceKeep: 0, sourceOnePassword: 1, sourceKeychain: 2}[c.source]))
+			lines = append(lines, c.choiceRow(fSource, "Login", []string{"keep current", "1Password", "keychain", "OAuth 2.0"}, map[int]int{sourceKeep: 0, sourceOnePassword: 1, sourceKeychain: 2, sourceOAuth: 3}[c.source]))
 		} else {
-			lines = append(lines, c.choiceRow(fSource, "Password", []string{"1Password", "keychain"}, c.source))
+			lines = append(lines, c.choiceRow(fSource, "Login", []string{"1Password", "keychain", "OAuth 2.0"}, c.source))
 		}
 	}
 	note := "Stored as password_cmd = \"op read <reference>\""
 	switch c.source {
 	case sourceKeep:
 		current := "keychain"
-		if c.orig.PasswordCmd != "" {
+		switch {
+		case c.orig.OAuth() && c.orig.PasswordCmd != "":
+			current = "token command"
+		case c.orig.OAuth() && c.orig.OAuthProvider != "":
+			current = "OAuth 2.0 (" + c.orig.OAuthProvider + ")"
+		case c.orig.OAuth():
+			current = "OAuth 2.0"
+		case c.orig.PasswordCmd != "":
 			current = "password_cmd"
 		}
 		lines = append(lines, c.readOnly("Current", current, innerW))
@@ -677,6 +839,14 @@ func (c Connect) View() string {
 	case sourceKeychain:
 		lines = append(lines, c.inputRow(fSecret, innerW))
 		note = "Saved in the OS keychain, never in config.toml"
+	case sourceOAuth:
+		lines = append(lines, c.choiceRow(fProvider, "Provider", []string{"Microsoft", "Google"}, map[bool]int{true: 0, false: 1}[c.provider == config.ProviderMicrosoft]), c.inputRow(fClientID, innerW))
+		for _, f := range []int{fTenant, fClientSecret} {
+			if c.visible(f) {
+				lines = append(lines, c.inputRow(f, innerW))
+			}
+		}
+		note = "Signs in with your browser; tokens go in the OS keychain"
 	default:
 		lines = append(lines, c.inputRow(fSecret, innerW))
 	}
@@ -692,7 +862,13 @@ func (c Connect) View() string {
 	lines = append(lines, "")
 
 	button := "[ Test & save ]"
+	if c.source == sourceOAuth {
+		button = "[ Sign in & save ]"
+	}
+	signing := c.busy && c.signIn != (SignIn{})
 	switch {
+	case signing:
+		lines = append(lines, c.signInLines(innerW)...)
 	case c.busy:
 		lines = append(lines, c.st.dim.Render("Testing connection…"))
 	case c.focus == fSubmit:
@@ -717,7 +893,12 @@ func (c Connect) View() string {
 	}
 
 	if room := c.maxH - 2; len(lines) > room {
-		lines = lines[:room]
+		if signing {
+			// Keep the sign-in status, which can't be cut, and drop form rows.
+			n := len(c.signInLines(innerW))
+			lines = append(lines[:max(room-n, 0)], lines[len(lines)-n:]...)
+		}
+		lines = lines[:min(len(lines), room)]
 	}
 	for i, l := range lines {
 		lines[i] = ansi.Truncate(l, innerW, "")
@@ -730,8 +911,12 @@ func (c Connect) Hints() []key.Binding {
 	b := func(k, desc string) key.Binding { return key.NewBinding(key.WithKeys(k), key.WithHelp(k, desc)) }
 	cancel := b("esc", "cancel")
 	switch {
+	case c.busy && c.signIn.URL != "" && c.provider == config.ProviderMicrosoft:
+		return []key.Binding{cancel, b("ctrl+d", "use a code instead")}
 	case c.busy:
 		return []key.Binding{cancel}
+	case c.confirming && c.orig.PasswordCmd == "" && c.orig.OAuth():
+		return []key.Binding{b("y", "delete + sign-in"), b("k", "delete, keep sign-in"), b("n", "cancel")}
 	case c.confirming && c.orig.PasswordCmd == "":
 		return []key.Binding{b("y", "delete + password"), b("k", "delete, keep password"), b("n", "cancel")}
 	case c.confirming:
@@ -739,7 +924,11 @@ func (c Connect) Hints() []key.Binding {
 	case c.passwordOnly:
 		return []key.Binding{b("enter", "test & save"), cancel}
 	}
-	hints := []key.Binding{b("tab", "next"), b("←→", "choose"), b("enter", "test & save")}
+	submit := "test & save"
+	if c.source == sourceOAuth {
+		submit = "sign in & save"
+	}
+	hints := []key.Binding{b("tab", "next"), b("←→", "choose"), b("enter", submit)}
 	if c.testFailed {
 		hints = append(hints, b("ctrl+s", "save anyway"))
 	}
@@ -755,7 +944,7 @@ func (c Connect) label(f int, text string) string {
 }
 
 func (c Connect) inputRow(f, innerW int) string {
-	names := map[int]string{fName: "Name", fEmail: "Email", fUser: "Username", fHost: "IMAP host", fPort: "Port", fSecret: "Reference", fSMTPHost: "SMTP host", fSMTPPort: "SMTP port", fAliases: "Aliases"}
+	names := map[int]string{fName: "Name", fEmail: "Email", fUser: "Username", fHost: "IMAP host", fPort: "Port", fSecret: "Reference", fClientID: "Client ID", fTenant: "Tenant", fClientSecret: "Secret", fSMTPHost: "SMTP host", fSMTPPort: "SMTP port", fAliases: "Aliases"}
 	if f == fSecret && c.source == sourceKeychain {
 		names[fSecret] = "Password"
 	}
@@ -778,4 +967,22 @@ func (c Connect) choiceRow(f int, name string, options []string, selected int) s
 
 func (c Connect) readOnly(name, value string, innerW int) string {
 	return c.st.dim.Render(fmt.Sprintf("%-*s", labelW, name)) + " " + ansi.Truncate(value, innerW-labelW-1, "…")
+}
+
+// signInLines is the status shown while an OAuth sign-in runs. Long
+// addresses are wrapped, never truncated, so they stay copyable.
+func (c Connect) signInLines(innerW int) []string {
+	var lines []string
+	wrap := func(text string) {
+		for _, l := range strings.Split(ansi.Hardwrap(text, innerW, true), "\n") {
+			lines = append(lines, l)
+		}
+	}
+	if c.signIn.URL != "" {
+		lines = append(lines, c.st.dim.Render("Waiting for you to sign in in your browser…"), c.st.dim.Render("If it didn't open, visit:"))
+		wrap(c.signIn.URL)
+		return lines
+	}
+	wrap("Go to " + c.signIn.VerificationURI)
+	return append(lines, "and enter the code "+c.st.badge.Render(c.signIn.UserCode))
 }

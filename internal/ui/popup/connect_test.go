@@ -1,6 +1,7 @@
 package popup
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -261,7 +262,7 @@ func TestConnect_HintsAreNotInThePopup(t *testing.T) {
 
 func TestConnect_FitsTheScreen(t *testing.T) {
 	c := newConnect()
-	if w := lipgloss.Width(c.View()); w > 70 {
+	if w := lipgloss.Width(c.View()); w > 71 {
 		t.Errorf("width = %d, want a compact form", w)
 	}
 	c.SetSize(50, 12)
@@ -604,7 +605,7 @@ func TestEditAccount_PasswordSourceCycleAndFocus(t *testing.T) {
 	if r != ConnectPending || !strings.Contains(c.err, "Password is required") {
 		t.Errorf("result %v err %q", r, c.err)
 	}
-	c, _ = keys(c, "shift+tab", "right")
+	c, _ = keys(c, "shift+tab", "right", "right") // OAuth 2.0, then around
 	if c.source != sourceKeep {
 		t.Errorf("source %d, want it back at keep current", c.source)
 	}
@@ -878,4 +879,622 @@ func TestApplyEdit(t *testing.T) {
 			t.Errorf("PasswordCmd = %q password %q", got.PasswordCmd, req.Password)
 		}
 	})
+}
+
+// toSource moves a new or edit form to the wanted password source by pressing
+// right on the Login row.
+func toSource(t *testing.T, c Connect, want int) Connect {
+	t.Helper()
+	c.setFocus(fSource)
+	for range 4 {
+		if c.source == want {
+			return c
+		}
+		c, _ = keys(c, "right")
+	}
+	t.Fatalf("source %d not reachable", want)
+	return c
+}
+
+func oauthEdit(provider string) config.Account {
+	a := editAccount()
+	a.Auth, a.OAuthProvider, a.OAuthClientID = config.AuthOAuth2, provider, "client-1"
+	return a
+}
+
+func fieldsOf(c Connect) []int { return c.focusable() }
+
+func hasField(c Connect, f int) bool {
+	for _, g := range c.focusable() {
+		if g == f {
+			return true
+		}
+	}
+	return false
+}
+
+func TestConnect_SourceCycle(t *testing.T) {
+	c := newConnect()
+	c.setFocus(fSource)
+	var got []int
+	for range 4 {
+		got = append(got, c.source)
+		c, _ = keys(c, "right")
+	}
+	if want := []int{sourceOnePassword, sourceKeychain, sourceOAuth, sourceOnePassword}; !reflect.DeepEqual(got, want) {
+		t.Errorf("new cycle = %v, want %v", got, want)
+	}
+
+	e := newEdit(editAccount())
+	e.setFocus(fSource)
+	got = nil
+	for range 5 {
+		got = append(got, e.source)
+		e, _ = keys(e, "right")
+	}
+	if want := []int{sourceKeep, sourceOnePassword, sourceKeychain, sourceOAuth, sourceKeep}; !reflect.DeepEqual(got, want) {
+		t.Errorf("edit cycle = %v, want %v", got, want)
+	}
+
+	v := ansi.Strip(toSource(t, newConnect(), sourceOAuth).View())
+	for _, want := range []string{"Login", "1Password", "keychain", "OAuth 2.0"} {
+		if !strings.Contains(v, want) {
+			t.Errorf("view lacks %q:\n%s", want, v)
+		}
+	}
+	if !strings.Contains(ansi.Strip(newEdit(editAccount()).View()), "keep current") {
+		t.Error("edit view lacks keep current")
+	}
+}
+
+func TestConnect_FieldVisibilityAndFocusOrder(t *testing.T) {
+	tests := []struct {
+		name     string
+		source   int
+		provider string
+		want     []int
+		absent   []int
+	}{
+		{"1password", sourceOnePassword, config.ProviderMicrosoft, []int{fSecret}, []int{fProvider, fClientID, fTenant, fClientSecret}},
+		{"keychain", sourceKeychain, config.ProviderGoogle, []int{fSecret}, []int{fProvider, fClientID, fTenant, fClientSecret}},
+		{"keep", sourceKeep, config.ProviderGoogle, nil, []int{fSecret, fProvider, fClientID, fTenant, fClientSecret}},
+		{"oauth microsoft", sourceOAuth, config.ProviderMicrosoft, []int{fProvider, fClientID, fTenant}, []int{fSecret, fClientSecret}},
+		{"oauth google", sourceOAuth, config.ProviderGoogle, []int{fProvider, fClientID, fClientSecret}, []int{fSecret, fTenant}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := newEdit(editAccount())
+			c.source, c.provider = tt.source, tt.provider
+			for _, f := range tt.want {
+				if !hasField(c, f) {
+					t.Errorf("field %d not focusable", f)
+				}
+			}
+			for _, f := range tt.absent {
+				if hasField(c, f) {
+					t.Errorf("field %d focusable", f)
+				}
+			}
+			// Focus order follows the field constants, which the view follows.
+			fs := fieldsOf(c)
+			for i := 1; i < len(fs); i++ {
+				if fs[i] <= fs[i-1] {
+					t.Errorf("focus order not ascending: %v", fs)
+				}
+			}
+			v := ansi.Strip(c.View())
+			for f, label := range map[int]string{fProvider: "Provider", fClientID: "Client ID", fTenant: "Tenant", fClientSecret: "Secret"} {
+				if shown := strings.Contains(v, label+" "); shown != hasField(c, f) {
+					t.Errorf("%q shown=%v focusable=%v:\n%s", label, shown, hasField(c, f), v)
+				}
+			}
+		})
+	}
+
+	c := toSource(t, newConnect(), sourceOAuth)
+	c, _ = keys(c, "tab")
+	if c.focus != fProvider {
+		t.Errorf("focus after Login = %d, want Provider", c.focus)
+	}
+	if c, _ = keys(c, "tab"); c.focus != fClientID || !c.inputs[fClientID].Focused() {
+		t.Errorf("focus = %d, want Client ID", c.focus)
+	}
+}
+
+func TestConnect_OAuthPresets(t *testing.T) {
+	for _, domain := range []string{"outlook.com", "hotmail.com", "live.com", "msn.com", "office365.com"} {
+		c := fill(newConnect(), "MS", "me@"+domain)
+		if h, p := c.inputs[fHost].Value(), c.inputs[fPort].Value(); h != "outlook.office365.com" || p != "993" || c.tls != config.TLSImplicit {
+			t.Errorf("%s: IMAP = %q %q %q", domain, h, p, c.tls)
+		}
+		if h, p := c.inputs[fSMTPHost].Value(), c.inputs[fSMTPPort].Value(); h != "smtp.office365.com" || p != "587" || c.smtpTLS != config.TLSStartTLS || c.inputs[fSMTPPort].Placeholder != "587" {
+			t.Errorf("%s: SMTP = %q %q %q", domain, h, p, c.smtpTLS)
+		}
+		if c.provider != config.ProviderMicrosoft {
+			t.Errorf("%s: provider = %q", domain, c.provider)
+		}
+	}
+
+	c := fill(newConnect(), "G", "me@gmail.com")
+	if c.provider != config.ProviderGoogle || c.inputs[fSMTPHost].Value() != "smtp.gmail.com" || c.inputs[fSMTPPort].Value() != "465" || c.smtpTLS != config.TLSImplicit {
+		t.Errorf("gmail: provider %q SMTP %q %q %q", c.provider, c.inputs[fSMTPHost].Value(), c.inputs[fSMTPPort].Value(), c.smtpTLS)
+	}
+}
+
+func TestConnect_CustomDomainFollowsProviderChoice(t *testing.T) {
+	c := fill(newConnect(), "Work", "me@corp.example")
+	if c.inputs[fHost].Value() != "" || c.inputs[fSMTPHost].Value() != "" {
+		t.Fatal("a custom domain without OAuth must not pre-fill")
+	}
+	c = toSource(t, c, sourceOAuth)
+	if c.inputs[fHost].Value() != "outlook.office365.com" || c.inputs[fSMTPHost].Value() != "smtp.office365.com" || c.smtpTLS != config.TLSStartTLS {
+		t.Errorf("Microsoft preset missing: %q %q %q", c.inputs[fHost].Value(), c.inputs[fSMTPHost].Value(), c.smtpTLS)
+	}
+
+	// Switching preset replaces the auto-filled values.
+	c.setFocus(fProvider)
+	c, _ = keys(c, "right")
+	if c.provider != config.ProviderGoogle || !c.providerTouched {
+		t.Fatalf("provider %q touched %v", c.provider, c.providerTouched)
+	}
+	if c.inputs[fHost].Value() != "imap.gmail.com" || c.inputs[fSMTPHost].Value() != "smtp.gmail.com" || c.inputs[fSMTPPort].Value() != "465" || c.smtpTLS != config.TLSImplicit {
+		t.Errorf("Google preset missing: %q %q %q %q", c.inputs[fHost].Value(), c.inputs[fSMTPHost].Value(), c.inputs[fSMTPPort].Value(), c.smtpTLS)
+	}
+	c, _ = keys(c, "space")
+	if c.provider != config.ProviderMicrosoft || c.inputs[fHost].Value() != "outlook.office365.com" || c.inputs[fSMTPPort].Value() != "587" {
+		t.Errorf("toggle back: %q %q %q", c.provider, c.inputs[fHost].Value(), c.inputs[fSMTPPort].Value())
+	}
+
+	// Leaving OAuth for a source without a preset clears what was filled.
+	c = toSource(t, c, sourceOnePassword)
+	if c.inputs[fHost].Value() != "" || c.inputs[fPort].Value() != "" || c.inputs[fSMTPHost].Value() != "" || c.inputs[fSMTPPort].Value() != "" {
+		t.Errorf("preset kept after leaving OAuth: %q %q", c.inputs[fHost].Value(), c.inputs[fSMTPHost].Value())
+	}
+}
+
+func TestConnect_PresetNeverOverwritesTypedHost(t *testing.T) {
+	c := fill(newConnect(), "Work", "me@corp.example", "", "mail.corp.example")
+	c.setFocus(fSMTPHost)
+	c = typeIn(c, "smtp.corp.example")
+	c = toSource(t, c, sourceOAuth)
+	c.setFocus(fProvider)
+	c, _ = keys(c, "right")
+	if c.inputs[fHost].Value() != "mail.corp.example" || c.inputs[fSMTPHost].Value() != "smtp.corp.example" {
+		t.Errorf("typed hosts overwritten: %q %q", c.inputs[fHost].Value(), c.inputs[fSMTPHost].Value())
+	}
+	c.setFocus(fEmail)
+	c = typeIn(c, "x")
+	c = c.Paste(tea.PasteMsg{Content: "@outlook.com"})
+	if c.inputs[fHost].Value() != "mail.corp.example" {
+		t.Errorf("host = %q after a detected domain", c.inputs[fHost].Value())
+	}
+}
+
+func TestConnect_ProviderFromEmailUnlessTouched(t *testing.T) {
+	c := fill(newConnect(), "Work", "me@gmail.com")
+	if c.provider != config.ProviderGoogle {
+		t.Errorf("provider = %q, want google", c.provider)
+	}
+	c = toSource(t, c, sourceOAuth)
+	if c.provider != config.ProviderGoogle {
+		t.Errorf("provider = %q after choosing OAuth", c.provider)
+	}
+
+	c = newConnect()
+	c.setFocus(fProvider)
+	c, _ = keys(c, "right") // google, chosen by hand
+	c.setFocus(fEmail)
+	c = typeIn(c, "me@outlook.com")
+	if c.provider != config.ProviderGoogle {
+		t.Errorf("provider = %q, a touched provider must not follow the email", c.provider)
+	}
+}
+
+func TestEditAccount_OAuthNeverAutoFills(t *testing.T) {
+	c := newEdit(oauthEdit(config.ProviderMicrosoft))
+	c = toSource(t, c, sourceOAuth)
+	c.setFocus(fProvider)
+	c, _ = keys(c, "right")
+	c.setFocus(fEmail)
+	c = typeIn(c, "x@outlook.com")
+	if c.autoHost || c.autoSMTP || c.inputs[fHost].Value() != "imap.example.com" || c.inputs[fSMTPHost].Value() != "smtp.example.com" {
+		t.Errorf("edit auto-filled: %q %q auto %v %v", c.inputs[fHost].Value(), c.inputs[fSMTPHost].Value(), c.autoHost, c.autoSMTP)
+	}
+}
+
+func oauthForm(t *testing.T, provider string) Connect {
+	t.Helper()
+	c := fill(newConnect(), "Work", "me@example.com", "", "mail.example.com", "")
+	c = toSource(t, c, sourceOAuth)
+	if provider == config.ProviderGoogle {
+		c.setFocus(fProvider)
+		c, _ = keys(c, "right")
+	}
+	return c
+}
+
+func TestConnect_OAuthValidation(t *testing.T) {
+	c := oauthForm(t, config.ProviderMicrosoft)
+	if err := c.validate(); err != "Client ID is required: register an app first (see docs/oauth.md)" {
+		t.Errorf("validate() = %q", err)
+	}
+	c.inputs[fClientID].SetValue("abc")
+	if err := c.validate(); err != "" {
+		t.Errorf("Microsoft with a client ID: %q", err)
+	}
+
+	g := oauthForm(t, config.ProviderGoogle)
+	g.inputs[fClientID].SetValue("abc")
+	if err := g.validate(); err != "Google needs the client secret from your OAuth client" {
+		t.Errorf("validate() = %q", err)
+	}
+	g.inputs[fClientSecret].SetValue("s3cret")
+	if err := g.validate(); err != "" {
+		t.Errorf("Google with a secret: %q", err)
+	}
+
+	// Editing a Google OAuth account: empty means keep the saved secret.
+	e := newEdit(oauthEdit(config.ProviderGoogle))
+	e = toSource(t, e, sourceOAuth)
+	if err := e.validate(); err != "" {
+		t.Errorf("edit Google keeps secret: %q", err)
+	}
+	if got := e.inputs[fClientSecret].Placeholder; got != "leave empty to keep the saved one" {
+		t.Errorf("placeholder = %q", got)
+	}
+	// Switching an existing Microsoft account to Google needs the secret.
+	m := newEdit(oauthEdit(config.ProviderMicrosoft))
+	m = toSource(t, m, sourceOAuth)
+	m.setFocus(fProvider)
+	m, _ = keys(m, "right")
+	if err := m.validate(); !strings.Contains(err, "Google needs the client secret") {
+		t.Errorf("microsoft to google: %q", err)
+	}
+
+	// Enter on the button reports it in the form.
+	c, r := keys(oauthForm(t, config.ProviderMicrosoft), "tab", "tab", "tab", "tab", "tab", "tab", "tab", "tab", "enter") // ... submit
+	if r != ConnectPending || !strings.Contains(c.err, "Client ID is required") {
+		t.Errorf("result %v err %q", r, c.err)
+	}
+}
+
+func TestConnect_OAuthRequest(t *testing.T) {
+	tests := []struct {
+		name, tenant string
+		want         string
+	}{
+		{"empty", "", ""},
+		{"common", "  Common ", ""},
+		{"specific", " contoso.onmicrosoft.com ", "contoso.onmicrosoft.com"},
+	}
+	for _, tt := range tests {
+		t.Run("microsoft "+tt.name, func(t *testing.T) {
+			c := oauthForm(t, config.ProviderMicrosoft)
+			c.inputs[fClientID].SetValue(" abc ")
+			c.inputs[fTenant].SetValue(tt.tenant)
+			c.inputs[fSecret].SetValue("ignored")
+			req := c.Request()
+			a := req.Account
+			if !c.OAuth() || a.Auth != config.AuthOAuth2 || a.OAuthProvider != config.ProviderMicrosoft || a.OAuthClientID != "abc" || a.OAuthTenant != tt.want || a.PasswordCmd != "" || req.Password != "" || req.ClientSecret != "" {
+				t.Errorf("Request() = %+v", req)
+			}
+		})
+	}
+
+	g := oauthForm(t, config.ProviderGoogle)
+	g.inputs[fClientID].SetValue("abc")
+	g.inputs[fTenant].SetValue("contoso")
+	g.inputs[fClientSecret].SetValue(" s3 cret ")
+	req := g.Request()
+	if a := req.Account; a.OAuthProvider != config.ProviderGoogle || a.OAuthTenant != "" || req.ClientSecret != " s3 cret " || a.Auth != config.AuthOAuth2 {
+		t.Errorf("Request() = %+v", req)
+	}
+	if er := g.EditRequest(); er.ClientSecret != " s3 cret " || er.KeepPassword {
+		t.Errorf("EditRequest() = %+v", er)
+	}
+	if newConnect().OAuth() {
+		t.Error("OAuth() true for a new form")
+	}
+}
+
+func TestConnect_OAuthSecretIsMasked(t *testing.T) {
+	g := oauthForm(t, config.ProviderGoogle)
+	g.setFocus(fClientSecret)
+	g = typeIn(g, "topsecret")
+	if v := ansi.Strip(g.View()); strings.Contains(v, "topsecret") {
+		t.Errorf("client secret shown:\n%s", v)
+	}
+}
+
+func TestApplyEdit_OAuth(t *testing.T) {
+	formOf := func(old config.Account, change func(*Connect)) EditRequest {
+		c := newEdit(old.WithDefaults())
+		change(&c)
+		return c.EditRequest()
+	}
+	pw := editAccount()
+	pw.PasswordCmd = "op read x"
+
+	t.Run("password to OAuth", func(t *testing.T) {
+		req := formOf(pw, func(c *Connect) {
+			*c = toSource(t, *c, sourceOAuth)
+			c.inputs[fClientID].SetValue("cid")
+			c.inputs[fTenant].SetValue("contoso")
+		})
+		got := ApplyEdit(pw, req)
+		if got.PasswordCmd != "" || got.Auth != config.AuthOAuth2 || got.OAuthProvider != config.ProviderMicrosoft || got.OAuthClientID != "cid" || got.OAuthTenant != "contoso" {
+			t.Errorf("got %+v", got)
+		}
+		if got.ArchiveFolder != "Done" || got.TLSCert != "/certs/a.pem" {
+			t.Errorf("other keys lost: %+v", got)
+		}
+	})
+	t.Run("OAuth to keychain clears the OAuth fields", func(t *testing.T) {
+		old := oauthEdit(config.ProviderGoogle)
+		old.OAuthClientSecretCmd = "cmd"
+		old.OAuthTenant = "x"
+		req := formOf(old, func(c *Connect) { *c = toSource(t, *c, sourceKeychain); c.inputs[fSecret].SetValue("pw") })
+		got := ApplyEdit(old, req)
+		if got.Auth != "" || got.OAuthProvider != "" || got.OAuthClientID != "" || got.OAuthTenant != "" || got.OAuthClientSecretCmd != "" || got.PasswordCmd != "" {
+			t.Errorf("got %+v", got)
+		}
+	})
+	t.Run("keep leaves everything", func(t *testing.T) {
+		old := oauthEdit(config.ProviderGoogle)
+		old.OAuthClientSecretCmd = "cmd"
+		if got := ApplyEdit(old, formOf(old, func(*Connect) {})); !reflect.DeepEqual(got, old) {
+			t.Errorf("got %+v", got)
+		}
+	})
+	t.Run("auth password is preserved", func(t *testing.T) {
+		old := pw
+		old.Auth = config.AuthPassword
+		req := formOf(old, func(c *Connect) { *c = toSource(t, *c, sourceKeychain); c.inputs[fSecret].SetValue("pw") })
+		if got := ApplyEdit(old, req); got.Auth != config.AuthPassword {
+			t.Errorf("Auth = %q", got.Auth)
+		}
+		req = formOf(old, func(c *Connect) { *c = toSource(t, *c, sourceOAuth); c.inputs[fClientID].SetValue("c") })
+		if got := ApplyEdit(old, req); got.Auth != config.AuthOAuth2 {
+			t.Errorf("Auth = %q, OAuth must replace password", got.Auth)
+		}
+	})
+	t.Run("client secret cmd kept only for Google without a new secret", func(t *testing.T) {
+		old := oauthEdit(config.ProviderGoogle)
+		old.OAuthClientSecretCmd = "cmd"
+		edit := func(secret string) config.Account {
+			return ApplyEdit(old, formOf(old, func(c *Connect) {
+				*c = toSource(t, *c, sourceOAuth)
+				c.inputs[fClientSecret].SetValue(secret)
+			}))
+		}
+		if got := edit(""); got.OAuthClientSecretCmd != "cmd" {
+			t.Errorf("cmd = %q, want it kept", got.OAuthClientSecretCmd)
+		}
+		if got := edit("new"); got.OAuthClientSecretCmd != "" {
+			t.Errorf("cmd = %q, want it cleared by a new secret", got.OAuthClientSecretCmd)
+		}
+		ms := ApplyEdit(old, formOf(old, func(c *Connect) {
+			*c = toSource(t, *c, sourceOAuth)
+			c.setFocus(fProvider)
+			*c, _ = keys(*c, "right")
+		}))
+		if ms.OAuthProvider != config.ProviderMicrosoft || ms.OAuthClientSecretCmd != "" {
+			t.Errorf("microsoft: %+v", ms)
+		}
+	})
+}
+
+func TestEditAccount_OAuthPrefill(t *testing.T) {
+	a := oauthEdit(config.ProviderGoogle)
+	c := newEdit(a.WithDefaults())
+	if c.provider != config.ProviderGoogle || !c.providerTouched || c.inputs[fClientID].Value() != "client-1" || c.inputs[fTenant].Value() != "" {
+		t.Errorf("provider %q touched %v client %q tenant %q", c.provider, c.providerTouched, c.inputs[fClientID].Value(), c.inputs[fTenant].Value())
+	}
+	if v := ansi.Strip(c.View()); !strings.Contains(v, "OAuth 2.0 (google)") {
+		t.Errorf("current row:\n%s", v)
+	}
+
+	m := oauthEdit(config.ProviderMicrosoft)
+	m.OAuthTenant = "contoso"
+	if c = newEdit(m); c.inputs[fTenant].Value() != "contoso" || c.provider != config.ProviderMicrosoft {
+		t.Errorf("tenant %q provider %q", c.inputs[fTenant].Value(), c.provider)
+	}
+	if c = newEdit(oauthEdit(config.ProviderMicrosoft).WithDefaults()); c.inputs[fTenant].Value() != "" {
+		t.Errorf("tenant %q, want the common default left empty", c.inputs[fTenant].Value())
+	}
+	if v := ansi.Strip(c.View()); !strings.Contains(v, "OAuth 2.0 (microsoft)") {
+		t.Errorf("current row:\n%s", v)
+	}
+
+	cmd := oauthEdit(config.ProviderMicrosoft)
+	cmd.PasswordCmd = "get-token"
+	c = newEdit(cmd)
+	if c.inputs[fClientID].Value() != "" || c.providerTouched {
+		t.Errorf("token command account prefilled: client %q touched %v", c.inputs[fClientID].Value(), c.providerTouched)
+	}
+	if v := ansi.Strip(c.View()); !strings.Contains(v, "token command") {
+		t.Errorf("current row:\n%s", v)
+	}
+	if v := ansi.Strip(newEdit(editAccount()).View()); !strings.Contains(v, "keychain") {
+		t.Errorf("current row:\n%s", v)
+	}
+}
+
+func TestConnect_OAuthNoteAndButton(t *testing.T) {
+	c := oauthForm(t, config.ProviderMicrosoft)
+	v := ansi.Strip(c.View())
+	for _, want := range []string{"Signs in with your browser; tokens go in the OS keychain", "[ Sign in & save ]"} {
+		if !strings.Contains(v, want) {
+			t.Errorf("view lacks %q:\n%s", want, v)
+		}
+	}
+	if strings.Contains(v, "[ Test & save ]") {
+		t.Error("OAuth form shows the test button")
+	}
+	if got := c.inputs[fClientID].Placeholder; got != "your app's client ID" {
+		t.Errorf("client ID placeholder = %q", got)
+	}
+	if got := c.inputs[fTenant].Placeholder; got != "common" {
+		t.Errorf("tenant placeholder = %q", got)
+	}
+	if got := c.inputs[fClientSecret].Placeholder; got != "client secret (Google Cloud)" {
+		t.Errorf("secret placeholder = %q", got)
+	}
+}
+
+func TestConnect_SignInProgress(t *testing.T) {
+	long := "https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=0123456789abcdef&redirect_uri=http%3A%2F%2F127.0.0.1%3A53682&state=" + strings.Repeat("abcdef0123", 12)
+	c := oauthForm(t, config.ProviderMicrosoft)
+	c.SetSignIn(SignIn{URL: long})
+
+	v := ansi.Strip(c.View())
+	if !c.busy || strings.Contains(v, "Testing connection") {
+		t.Errorf("busy %v, view:\n%s", c.busy, v)
+	}
+	for _, want := range []string{"Waiting for you to sign in in your browser…", "If it didn't open, visit:"} {
+		if !strings.Contains(v, want) {
+			t.Errorf("view lacks %q:\n%s", want, v)
+		}
+	}
+	// The whole URL is present across the wrapped lines.
+	var joined strings.Builder
+	in := false
+	for _, l := range strings.Split(v, "\n") {
+		l = strings.Trim(l, "│ ")
+		if strings.HasPrefix(l, "https://") {
+			in = true
+		}
+		if in && l != "" && !strings.HasPrefix(l, "╰") && !strings.HasPrefix(l, "└") {
+			joined.WriteString(l)
+		}
+	}
+	if !strings.Contains(joined.String(), long) {
+		t.Errorf("URL cut or missing:\n%s", v)
+	}
+	if got := hintText(c.Hints()); got != "Cancel: esc | Use a code instead: ctrl+d" {
+		t.Errorf("hints = %q", got)
+	}
+	if _, r := keys(c, "ctrl+d"); r != ConnectUseCode {
+		t.Errorf("ctrl+d result = %v", r)
+	}
+	if c2, r := keys(c, "x", "tab"); r != ConnectPending || c2.inputs[fName].Value() != "Work" {
+		t.Error("a key got through while signing in")
+	}
+	if _, r := keys(c, "esc"); r != ConnectCancelled {
+		t.Error("esc should cancel the sign-in")
+	}
+
+	c.SetBusy(false)
+	if v := ansi.Strip(c.View()); strings.Contains(v, "Waiting for you") || (SignIn{}) != c.signIn {
+		t.Errorf("sign-in not cleared:\n%s", v)
+	}
+	if _, r := keys(c, "ctrl+d"); r != ConnectPending {
+		t.Error("ctrl+d acted when not busy")
+	}
+
+	// Google has no device code, and a device code sign-in has no URL to swap.
+	g := oauthForm(t, config.ProviderGoogle)
+	g.SetSignIn(SignIn{URL: "https://accounts.google.com/o/oauth2/auth"})
+	if _, r := keys(g, "ctrl+d"); r != ConnectPending {
+		t.Errorf("google ctrl+d result = %v", r)
+	}
+	if got := hintText(g.Hints()); got != "Cancel: esc" {
+		t.Errorf("google hints = %q", got)
+	}
+
+	d := oauthForm(t, config.ProviderMicrosoft)
+	d.SetSignIn(SignIn{UserCode: "ABCD-EFGH", VerificationURI: "https://microsoft.com/devicelogin"})
+	v = ansi.Strip(d.View())
+	for _, want := range []string{"Go to https://microsoft.com/devicelogin", "and enter the code", "ABCD-EFGH"} {
+		if !strings.Contains(v, want) {
+			t.Errorf("view lacks %q:\n%s", want, v)
+		}
+	}
+	if _, r := keys(d, "ctrl+d"); r != ConnectPending {
+		t.Errorf("device code ctrl+d result = %v", r)
+	}
+	if got := hintText(d.Hints()); got != "Cancel: esc" {
+		t.Errorf("device hints = %q", got)
+	}
+}
+
+func TestEditAccount_DeleteConfirmOAuth(t *testing.T) {
+	open := func(a config.Account) Connect {
+		c := newEdit(a)
+		c, _ = keys(c, "shift+tab", "enter")
+		return c
+	}
+	c := open(oauthEdit(config.ProviderMicrosoft))
+	if got := hintText(c.Hints()); got != "Delete + sign-in: y | Delete, keep sign-in: k | Cancel: n" {
+		t.Errorf("hints = %q", got)
+	}
+	if c, r := keys(c, "y"); r != ConnectDelete || !c.DeletePassword() {
+		t.Errorf("y: result %v deletePassword %v", r, c.DeletePassword())
+	}
+	if c, r := keys(open(oauthEdit(config.ProviderMicrosoft)), "k"); r != ConnectDelete || c.DeletePassword() {
+		t.Errorf("k: result %v deletePassword %v", r, c.DeletePassword())
+	}
+
+	cmd := oauthEdit(config.ProviderMicrosoft)
+	cmd.PasswordCmd = "get-token"
+	if got := hintText(open(cmd).Hints()); got != "Delete: y | Cancel: n" {
+		t.Errorf("token command hints = %q", got)
+	}
+}
+
+func TestConnect_RendersWithin80x24(t *testing.T) {
+	check := func(t *testing.T, c Connect, button string) {
+		t.Helper()
+		c.SetSize(80, 24)
+		v := c.View()
+		if h := lipgloss.Height(v); h > 24 {
+			t.Errorf("height = %d", h)
+		}
+		for _, l := range strings.Split(v, "\n") {
+			if w := lipgloss.Width(l); w > 80 {
+				t.Errorf("line is %d wide: %q", w, ansi.Strip(l))
+			}
+		}
+		if !strings.Contains(ansi.Strip(v), button) {
+			t.Errorf("button %q not visible:\n%s", button, ansi.Strip(v))
+		}
+	}
+	for _, src := range []int{sourceOnePassword, sourceKeychain, sourceOAuth} {
+		for _, p := range []string{config.ProviderMicrosoft, config.ProviderGoogle} {
+			t.Run(fmt.Sprintf("new source %d %s", src, p), func(t *testing.T) {
+				c := newConnect()
+				c.source, c.provider = src, p
+				button := "[ Test & save ]"
+				if src == sourceOAuth {
+					button = "[ Sign in & save ]"
+				}
+				check(t, c, button)
+			})
+		}
+	}
+	for _, src := range []int{sourceKeep, sourceOnePassword, sourceKeychain, sourceOAuth} {
+		for _, p := range []string{config.ProviderMicrosoft, config.ProviderGoogle} {
+			t.Run(fmt.Sprintf("edit source %d %s", src, p), func(t *testing.T) {
+				c := newEdit(oauthEdit(p))
+				c.source = src
+				button := "[ Test & save ]"
+				if src == sourceOAuth {
+					button = "[ Sign in & save ]"
+				}
+				check(t, c, button)
+				if v := ansi.Strip(c.View()); !strings.Contains(v, "[ Delete account ]") {
+					t.Errorf("delete row cut:\n%s", v)
+				}
+			})
+		}
+	}
+
+	// A long URL keeps its end visible at 80x24.
+	c := oauthForm(t, config.ProviderMicrosoft)
+	url := "https://example.com/authorize?" + strings.Repeat("0123456789", 20) + "END"
+	c.SetSignIn(SignIn{URL: url})
+	c.SetSize(80, 24)
+	if v := ansi.Strip(c.View()); !strings.Contains(v, "END") {
+		t.Errorf("URL end cut at 80x24:\n%s", v)
+	}
 }

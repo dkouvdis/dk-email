@@ -150,14 +150,14 @@ Plan: [oauth-plan.md](oauth-plan.md).
 **Description:** Expand `popup.Connect` so users can choose between `[1Password | Keychain | OAuth 2.0]` (plus `Keep current` in edit mode), auto-fill Microsoft 365 / Outlook and Gmail server settings from the email address, and enter BYO `oauth_client_id` fields (`[Microsoft | Google]`, `Tenant`, or `Client Secret`).
 
 **Acceptance criteria:**
-- [ ] Credential source selector cycles `[1Password | Keychain | OAuth 2.0]` on new accounts and `[Keep current | 1Password | Keychain | OAuth 2.0]` when editing, showing only the fields relevant to the chosen source and OAuth provider.
-- [ ] Typing an `@outlook.com` / `@hotmail.com` / `@live.com` / `@office365.com` address (or selecting `Microsoft` OAuth when hosts haven't been manually edited) prefills `outlook.office365.com:993` (`implicit`) and `smtp.office365.com:587` (`starttls`); Gmail addresses prefill `imap.gmail.com:993` and `smtp.gmail.com:465`.
-- [ ] While OAuth sign-in is pending, the popup displays the sign-in status / fallback URL (or Microsoft device code) and `esc` cancels the in-flight attempt cleanly.
+- [x] Credential source selector cycles `[1Password | Keychain | OAuth 2.0]` on new accounts and `[Keep current | 1Password | Keychain | OAuth 2.0]` when editing, showing only the fields relevant to the chosen source and OAuth provider.
+- [x] Typing an `@outlook.com` / `@hotmail.com` / `@live.com` / `@office365.com` address (or selecting `Microsoft` OAuth when hosts haven't been manually edited) prefills `outlook.office365.com:993` (`implicit`) and `smtp.office365.com:587` (`starttls`); Gmail addresses prefill `imap.gmail.com:993` and `smtp.gmail.com:465`.
+- [x] While OAuth sign-in is pending, the popup displays the sign-in status / fallback URL (or Microsoft device code) and `esc` cancels the in-flight attempt cleanly.
 
 **Verification:**
-- [ ] Tests pass: `go test -race ./internal/ui/popup`
-- [ ] Build succeeds: `go build -o bin/dk-email ./cmd/dk-email`
-- [ ] Manual check: Verify `popup.Connect` renders cleanly at 80x24 across all three credential sources.
+- [x] Tests pass: `go test -race ./internal/ui/popup`
+- [x] Build succeeds: `go build -o bin/dk-email ./cmd/dk-email`
+- [x] Manual check: Verify `popup.Connect` renders cleanly at 80x24 across all three credential sources.
 
 **Dependencies:** Task 1
 

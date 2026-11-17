@@ -4,25 +4,25 @@
 │                              ││                                                                                                          │
 │                              ││                                                                                                          │
 │                              ││                                                                                                          │
-│                              ││      ╭────────────────────────────────────────────────────────────╮                                      │
-│                              ││      │ Connect account                                            │                                      │
-│                              ││      │                                                            │                                      │
-│                              ││      │ Name       Gmail                                           │                                      │
-│                              ││      │ Email      me@gmail.com                                    │                                      │
-│                              ││      │ Username   same as email                                   │                                      │
-│                              ││      │ IMAP host  imap.gmail.com                                  │                                      │
-│                              ││      │ Port       993                                             │                                      │
-│                              ││      │ TLS        ● implicit   ○ starttls                         │                                      │
-│                              ││      │ Password   ● 1Password   ○ keychain                        │                                      │
-│                              ││      │ Reference  op://Vault/Item/password                        │                                      │
-│                              ││      │            Stored as password_cmd = "op read <reference>"  │                                      │
-│                              ││      │ SMTP host  smtp.gmail.com                                  │                                      │
-│                              ││      │ SMTP port  465                                             │                                      │
-│                              ││      │ SMTP TLS   ● implicit   ○ starttls                         │                                      │
-│                              ││      │ Aliases    optional: me@mydomain.com, hi@mydomain.com      │                                      │
-│                              ││      │                                                            │                                      │
-│                              ││      │ [ Test & save ]                                            │                                      │
-│                              ││      ╰────────────────────────────────────────────────────────────╯                                      │
+│                              ││ ╭─────────────────────────────────────────────────────────────────────╮                                  │
+│                              ││ │ Connect account                                                     │                                  │
+│                              ││ │                                                                     │                                  │
+│                              ││ │ Name       Gmail                                                    │                                  │
+│                              ││ │ Email      me@gmail.com                                             │                                  │
+│                              ││ │ Username   same as email                                            │                                  │
+│                              ││ │ IMAP host  imap.gmail.com                                           │                                  │
+│                              ││ │ Port       993                                                      │                                  │
+│                              ││ │ TLS        ● implicit   ○ starttls                                  │                                  │
+│                              ││ │ Login      ● 1Password   ○ keychain   ○ OAuth 2.0                   │                                  │
+│                              ││ │ Reference  op://Vault/Item/password                                 │                                  │
+│                              ││ │            Stored as password_cmd = "op read <reference>"           │                                  │
+│                              ││ │ SMTP host  smtp.gmail.com                                           │                                  │
+│                              ││ │ SMTP port  465                                                      │                                  │
+│                              ││ │ SMTP TLS   ● implicit   ○ starttls                                  │                                  │
+│                              ││ │ Aliases    optional: me@mydomain.com, hi@mydomain.com               │                                  │
+│                              ││ │                                                                     │                                  │
+│                              ││ │ [ Test & save ]                                                     │                                  │
+│                              ││ ╰─────────────────────────────────────────────────────────────────────╯                                  │
 │                              ││                                                                                                          │
 │                              ││                                                                                                          │
 │                              ││                                                                                                          │
