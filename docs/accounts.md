@@ -4,6 +4,12 @@ How to add, edit and delete accounts in dk-email, which login to choose,
 and what to do when your account has two-factor authentication (2FA). You
 never need to edit `config.toml` by hand, though you can.
 
+> [!IMPORTANT]
+> **No password or secret is ever written to `config.toml`.** It comes from
+> a command (`password_cmd`, such as 1Password's `op read`), the OS
+> keychain, or an OAuth sign-in kept in the keychain. A `password` or
+> `oauth_client_secret` key in the config is rejected.
+
 - [Adding an account](#adding-an-account)
 - [Choosing a login](#choosing-a-login)
 - [Two-factor authentication](#two-factor-authentication)
@@ -42,11 +48,28 @@ a hint show in the popup: fix the field and press `enter` again.
 | **Keychain** | You want dk-email to remember the password for you. | The OS keychain (macOS Keychain, or Secret Service on Linux). |
 | **OAuth 2.0** | Microsoft 365, Outlook.com, or a Google account that refuses passwords. | A token in the OS keychain. You sign in in the browser; dk-email never sees your password. |
 
-Whichever you pick, **no password is ever written to `config.toml`**: a
-`password` key is rejected. If you prefer another password manager, set
-`password_cmd` in the config by hand to any command that prints the password
-(for example `pass show mail/work` or `security find-generic-password …`).
-See [Passwords](../README.md#passwords).
+Whichever you pick, the password stays out of `config.toml`. If you prefer
+another password manager, set `password_cmd` in the config by hand to any
+command that prints the password on its first line:
+
+| Source | `password_cmd` |
+|---|---|
+| 1Password | `op read op://Personal/Mail/password` |
+| pass / gopass ([setup](gpg.md)) | `pass show mail/work` |
+| GPG-encrypted file ([setup](gpg.md)) | `gpg --quiet --decrypt ~/.config/dk-email/work.gpg` |
+| macOS Keychain (your own entry) | `security find-generic-password -s mail-work -w` |
+| Linux Secret Service | `secret-tool lookup service mail account work` |
+| Bitwarden | `bw get password mail-work` |
+| Environment variable | `printenv WORK_MAIL_PASSWORD` |
+
+The command runs with `sh -c` in your environment, with no terminal to type
+into, so it must not wait for keyboard input. A desktop prompt such as
+1Password's Touch ID approval works; dk-email waits up to 60 seconds for it.
+Anything after the first line is ignored, which suits `pass` entries with
+notes below the password. See [Passwords](../README.md#passwords).
+
+GPG, `pass` and `gopass` need a graphical passphrase prompt (pinentry) or a
+cached passphrase; see [Passwords from GPG](gpg.md).
 
 **Which one for my provider?**
 
@@ -347,7 +370,11 @@ the problem. The common ones:
 | *dial tcp … connection refused* / *timeout* | Wrong host or port, or a firewall. Check the [provider settings](#provider-settings). |
 | *x509: certificate …* | The server's certificate isn't trusted: wrong host name, or a self-signed certificate that needs `tls_cert`. |
 | *no password* | Nothing in the keychain under this account name, or `password_cmd` printed nothing. |
+| *password_cmd … failed: authorization prompt dismissed* | You dismissed or denied 1Password's prompt, or it was locked. Press `ctrl+r` to try again. |
+| *password_cmd … timed out* | The command waited more than 60 seconds, usually for a 1Password approval nobody saw. Press `ctrl+r` to try again. |
 
 A new account is only added once its test passes. An account you're
-editing can be [saved anyway](#saving). For a full log of each login step,
+editing can be [saved anyway](#saving). When an account that's already set
+up fails to connect at startup, for example because you dismissed a
+password manager prompt or were offline, press `ctrl+r` to connect it again. For a full log of each login step,
 run `DK_EMAIL_DEBUG=1 dk-email`; the log never contains a password or token.

@@ -118,6 +118,12 @@ A value is an ANSI colour number (`0`–`255`, quoted or not) or a hex colour (`
 
 ### Passwords
 
+> [!IMPORTANT]
+> **No password or secret is ever written to `config.toml`.** A `password`
+> or `oauth_client_secret` key is rejected. Secrets come from a command, the
+> OS keychain, or an OAuth sign-in kept in the keychain. See
+> [Accounts](docs/accounts.md#choosing-a-login) for the options.
+
 dk-email looks for a password in this order:
 
 1. **`password_cmd`**: run with `sh -c`, using the first line of its output. It times out after 60s. If `op` isn't on your `PATH` when dk-email starts, use its absolute path.
@@ -132,6 +138,14 @@ Accounts with `auth = "oauth2"` don't use a password: they sign in with OAuth 2.
 ```toml
 password_cmd = "op read op://Personal/Gmail/app-password"
 ```
+
+#### GPG and pass
+
+```toml
+password_cmd = "gpg --quiet --decrypt ~/.config/dk-email/work.gpg"  # or "pass show mail/work"
+```
+
+gpg must ask for its passphrase in a graphical pinentry (such as `pinentry-mac`), or have it cached. See [Passwords from GPG](docs/gpg.md).
 
 #### Keychain
 
@@ -272,7 +286,7 @@ The connect-account popup has optional **SMTP host**, **SMTP port** and **SMTP T
 | `space` | expand / collapse thread | `g` / `G` | top / bottom |
 | `u` | toggle read / unread | `s` | toggle star |
 | `e` | archive | `d` | delete (moves to Trash) |
-| `m` | move to folder | `ctrl+r` | refresh |
+| `m` | move to folder | `ctrl+r` | refresh, and reconnect accounts that failed |
 | `r` | reply | `R` | reply all |
 | `f` | forward | `c` | new message |
 | `a` | focus folders (narrow) / folder picker (list) | `A` | connect account |
