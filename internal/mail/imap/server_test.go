@@ -169,8 +169,17 @@ func startServer(t *testing.T, mode string, caps goimap.CapSet) *testServer {
 	}
 
 	srv := imapserver.New(opts)
-	go srv.Serve(serveLn)
-	t.Cleanup(func() { srv.Close() })
+	served := make(chan struct{})
+	go func() {
+		defer close(served)
+		srv.Serve(serveLn)
+	}()
+	t.Cleanup(func() {
+		// Close the listener and await Serve first: srv.Close can otherwise run before Serve registers it.
+		serveLn.Close()
+		<-served
+		srv.Close()
+	})
 	// Registered last, so it runs first and unblocks any hung handler before srv.Close waits.
 	t.Cleanup(func() { close(s.release) })
 	return s
