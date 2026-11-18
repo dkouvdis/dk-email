@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"context"
+	"encoding/base64"
 	"errors"
 	"strings"
 	"testing"
@@ -29,12 +31,6 @@ type replyUIDs struct{ first, second, latest mail.UID }
 // newest thread in the inbox, whose first message is the only unread one.
 func replyFixture(t *testing.T) (Model, *mailtest.Sender, *mailtest.Fake, replyUIDs) {
 	t.Helper()
-	return replyFixtureWith(t, nil)
-}
-
-// replyFixtureWith is replyFixture where the latest message has atts.
-func replyFixtureWith(t *testing.T, atts []mail.Attachment) (Model, *mailtest.Sender, *mailtest.Fake, replyUIDs) {
-	t.Helper()
 	s := &mailtest.Sender{}
 	f := newFixture()
 	f.personalSender = s
@@ -42,9 +38,6 @@ func replyFixtureWith(t *testing.T, atts []mail.Attachment) (Model, *mailtest.Se
 		m := msg("", subject, fixedNow.Add(-ago), seen, id, refs...)
 		m.From, m.To, m.Cc = from, to, cc
 		m.Body = "Body of " + id + ".\n\nSecond paragraph."
-		if id == "o3" {
-			m.Attachments = atts
-		}
 		return f.personal.AddMessage("INBOX", m)
 	}
 	var u replyUIDs
@@ -55,6 +48,89 @@ func replyFixtureWith(t *testing.T, atts []mail.Attachment) (Model, *mailtest.Se
 	m := started(t, f, 160, 30)
 	m.accts[0].Email, m.accts[0].FromName = replyMe.Email, replyMe.Name
 	return m, s, f.personal, u
+}
+
+// forwardFixture is replyFixture built from raw messages (a forward fetches
+// them with Raw), where the latest message has files.
+func forwardFixture(t *testing.T, files []mail.File) (Model, *mailtest.Sender, *mailtest.Fake, replyUIDs) {
+	t.Helper()
+	s := &mailtest.Sender{}
+	f := newFixture()
+	f.personalSender = s
+	var seen []mail.UID
+	add := func(from mail.Address, to, cc []mail.Address, subject string, ago time.Duration, read bool, id string, refs ...string) mail.UID {
+		var atts []mail.File
+		if id == "o3" {
+			atts = files
+		}
+		raw := rawMessage(from, to, cc, subject, fixedNow.Add(-ago), id, "Body of "+id+".\n\nSecond paragraph.", atts, refs...)
+		uid := f.personal.AddRaw("INBOX", raw)
+		if read {
+			seen = append(seen, uid)
+		}
+		return uid
+	}
+	var u replyUIDs
+	u.first = add(replyAlice, []mail.Address{replyMe, replyBob}, []mail.Address{replyCarol}, "Offsite", 3*time.Hour, false, "o1")
+	u.second = add(replyBob, []mail.Address{replyMe}, nil, "Re: Offsite", 2*time.Hour, true, "o2", "o1")
+	u.latest = add(replyDave, []mail.Address{replyMe, replyBob}, []mail.Address{replyAlice, {Email: "ME@example.com"}, replyCarol}, "Re: Offsite", time.Hour, true, "o3", "o1", "o2")
+	if err := f.personal.SetFlag(context.Background(), "INBOX", seen, mail.FlagSeen, true); err != nil {
+		t.Fatal(err)
+	}
+
+	m := started(t, f, 160, 30)
+	m.accts[0].Email, m.accts[0].FromName = replyMe.Email, replyMe.Name
+	return m, s, f.personal, u
+}
+
+// rawMessage builds an RFC 5322 message: plain text, or multipart/mixed with
+// files attached when there are any.
+func rawMessage(from mail.Address, to, cc []mail.Address, subject string, at time.Time, id, body string, files []mail.File, refs ...string) []byte {
+	list := func(l []mail.Address) string {
+		parts := make([]string, len(l))
+		for i, a := range l {
+			parts[i] = a.Email
+			if a.Name != "" {
+				parts[i] = a.Name + " <" + a.Email + ">"
+			}
+		}
+		return strings.Join(parts, ", ")
+	}
+	var b strings.Builder
+	b.WriteString("From: " + list([]mail.Address{from}) + "\r\n")
+	b.WriteString("To: " + list(to) + "\r\n")
+	if len(cc) > 0 {
+		b.WriteString("Cc: " + list(cc) + "\r\n")
+	}
+	b.WriteString("Subject: " + subject + "\r\n")
+	b.WriteString("Date: " + at.Format(time.RFC1123Z) + "\r\n")
+	b.WriteString("Message-ID: <" + id + "@example.com>\r\n")
+	if len(refs) > 0 {
+		ids := make([]string, len(refs))
+		for i, r := range refs {
+			ids[i] = "<" + r + "@example.com>"
+		}
+		b.WriteString("In-Reply-To: " + ids[len(ids)-1] + "\r\n")
+		b.WriteString("References: " + strings.Join(ids, " ") + "\r\n")
+	}
+	b.WriteString("MIME-Version: 1.0\r\n")
+	text := strings.ReplaceAll(body, "\n", "\r\n") + "\r\n"
+	if len(files) == 0 {
+		b.WriteString("Content-Type: text/plain; charset=utf-8\r\n\r\n" + text)
+		return []byte(b.String())
+	}
+	const boundary = "BOUNDARY"
+	b.WriteString("Content-Type: multipart/mixed; boundary=" + boundary + "\r\n\r\n")
+	b.WriteString("--" + boundary + "\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n" + text)
+	for _, f := range files {
+		b.WriteString("--" + boundary + "\r\n")
+		b.WriteString("Content-Type: " + f.ContentType + "\r\n")
+		b.WriteString("Content-Disposition: attachment; filename=\"" + f.Name + "\"\r\n")
+		b.WriteString("Content-Transfer-Encoding: base64\r\n\r\n")
+		b.WriteString(base64.StdEncoding.EncodeToString(f.Data) + "\r\n")
+	}
+	b.WriteString("--" + boundary + "--\r\n")
+	return []byte(b.String())
 }
 
 // replied presses k and, if that started a fetch, delivers its result.

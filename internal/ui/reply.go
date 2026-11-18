@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"bytes"
 	"cmp"
 	"context"
 	"errors"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/dkouvdis/dk-email/internal/compose"
 	"github.com/dkouvdis/dk-email/internal/mail"
+	"github.com/dkouvdis/dk-email/internal/render"
 )
 
 const statusLoadingReply = "Loading message…"
@@ -42,6 +44,7 @@ type replyFetchedMsg struct {
 	folder  string
 	kind    composeKind
 	msg     mail.Message
+	files   []mail.File // a forward's attachments, from the same bytes as msg
 	err     error
 }
 
@@ -51,6 +54,37 @@ func fetchReply(mb mail.Mailbox, account int, folder string, uid mail.UID, kind 
 		defer cancel()
 		msg, err := mb.Message(ctx, folder, uid)
 		return replyFetchedMsg{account: account, folder: folder, kind: kind, msg: msg, err: err}
+	}
+}
+
+// fetchForward fetches the raw message and derives both the message and its
+// attachments from the same bytes, so they match by construction.
+func fetchForward(mb mail.Mailbox, account int, folder string, uid mail.UID) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), messageTimeout)
+		defer cancel()
+		res := replyFetchedMsg{account: account, folder: folder, kind: composeForward}
+		raw, err := mb.Raw(ctx, folder, uid)
+		if err != nil {
+			res.err = err
+			return res
+		}
+		msg, err := render.Parse(bytes.NewReader(raw))
+		if err != nil {
+			res.err = err
+			return res
+		}
+		msg.UID = uid
+		parts, err := render.Parts(raw)
+		if err != nil {
+			res.err = err
+			return res
+		}
+		res.msg = msg
+		for _, p := range parts {
+			res.files = append(res.files, mail.File{Name: p.Filename, ContentType: p.ContentType, Data: p.Data})
+		}
+		return res
 	}
 }
 
@@ -91,9 +125,10 @@ func (m Model) startForward() (Model, tea.Cmd) {
 	return m.startFromTarget(composeForward)
 }
 
-// startFromTarget drafts kind from the target message. The message is taken
-// from the reader when it already has it, and fetched otherwise; the draft
-// slot is held meanwhile.
+// startFromTarget drafts kind from the target message. A reply takes the
+// message from the reader when it already has it; a forward always fetches the
+// raw message, since the reader has no bytes to copy attachments from. The
+// draft slot is held meanwhile.
 func (m Model) startFromTarget(kind composeKind) (Model, tea.Cmd) {
 	account, ok := m.draftAccount(m.open.account)
 	if !ok {
@@ -104,26 +139,33 @@ func (m Model) startFromTarget(kind composeKind) (Model, tea.Cmd) {
 		return m, nil
 	}
 	folder := m.open.folder
-	if m.read.Showing(account, folder, target.UID) {
+	if kind != composeForward && m.read.Showing(account, folder, target.UID) {
 		if msg, ok := m.read.Message(target.UID); ok {
-			return m.startMessageDraft(account, folder, msg, kind)
+			return m.startMessageDraft(account, folder, msg, nil, kind)
 		}
 	}
 	m.draft = &draftState{account: account, loading: true}
 	m.setStatus(statusLoadingReply)
 	m.log.Debug("compose: fetching message", "account", m.accts[account].Name, "action", kind.String())
+	if kind == composeForward {
+		return m, fetchForward(m.boxes[account], account, folder, target.UID)
+	}
 	return m, fetchReply(m.boxes[account], account, folder, target.UID, kind)
 }
 
-// startMessageDraft opens the composer on kind's draft for msg. A forward's
-// attachments aren't listed; the sender copies them from the original.
-func (m Model) startMessageDraft(account int, folder string, msg mail.Message, kind composeKind) (Model, tea.Cmd) {
+// startMessageDraft opens the composer on kind's draft for msg. A forward
+// carries the original's attachments, files, in the draft.
+func (m Model) startMessageDraft(account int, folder string, msg mail.Message, files []mail.File, kind composeKind) (Model, tea.Cmd) {
 	mine := m.identities(account)
 	switch kind {
 	case composeReplyAll:
 		return m.startDraft(account, compose.ReplyAll(msg, folder, mine), kind)
 	case composeForward:
-		return m.startDraft(account, compose.Forward(msg, folder, mine), kind)
+		d := compose.Forward(msg, folder, mine)
+		// The attachments travel with the draft; ForwardOf is going away.
+		d.ForwardOf = nil
+		d.Attachments = files
+		return m.startDraft(account, d, kind)
 	}
 	return m.startDraft(account, compose.Reply(msg, folder, mine), kind)
 }
@@ -141,5 +183,5 @@ func (m Model) handleReplyFetched(msg replyFetchedMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.setStatus("")
-	return m.startMessageDraft(msg.account, msg.folder, msg.msg, msg.kind)
+	return m.startMessageDraft(msg.account, msg.folder, msg.msg, msg.files, msg.kind)
 }
