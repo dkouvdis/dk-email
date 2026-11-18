@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 	"unicode"
@@ -14,6 +15,7 @@ import (
 	"github.com/dkouvdis/dk-email/internal/compose"
 	"github.com/dkouvdis/dk-email/internal/mail"
 	"github.com/dkouvdis/dk-email/internal/ui/popup"
+	"github.com/dkouvdis/dk-email/internal/ui/reader"
 )
 
 const (
@@ -169,12 +171,22 @@ func (m Model) startDraft(account int, base mail.Draft, kind composeKind) (Model
 		labels[i] = a.String()
 	}
 	pop.SetFrom(labels, selected)
+	pop.InitAttachments(attachmentLabels(base.Attachments))
 	pop.SetSize(m.panes.Popup.W, m.panes.Popup.H)
 	_, canSave := m.drafter(account)
 	pop.EnableSave(canSave)
 	m.draft = &draftState{account: account, base: base, from: choices, titlePrefix: prefix, pop: pop}
 	m.log.Debug("popup opened", "popup", "compose", "action", kind.String())
 	return m, nil
+}
+
+// attachmentLabels are the composer's attachment items: "name (12 KB)".
+func attachmentLabels(files []mail.File) []string {
+	out := make([]string, len(files))
+	for i, f := range files {
+		out[i] = f.Name + " (" + reader.FormatSize(int64(len(f.Data))) + ")"
+	}
+	return out
 }
 
 // indexOfAddr is the index of the address with email in list, compared
@@ -218,6 +230,13 @@ func (m Model) updateComposer(msg tea.Msg) (Model, tea.Cmd) {
 		if m.saving && m.cancelSave != nil {
 			m.cancelSave()
 			m.setStatus(statusCancelling)
+		}
+	case popup.ComposeRemoveAttachment:
+		// A copy, so the files a send or save already holds stay as they were.
+		if i, files := d.pop.AttachmentIndex(), d.base.Attachments; i >= 0 && i < len(files) {
+			d.base.Attachments = slices.Delete(slices.Clone(files), i, i+1)
+			d.pop.SetAttachments(attachmentLabels(d.base.Attachments))
+			m.log.Debug("attachment removed", "left", len(d.base.Attachments))
 		}
 	case popup.ComposeClose:
 		m.closeDraft()

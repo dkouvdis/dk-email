@@ -701,3 +701,148 @@ func TestComposeFrom_DropdownDimsTheRestAndKeepsItVisible(t *testing.T) {
 		t.Error("closing should restore the normal view")
 	}
 }
+
+var attLabels = []string{"report.pdf (1.2 KB)", "notes.txt (18 B)"}
+
+func attCompose(focus ComposeField) Compose {
+	c := newTestCompose(ComposeValues{To: "a@b.c"}, focus)
+	c.InitAttachments(attLabels)
+	return c
+}
+
+func TestComposeAttachments_AbsentWithNoneAndFocusOrderUnchanged(t *testing.T) {
+	base := newTestCompose(ComposeValues{To: "a@b.c"}, ComposeTo).View()
+	c := newTestCompose(ComposeValues{To: "a@b.c"}, ComposeTo)
+	c.InitAttachments(nil)
+	if c.View() != base || strings.Contains(ansi.Strip(c.View()), "Attach") {
+		t.Error("an empty list should leave the composer as it was")
+	}
+	c, _ = press(c, "tab", "tab", "tab", "tab")
+	if c.focus != ComposeBody {
+		t.Errorf("tab x4 from To = %v, want Body", c.focus)
+	}
+}
+
+func TestComposeAttachments_TabOrder(t *testing.T) {
+	c := attCompose(ComposeSubject)
+	c, _ = press(c, "tab")
+	if c.focus != ComposeAttachments {
+		t.Fatalf("tab from Subject = %v, want Attachments", c.focus)
+	}
+	c, _ = press(c, "tab")
+	if c.focus != ComposeBody {
+		t.Fatalf("tab from Attachments = %v, want Body", c.focus)
+	}
+	c, _ = press(c, "shift+tab")
+	if c.focus != ComposeAttachments {
+		t.Errorf("shift+tab from Body = %v, want Attachments", c.focus)
+	}
+	c, _ = press(c, "enter")
+	if c.focus != ComposeBody {
+		t.Errorf("enter on Attachments = %v, want Body", c.focus)
+	}
+}
+
+func TestComposeAttachments_ChooseRemoveAndIgnoreOtherKeys(t *testing.T) {
+	c := attCompose(ComposeAttachments)
+	c, _ = press(c, "left")
+	if c.AttachmentIndex() != 0 {
+		t.Errorf("left at the start moved to %d", c.AttachmentIndex())
+	}
+	c, _ = press(c, "right", "right")
+	if c.AttachmentIndex() != 1 {
+		t.Errorf("right x2 = %d, want 1 (no wrap)", c.AttachmentIndex())
+	}
+	c, _ = press(c, "left")
+	if c.AttachmentIndex() != 0 {
+		t.Errorf("left = %d, want 0", c.AttachmentIndex())
+	}
+	c, _ = press(c, "x", "space")
+	if c.Dirty() || c.Values().To != "a@b.c" {
+		t.Error("other keys should do nothing on the row")
+	}
+	for _, k := range []tea.KeyPressMsg{ck("d"), ck("backspace"), {Code: tea.KeyDelete}} {
+		if _, r, _ := c.Update(k); r != ComposeRemoveAttachment {
+			t.Errorf("%v returned %v, want ComposeRemoveAttachment", k, r)
+		}
+	}
+	c, _, _ = c.Update(tea.PasteMsg{Content: "pasted"})
+	if c.Values().To != "a@b.c" {
+		t.Error("a paste should be ignored on the row")
+	}
+}
+
+func TestComposeAttachments_Dirty(t *testing.T) {
+	c := attCompose(ComposeTo)
+	if c.Dirty() {
+		t.Error("dirty right after InitAttachments")
+	}
+	c.SetAttachments(attLabels[:1])
+	if !c.Dirty() {
+		t.Error("removing an attachment should make the composer dirty")
+	}
+	if c, _ = press(c, "esc"); !c.Prompting() {
+		t.Error("esc after a removal should prompt")
+	}
+}
+
+func TestComposeAttachments_EmptyingWhileFocusedMovesToBody(t *testing.T) {
+	c := attCompose(ComposeAttachments)
+	c, _ = press(c, "right")
+	c.SetAttachments(attLabels[:1])
+	if c.AttachmentIndex() != 0 {
+		t.Errorf("selection = %d, want it clamped to 0", c.AttachmentIndex())
+	}
+	c.SetAttachments(nil)
+	if c.focus != ComposeBody {
+		t.Errorf("focus = %v, want Body", c.focus)
+	}
+}
+
+func TestComposeAttachments_HintsWhenFocused(t *testing.T) {
+	c := attCompose(ComposeAttachments)
+	var got []string
+	for _, b := range c.Hints() {
+		got = append(got, b.Help().Key+" "+b.Help().Desc)
+	}
+	if s := strings.Join(got, "|"); !strings.HasPrefix(s, "←/→ choose|d remove|") {
+		t.Errorf("hints = %q", s)
+	}
+}
+
+func TestComposeAttachments_ViewFitsAndKeepsSelectionVisible(t *testing.T) {
+	long := []string{strings.Repeat("a", 30) + ".pdf (1 KB)", strings.Repeat("b", 30) + ".pdf (2 KB)", strings.Repeat("c", 30) + ".pdf (3 KB)"}
+	c := newTestCompose(ComposeValues{To: "a@b.c"}, ComposeAttachments)
+	c.InitAttachments(long)
+	for _, sz := range [][2]int{{80, 24}, {40, 14}, {24, 12}} {
+		c.SetSize(sz[0], sz[1])
+		for sel := range long {
+			c.attSel = sel
+			lines := strings.Split(ansi.Strip(c.View()), "\n")
+			if len(lines) != sz[1] {
+				t.Fatalf("%v: %d lines", sz, len(lines))
+			}
+			row := ""
+			for _, l := range lines {
+				if strings.Contains(l, "Attach") {
+					row = l
+				}
+				if w := ansi.StringWidth(l); w != sz[0] {
+					t.Errorf("%v: line is %d wide: %q", sz, w, l)
+				}
+			}
+			if row == "" {
+				t.Fatalf("%v: no Attachments row:\n%s", sz, ansi.Strip(c.View()))
+			}
+			if sz[0] == 80 && !strings.Contains(row, long[sel][:10]) {
+				t.Errorf("%v sel %d: selected item not visible: %q", sz, sel, row)
+			}
+			if sz[0] == 40 && !strings.Contains(row, long[sel][:10]) {
+				t.Errorf("%v sel %d: selected item not visible: %q", sz, sel, row)
+			}
+			if sz[0] == 40 && sel > 0 && !strings.Contains(row, "… ") {
+				t.Errorf("%v sel %d: no leading ellipsis: %q", sz, sel, row)
+			}
+		}
+	}
+}

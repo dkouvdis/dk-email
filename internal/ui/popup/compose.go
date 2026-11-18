@@ -2,6 +2,7 @@ package popup
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"charm.land/bubbles/v2/key"
@@ -24,6 +25,9 @@ const (
 	ComposeDiscard // d in the close prompt
 	ComposeSave    // s or esc in the close prompt, when saving is enabled
 	ComposeCancel  // esc while busy with work that can be cancelled
+	// ComposeRemoveAttachment is d, backspace or delete on the Attachments
+	// row; the UI drops the one AttachmentIndex names.
+	ComposeRemoveAttachment
 )
 
 // ComposeField is a field of the composer, in focus order.
@@ -39,6 +43,9 @@ const (
 	// ComposeFrom is the From row, which sits before To in focus order and
 	// exists only with two or more choices (see SetFrom).
 	ComposeFrom
+	// ComposeAttachments is the Attachments row, after Subject in focus order,
+	// present only while there are attachments (see InitAttachments).
+	ComposeAttachments
 )
 
 // ComposeValues is the text of every field.
@@ -68,6 +75,12 @@ type Compose struct {
 	// highlighted choice and fromTop the first one shown.
 	fromOpen        bool
 	fromHi, fromTop int
+
+	// atts are the labels of the attachments; the row shows while there are
+	// any. initialAtts is the list Dirty compares with and attSel the
+	// selected one.
+	atts, initialAtts []string
+	attSel            int
 
 	title     string
 	w, h      int
@@ -155,17 +168,43 @@ func (c *Compose) SetFrom(choices []string, selected int) {
 // FromIndex is the selected From choice.
 func (c Compose) FromIndex() int { return c.fromSel }
 
+// InitAttachments sets the attachment labels (already formatted), which
+// become the baseline for Dirty. With none the row is hidden.
+func (c *Compose) InitAttachments(labels []string) {
+	c.atts, c.initialAtts = slices.Clone(labels), slices.Clone(labels)
+	c.attSel = 0
+	c.layout()
+}
+
+// SetAttachments replaces the attachment labels without touching the
+// baseline for Dirty. Focus leaves the row when the last one goes.
+func (c *Compose) SetAttachments(labels []string) {
+	c.atts = slices.Clone(labels)
+	c.attSel = max(min(c.attSel, len(c.atts)-1), 0)
+	if len(c.atts) == 0 && c.focus == ComposeAttachments {
+		c.setFocus(ComposeBody)
+	}
+	c.layout()
+}
+
+// AttachmentIndex is the selected attachment.
+func (c Compose) AttachmentIndex() int { return c.attSel }
+
 // SetTitle replaces the popup title.
 func (c *Compose) SetTitle(t string) { c.title = t }
 
 func (c Compose) hasFrom() bool { return len(c.from) >= 2 }
 
-// extraRows is how many rows the From row adds to the layout.
+// extraRows is how many rows the From and Attachments rows add to the layout.
 func (c Compose) extraRows() int {
+	n := 0
 	if c.hasFrom() {
-		return 1
+		n++
 	}
-	return 0
+	if len(c.atts) > 0 {
+		n++
+	}
+	return n
 }
 
 // SetError shows msg in the footer. An empty msg clears it.
@@ -204,14 +243,16 @@ func (c Compose) Values() ComposeValues {
 }
 
 // Dirty reports whether any field differs from where it started.
-func (c Compose) Dirty() bool { return c.Values() != c.initial || c.fromSel != c.initialFrom }
+func (c Compose) Dirty() bool {
+	return c.Values() != c.initial || c.fromSel != c.initialFrom || !slices.Equal(c.atts, c.initialAtts)
+}
 
 // Prompting reports whether the close prompt is showing.
 func (c Compose) Prompting() bool { return c.prompting }
 
 func (c *Compose) setFocus(f ComposeField) {
 	c.focus = f
-	if f == ComposeFrom {
+	if f == ComposeFrom || f == ComposeAttachments {
 		for i := range c.headers {
 			c.headers[i].Blur()
 		}
@@ -237,6 +278,9 @@ func (c *Compose) move(step int) {
 	if c.hasFrom() {
 		order = append([]ComposeField{ComposeFrom}, order...)
 	}
+	if len(c.atts) > 0 {
+		order = slices.Insert(order, slices.Index(order, ComposeSubject)+1, ComposeAttachments)
+	}
 	for i, f := range order {
 		if f == c.focus {
 			c.setFocus(order[(i+step+len(order))%len(order)])
@@ -254,7 +298,7 @@ func (c *Compose) cycleFrom(step int) {
 // forward gives msg to the focused input.
 func (c *Compose) forward(msg tea.Msg) tea.Cmd {
 	var cmd tea.Cmd
-	if c.focus == ComposeFrom {
+	if c.focus == ComposeFrom || c.focus == ComposeAttachments {
 		return nil
 	}
 	if c.focus == ComposeBody {
@@ -335,7 +379,19 @@ func (c Compose) updateKey(msg tea.KeyPressMsg) (Compose, ComposeResult, tea.Cmd
 			c.move(1)
 			return c, ComposeNone, nil
 		}
+	case "d", "backspace", "delete":
+		if c.focus == ComposeAttachments {
+			return c, ComposeRemoveAttachment, nil
+		}
 	case "left", "right", "space":
+		if c.focus == ComposeAttachments {
+			if msg.String() == "left" {
+				c.attSel = max(c.attSel-1, 0)
+			} else if msg.String() == "right" {
+				c.attSel = min(c.attSel+1, len(c.atts)-1)
+			}
+			return c, ComposeNone, nil
+		}
 		if c.focus == ComposeFrom {
 			step := 1
 			if msg.String() == "left" {
@@ -400,6 +456,9 @@ func (c Compose) View() string {
 			label = c.th.Muted.Render(label)
 		}
 		lines = append(lines, label+c.headers[i].View())
+		if ComposeField(i) == ComposeSubject && len(c.atts) > 0 {
+			lines = append(lines, c.attachmentsRow(innerW))
+		}
 	}
 	rule := c.th.Muted.Render(strings.Repeat("─", innerW))
 	if c.focus == ComposeBody {
@@ -425,6 +484,40 @@ func (c Compose) View() string {
 	}
 	body = append(body, footer...)
 	return FrameTitled(c.th, c.title, strings.Join(body, "\n"), c.w, c.h)
+}
+
+// attachmentsRow is the Attachments row. When the items don't fit, the
+// window starts at the selected one, after "… " if others come before it,
+// and is cut off with "…".
+func (c Compose) attachmentsRow(w int) string {
+	label := fmt.Sprintf("%-*s", composeLabelW, "Attach")
+	focused := c.focus == ComposeAttachments
+	if focused {
+		label = c.th.Accent.Render(label)
+	} else {
+		label = c.th.Muted.Render(label)
+	}
+	avail := max(w-composeLabelW, 1)
+	render := func(from int) string {
+		parts := make([]string, 0, len(c.atts)-from)
+		for i := from; i < len(c.atts); i++ {
+			if focused && i == c.attSel {
+				parts = append(parts, c.th.Cursor.Render(c.atts[i]))
+			} else {
+				parts = append(parts, c.atts[i])
+			}
+		}
+		return strings.Join(parts, "  ")
+	}
+	items := render(0)
+	if ansi.StringWidth(items) > avail {
+		items = render(c.attSel)
+		if c.attSel > 0 {
+			items = c.th.Muted.Render("… ") + items
+		}
+		items = ansi.Truncate(items, avail, "…")
+	}
+	return label + items
 }
 
 // overlayDropdown draws the From choices in a bordered box over the rows
@@ -525,6 +618,9 @@ func (c Compose) Hints() []key.Binding {
 		return []key.Binding{h("↑/↓", "move"), h("enter", "pick"), h("esc", "close")}
 	}
 	keys := []key.Binding{h("ctrl+s", "send"), h("tab", "next field"), h("shift+tab", "previous field"), h("esc", "close")}
+	if c.focus == ComposeAttachments {
+		keys = append([]key.Binding{h("←/→", "choose"), h("d", "remove")}, keys...)
+	}
 	if c.focus == ComposeFrom {
 		keys = append([]key.Binding{h("enter", "choose"), h("←/→", "switch")}, keys...)
 	}

@@ -290,3 +290,18 @@ func TestDrafts_OpeningIsRefusedWhileBusy(t *testing.T) {
 		})
 	}
 }
+
+func TestDrafts_ReopenedDraftShowsItsAttachments(t *testing.T) {
+	m, f, u := draftsFixture(t, &mailtest.DraftSender{})
+	s := f.personalSender.(*mailtest.DraftSender)
+	ref := mail.MessageRef{Folder: "Drafts", UID: u.solo}
+	s.AddDraft(ref, mail.Draft{To: []mail.Address{{Email: "carol@example.com"}}, Subject: "Files", Body: "see attached", Attachments: []mail.File{
+		{Name: "a.pdf", ContentType: "application/pdf", Data: []byte("%PDF")},
+	}})
+	m = send(t, m, click(60, 3)) // the Solo draft
+	m = openedDraft(t, m)
+
+	if v := plain(m); !strings.Contains(v, "Attach") || !strings.Contains(v, "a.pdf (4 B)") {
+		t.Errorf("composer lacks the attachment:\n%s", v)
+	}
+}

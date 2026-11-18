@@ -801,3 +801,67 @@ func TestCompose_EscCancelsASave(t *testing.T) {
 		t.Errorf("body = %q, want typing to work after cancelling", got)
 	}
 }
+
+// attachmentsOpen is a forward of a message with two files, in the composer,
+// with focus on the Attachments row.
+func attachmentsOpen(t *testing.T) (Model, *mailtest.Sender) {
+	t.Helper()
+	m, s, _, _ := forwardFixture(t, forwardAtts)
+	m = replied(t, m, "f")
+	return send(t, m, press("tab"), press("tab"), press("tab"), press("tab")), s
+}
+
+func TestCompose_ForwardShowsItsAttachments(t *testing.T) {
+	m, _ := attachmentsOpen(t)
+	v := plain(m)
+	for _, want := range []string{"Attach", "report.pdf (", "notes.txt (18 B)"} {
+		if !strings.Contains(v, want) {
+			t.Errorf("composer lacks %q:\n%s", want, v)
+		}
+	}
+}
+
+func TestCompose_RemovingAnAttachmentSendsTheRest(t *testing.T) {
+	m, s := attachmentsOpen(t)
+	m = send(t, m, press("right"), press("d"))
+	if v := plain(m); strings.Contains(v, "notes.txt") || !strings.Contains(v, "report.pdf") {
+		t.Errorf("composer after removal:\n%s", v)
+	}
+	m = send(t, m, press("shift+tab"), press("shift+tab"), press("shift+tab"), press("shift+tab"))
+	m = typed(t, m, "zed@example.com")
+
+	m = sendKey(t, m)
+
+	got := s.Sent()
+	if len(got) != 1 {
+		t.Fatalf("sent %d, want 1", len(got))
+	}
+	checkCarried(t, got[0].Attachments, forwardAtts[:1])
+	if len(forwardAtts) != 2 || forwardAtts[1].Name != "notes.txt" {
+		t.Errorf("shared fixture mutated: %+v", forwardAtts)
+	}
+}
+
+func TestCompose_RemovingTheLastAttachmentHidesTheRow(t *testing.T) {
+	m, _ := attachmentsOpen(t)
+	m = send(t, m, press("d"), press("d"))
+	if v := plain(m); strings.Contains(v, "Attach") || len(m.draft.base.Attachments) != 0 {
+		t.Errorf("row still shown:\n%s", v)
+	}
+}
+
+func TestCompose_EscAfterRemovingAnAttachmentPrompts(t *testing.T) {
+	m, _ := attachmentsOpen(t)
+	m = send(t, m, press("d"), press("esc"))
+	if !m.composing() || !m.draft.pop.Prompting() {
+		t.Error("esc after removing an attachment should show the prompt")
+	}
+}
+
+func TestCompose_EscWithAttachmentsUntouchedClosesAtOnce(t *testing.T) {
+	m, _ := attachmentsOpen(t)
+	m = send(t, m, press("esc"))
+	if m.composing() {
+		t.Error("esc with no change should close")
+	}
+}
