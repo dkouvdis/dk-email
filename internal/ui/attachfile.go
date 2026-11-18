@@ -209,19 +209,69 @@ func (m Model) handleAttachRead(msg attachReadMsg) (tea.Model, tea.Cmd) {
 		m.log.Debug("attach failed")
 		return m, nil
 	}
-	f := msg.file
-	for _, a := range d.base.Attachments {
-		if a.Name == f.Name && slices.Equal(a.Data, f.Data) {
-			d.pop.CloseAttach()
-			m.setStatus(f.Name + " is already attached.")
-			m.log.Debug("attachment already attached", "bytes", len(f.Data))
-			return m, nil
-		}
-	}
-	d.base.Attachments = append(slices.Clone(d.base.Attachments), f)
-	d.pop.SetAttachments(attachmentLabels(d.base.Attachments))
+	added, skipped := d.addAttachments([]mail.File{msg.file})
 	d.pop.CloseAttach()
-	m.setStatus("Attached " + f.Name + ".")
-	m.log.Debug("attachment added", "count", len(d.base.Attachments), "bytes", len(f.Data))
+	m.setStatus(attachStatus(added, skipped))
+	m.log.Debug("attachment read", "added", len(added), "skipped", len(skipped), "bytes", len(msg.file.Data))
 	return m, nil
+}
+
+// addAttachments adds the files not already attached (same name and bytes) to
+// the draft and returns the names it added and the names it skipped.
+func (d *draftState) addAttachments(files []mail.File) (added, skipped []string) {
+	list := slices.Clone(d.base.Attachments)
+	for _, f := range files {
+		if slices.ContainsFunc(list, func(a mail.File) bool {
+			return a.Name == f.Name && slices.Equal(a.Data, f.Data)
+		}) {
+			skipped = append(skipped, f.Name)
+			continue
+		}
+		list = append(list, f)
+		added = append(added, f.Name)
+	}
+	if len(added) > 0 {
+		d.base.Attachments = list
+		d.pop.SetAttachments(attachmentLabels(list))
+	}
+	return added, skipped
+}
+
+// attachStatus words the outcome of adding files.
+func attachStatus(added, skipped []string) string {
+	var parts []string
+	if len(added) > 0 {
+		parts = append(parts, "Attached "+strings.Join(added, ", "))
+	}
+	if len(skipped) > 0 {
+		verb := " is already attached"
+		if len(skipped) > 1 {
+			verb = " are already attached"
+		}
+		parts = append(parts, strings.Join(skipped, ", ")+verb)
+	}
+	return strings.Join(parts, "; ") + "."
+}
+
+// handleDropped attaches the files a paste dropped, if the composer is still
+// open, and closes the attach prompt if it was.
+func (m Model) handleDropped(msg droppedMsg) (tea.Model, tea.Cmd) {
+	if !m.composing() {
+		return m, nil
+	}
+	d := m.draft
+	added, skipped := d.addAttachments(msg.files)
+	d.pop.CloseAttach()
+	m.setStatus(attachStatus(added, skipped))
+	m.log.Debug("files dropped", "added", len(added), "skipped", len(skipped))
+	return m, nil
+}
+
+// handleDropFallback pastes the text of a drop that could not be read.
+func (m Model) handleDropFallback(msg dropFallbackMsg) (tea.Model, tea.Cmd) {
+	if !m.composing() {
+		return m, nil
+	}
+	m.log.Debug("drop unreadable, pasting as text")
+	return m.updateComposer(msg.paste)
 }

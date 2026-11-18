@@ -306,6 +306,10 @@ func (c Compose) Dirty() bool {
 // Prompting reports whether the close prompt is showing.
 func (c Compose) Prompting() bool { return c.prompting }
 
+// TakesPaste reports whether a paste would be acted on: it is not while busy
+// or while the close prompt or the From choices are open.
+func (c Compose) TakesPaste() bool { return c.busy == "" && !c.prompting && !c.fromOpen }
+
 func (c *Compose) setFocus(f ComposeField) {
 	c.focus = f
 	if f == ComposeFrom || f == ComposeAttachments {

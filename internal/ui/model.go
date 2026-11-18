@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"runtime"
 	"slices"
 	"strings"
 	"time"
@@ -199,6 +200,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.PasteMsg:
 		switch {
 		case m.composing():
+			if m.draft.pop.TakesPaste() {
+				if paths, ok := parseDropped(msg.Content, runtime.GOOS); ok {
+					m.log.Debug("paste looks like a drop", "files", len(paths))
+					return m, readDropped(paths, msg)
+				}
+			}
 			return m.updateComposer(msg)
 		case m.showConnect:
 			m.connectPop = m.connectPop.Paste(msg)
@@ -258,6 +265,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleCompleted(msg)
 	case attachReadMsg:
 		return m.handleAttachRead(msg)
+	case droppedMsg:
+		return m.handleDropped(msg)
+	case dropFallbackMsg:
+		return m.handleDropFallback(msg)
 	default:
 		// Whatever else the composer's inputs wait for, such as a clipboard read.
 		if m.composing() {

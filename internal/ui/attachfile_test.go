@@ -10,6 +10,8 @@ import (
 	"testing"
 	"testing/fstest"
 
+	tea "charm.land/bubbletea/v2"
+
 	"github.com/dkouvdis/dk-email/internal/mail/mailtest"
 )
 
@@ -320,5 +322,131 @@ func TestAttach_LateResultsAreDropped(t *testing.T) {
 	m = send(t, m, msg, completedMsg{value: "zzz"})
 	if m.draft != nil {
 		t.Error("late results reopened the composer")
+	}
+}
+
+// escaped is path as a terminal pastes it on a drop.
+func escaped(path string) string { return strings.ReplaceAll(path, " ", `\ `) }
+
+// pasteCmd sends a paste and returns the model and the command it started.
+func pasteCmd(t *testing.T, m Model, text string) (Model, tea.Cmd) {
+	t.Helper()
+	next, cmd := m.Update(tea.PasteMsg{Content: text})
+	return next.(Model), cmd
+}
+
+// dropped pastes text and runs the command it started, if any.
+func dropped(t *testing.T, m Model, text string) Model {
+	t.Helper()
+	m, cmd := pasteCmd(t, m, text)
+	if cmd == nil {
+		t.Fatal("the paste started nothing")
+	}
+	return send(t, m, cmd())
+}
+
+func TestDrop_TwoFilesIntoBodyAttachBoth(t *testing.T) {
+	m, s, dir := attachComposer(t)
+	write(t, filepath.Join(dir, "one file.txt"), []byte("first"))
+	write(t, filepath.Join(dir, "two.bin"), []byte{0, 1, 2, 0xff})
+	body := m.draft.pop.Values().Body
+
+	m = dropped(t, m, escaped(filepath.Join(dir, "one file.txt"))+" "+filepath.Join(dir, "two.bin"))
+
+	if got := m.draft.pop.Values().Body; got != body {
+		t.Errorf("body changed to %q", got)
+	}
+	if want := "Attached one file.txt, two.bin."; m.status != want {
+		t.Errorf("status %q, want %q", m.status, want)
+	}
+	v := plain(m)
+	for _, want := range []string{"one file.txt (5 B)", "two.bin (4 B)"} {
+		if !strings.Contains(v, want) {
+			t.Errorf("composer lacks %q:\n%s", want, v)
+		}
+	}
+	m = sendKey(t, m)
+	got := s.Sent()
+	if len(got) != 1 || len(got[0].Attachments) != 2 ||
+		string(got[0].Attachments[0].Data) != "first" || string(got[0].Attachments[1].Data) != "\x00\x01\x02\xff" {
+		t.Fatalf("sent %+v", got)
+	}
+}
+
+func TestDrop_UnreadablePastesAsText(t *testing.T) {
+	m, _, dir := attachComposer(t)
+	if err := os.Mkdir(filepath.Join(dir, "folder"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range []string{filepath.Join(dir, "missing.txt"), filepath.Join(dir, "folder")} {
+		before := m.draft.pop.Values().Body
+		m = dropped(t, m, p)
+		if got := m.draft.pop.Values().Body; got != before+p {
+			t.Errorf("body %q, want %q", got, before+p)
+		}
+		if n := len(m.draft.base.Attachments); n != 0 {
+			t.Errorf("%d attachments, want none", n)
+		}
+	}
+}
+
+func TestDrop_PlainTextPastesAtOnce(t *testing.T) {
+	m, _, _ := attachComposer(t)
+	before := m.draft.pop.Values().Body
+	m, _ = pasteCmd(t, m, "just words")
+	if got := m.draft.pop.Values().Body; got != before+"just words" {
+		t.Errorf("body %q", got)
+	}
+	if len(m.draft.base.Attachments) != 0 {
+		t.Error("text attached something")
+	}
+}
+
+func TestDrop_AlreadyAttachedIsSkipped(t *testing.T) {
+	m, _, dir := attachComposer(t)
+	write(t, filepath.Join(dir, "a.txt"), []byte("same"))
+	write(t, filepath.Join(dir, "b.txt"), []byte("other"))
+	m = dropped(t, m, filepath.Join(dir, "a.txt"))
+	m = dropped(t, m, filepath.Join(dir, "a.txt"))
+	if m.status != "a.txt is already attached." || len(m.draft.base.Attachments) != 1 {
+		t.Errorf("status %q, %d attachments", m.status, len(m.draft.base.Attachments))
+	}
+	m = dropped(t, m, filepath.Join(dir, "a.txt")+" "+filepath.Join(dir, "b.txt"))
+	if m.status != "Attached b.txt; a.txt is already attached." || len(m.draft.base.Attachments) != 2 {
+		t.Errorf("status %q, %d attachments", m.status, len(m.draft.base.Attachments))
+	}
+}
+
+func TestDrop_ClosesTheAttachPrompt(t *testing.T) {
+	m, _, dir := attachComposer(t)
+	write(t, filepath.Join(dir, "a.txt"), []byte("x"))
+	m = send(t, m, press("ctrl+o"))
+	m = dropped(t, m, filepath.Join(dir, "a.txt"))
+	if m.draft.pop.Attaching() || len(m.draft.base.Attachments) != 1 || m.status != "Attached a.txt." {
+		t.Errorf("attaching %v, %d attachments, status %q", m.draft.pop.Attaching(), len(m.draft.base.Attachments), m.status)
+	}
+}
+
+func TestDrop_IntoHeaderField(t *testing.T) {
+	m, _, dir := attachComposer(t)
+	write(t, filepath.Join(dir, "a.txt"), []byte("x"))
+	m = send(t, m, press("shift+tab"), press("shift+tab"), press("shift+tab"), press("shift+tab"))
+	to := m.draft.pop.Values().To
+	m = dropped(t, m, filepath.Join(dir, "a.txt"))
+	if len(m.draft.base.Attachments) != 1 || m.draft.pop.Values().To != to {
+		t.Errorf("%d attachments, To %q (was %q)", len(m.draft.base.Attachments), m.draft.pop.Values().To, to)
+	}
+}
+
+func TestDrop_IgnoredWhileClosePromptShows(t *testing.T) {
+	m, _, dir := attachComposer(t)
+	write(t, filepath.Join(dir, "a.txt"), []byte("x"))
+	m = send(t, m, press("esc"))
+	if !m.draft.pop.Prompting() {
+		t.Fatal("no close prompt")
+	}
+	m, cmd := pasteCmd(t, m, filepath.Join(dir, "a.txt"))
+	if cmd != nil || len(m.draft.base.Attachments) != 0 {
+		t.Errorf("cmd %v, %d attachments", cmd != nil, len(m.draft.base.Attachments))
 	}
 }
