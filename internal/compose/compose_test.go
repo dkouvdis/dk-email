@@ -29,7 +29,6 @@ var (
 type buildCase struct {
 	name string
 	d    dkmail.Draft
-	atts []Attachment
 }
 
 func buildCases() []buildCase {
@@ -54,9 +53,10 @@ func buildCases() []buildCase {
 		}},
 		{name: "attachments", d: dkmail.Draft{
 			From: alice, To: []dkmail.Address{bob}, Subject: "Files", Body: "See attached.\n",
-		}, atts: []Attachment{
-			{Filename: "notes.txt", ContentType: "text/plain; charset=utf-8", Data: []byte("line one\nline two\n")},
-			{Filename: "résumé.pdf", Data: bytes.Repeat([]byte{0, 1, 2, 250, 255, 'A'}, 40)},
+			Attachments: []dkmail.File{
+				{Name: "notes.txt", ContentType: "text/plain; charset=utf-8", Data: []byte("line one\nline two\n")},
+				{Name: "résumé.pdf", Data: bytes.Repeat([]byte{0, 1, 2, 250, 255, 'A'}, 40)},
+			},
 		}},
 		{name: "reply", d: dkmail.Draft{
 			From: alice, To: []dkmail.Address{bob}, Subject: "Re: Lunch on Friday",
@@ -70,7 +70,7 @@ func buildCases() []buildCase {
 func TestBuild_Golden(t *testing.T) {
 	for _, tc := range buildCases() {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := Build(tc.d, tc.atts, fixedNow, fixedID)
+			got, err := Build(tc.d, fixedNow, fixedID)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -94,7 +94,7 @@ func TestBuild_Golden(t *testing.T) {
 func TestBuild_WellFormedAndReparses(t *testing.T) {
 	for _, tc := range buildCases() {
 		t.Run(tc.name, func(t *testing.T) {
-			raw, err := Build(tc.d, tc.atts, fixedNow, fixedID)
+			raw, err := Build(tc.d, fixedNow, fixedID)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -137,7 +137,7 @@ func TestBuild_WellFormedAndReparses(t *testing.T) {
 			}
 
 			var body string
-			var files []Attachment
+			var files []dkmail.File
 			for {
 				p, err := r.NextPart()
 				if err == io.EOF {
@@ -153,18 +153,18 @@ func TestBuild_WellFormedAndReparses(t *testing.T) {
 				case *gomail.AttachmentHeader:
 					name, _ := ph.Filename()
 					ct, _, _ := ph.ContentType()
-					files = append(files, Attachment{Filename: name, ContentType: ct, Data: data})
+					files = append(files, dkmail.File{Name: name, ContentType: ct, Data: data})
 				}
 			}
 			if got := strings.ReplaceAll(body, "\r\n", "\n"); got != tc.d.Body {
 				t.Errorf("body = %q, want %q", got, tc.d.Body)
 			}
-			if len(files) != len(tc.atts) {
-				t.Fatalf("got %d attachments, want %d", len(files), len(tc.atts))
+			if len(files) != len(tc.d.Attachments) {
+				t.Fatalf("got %d attachments, want %d", len(files), len(tc.d.Attachments))
 			}
-			for i, a := range tc.atts {
-				if files[i].Filename != a.Filename || !bytes.Equal(files[i].Data, a.Data) {
-					t.Errorf("attachment %d = %q (%d bytes), want %q (%d bytes)", i, files[i].Filename, len(files[i].Data), a.Filename, len(a.Data))
+			for i, a := range tc.d.Attachments {
+				if files[i].Name != a.Name || !bytes.Equal(files[i].Data, a.Data) {
+					t.Errorf("attachment %d = %q (%d bytes), want %q (%d bytes)", i, files[i].Name, len(files[i].Data), a.Name, len(a.Data))
 				}
 			}
 		})
@@ -173,7 +173,7 @@ func TestBuild_WellFormedAndReparses(t *testing.T) {
 
 func TestBuild_ReplyHeadersAndTextPartFirst(t *testing.T) {
 	tc := buildCases()[5]
-	raw, err := Build(tc.d, nil, fixedNow, "<"+fixedID+">")
+	raw, err := Build(tc.d, fixedNow, "<"+fixedID+">")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -192,14 +192,14 @@ func TestBuild_ReplyHeadersAndTextPartFirst(t *testing.T) {
 	}
 
 	tc = buildCases()[4]
-	raw, _ = Build(tc.d, tc.atts, fixedNow, fixedID)
+	raw, _ = Build(tc.d, fixedNow, fixedID)
 	if i, j := bytes.Index(raw, []byte("text/plain")), bytes.Index(raw, []byte("Content-Disposition")); i < 0 || j < i {
 		t.Error("text part must come before the attachments")
 	}
 }
 
 func TestBuild_ReplyHeadersAbsentWhenUnset(t *testing.T) {
-	raw, err := Build(buildCases()[0].d, nil, fixedNow, fixedID)
+	raw, err := Build(buildCases()[0].d, fixedNow, fixedID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -215,12 +215,12 @@ func TestBuild_SanitizesInjectionAndFilenames(t *testing.T) {
 		From: alice, To: []dkmail.Address{{Name: "Eve\r\nBcc: x@y.z", Email: "eve@example.com"}},
 		Subject: "Hi\r\nBcc: evil@example.com", Body: "x",
 	}
-	atts := []Attachment{
-		{Filename: "../../etc/pass\nwd", ContentType: "bad content type"},
-		{Filename: ""},
-		{Filename: `C:\dir\win.txt`, ContentType: "text/plain"},
+	d.Attachments = []dkmail.File{
+		{Name: "../../etc/pass\nwd", ContentType: "bad content type"},
+		{Name: ""},
+		{Name: `C:\dir\win.txt`, ContentType: "text/plain"},
 	}
-	raw, err := Build(d, atts, fixedNow, fixedID)
+	raw, err := Build(d, fixedNow, fixedID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -253,9 +253,9 @@ func TestBuild_SanitizesInjectionAndFilenames(t *testing.T) {
 
 func TestBuild_Deterministic(t *testing.T) {
 	tc := buildCases()[4]
-	a, _ := Build(tc.d, tc.atts, fixedNow, fixedID)
-	b, _ := Build(tc.d, tc.atts, fixedNow, fixedID)
-	c, _ := Build(tc.d, tc.atts, fixedNow, "other@example.com")
+	a, _ := Build(tc.d, fixedNow, fixedID)
+	b, _ := Build(tc.d, fixedNow, fixedID)
+	c, _ := Build(tc.d, fixedNow, "other@example.com")
 	if !bytes.Equal(a, b) {
 		t.Error("same input produced different output")
 	}

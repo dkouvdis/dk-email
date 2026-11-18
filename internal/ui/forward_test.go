@@ -82,8 +82,7 @@ func TestForward_CollapsedThreadForwardsTheLatestMessage(t *testing.T) {
 		t.Errorf("typing landed in To = %q", got)
 	}
 	d := m.draft.base
-	if d.From != replyMe || len(d.To) != 0 || d.InReplyTo != "" || len(d.References) != 0 || d.ReplyTo != nil ||
-		d.ForwardOf != nil {
+	if d.From != replyMe || len(d.To) != 0 || d.InReplyTo != "" || len(d.References) != 0 || d.ReplyTo != nil {
 		t.Errorf("base draft = %+v", d)
 	}
 	checkCarried(t, d.Attachments, forwardAtts)
@@ -101,7 +100,7 @@ func TestForward_ExpandedRowForwardsTheSelectedMessage(t *testing.T) {
 	if got := rawFetchUIDs(fake); len(got) != 1 || got[0] != u.first {
 		t.Errorf("fetched %v, want the selected message %d", got, u.first)
 	}
-	if d := m.draft.base; d.ForwardOf != nil || len(d.Attachments) != 0 || d.Subject != "Fwd: Offsite" || !strings.Contains(m.draft.pop.Values().Body, "Body of o1.") {
+	if d := m.draft.base; len(d.Attachments) != 0 || d.Subject != "Fwd: Offsite" || !strings.Contains(m.draft.pop.Values().Body, "Body of o1.") {
 		t.Errorf("draft = %+v\n%s", d, m.draft.pop.Values().Body)
 	}
 }
@@ -129,7 +128,7 @@ func TestForward_ReaderStillFetchesRawBeforeOpening(t *testing.T) {
 	if got := rawFetchUIDs(fake); len(got) != before+1 || got[len(got)-1] != u.latest {
 		t.Errorf("raw fetches %v, want one more, of %d", got, u.latest)
 	}
-	if !m.composing() || m.draft.base.ForwardOf != nil {
+	if !m.composing() {
 		t.Fatalf("draft = %+v; want the composer open after the fetch", m.draft)
 	}
 	checkCarried(t, m.draft.base.Attachments, forwardAtts)
@@ -145,7 +144,7 @@ func TestForward_ReaderOnAnUnreadThreadForwardsTheLatest(t *testing.T) {
 	if got := rawFetchUIDs(fake); len(got) <= before || got[len(got)-1] != u.latest {
 		t.Errorf("fetched %v, want the latest message %d fetched last", got, u.latest)
 	}
-	if !strings.Contains(m.draft.pop.Values().Body, "Body of o3.") || m.draft.base.ForwardOf != nil {
+	if !strings.Contains(m.draft.pop.Values().Body, "Body of o3.") {
 		t.Errorf("draft = %+v\n%s", m.draft.base, m.draft.pop.Values().Body)
 	}
 }
@@ -228,9 +227,6 @@ func TestForward_SendCarriesAttachmentsAndNoThreading(t *testing.T) {
 	if d.From != replyMe || addrs(d.To) != "zed@example.com" || d.Subject != "Fwd: Re: Offsite" {
 		t.Errorf("draft = %+v", d)
 	}
-	if d.ForwardOf != nil {
-		t.Errorf("ForwardOf = %v, want nil", d.ForwardOf)
-	}
 	checkCarried(t, d.Attachments, forwardAtts)
 	if d.InReplyTo != "" || len(d.References) != 0 || d.ReplyTo != nil {
 		t.Errorf("threading fields set: %+v", d)
@@ -267,9 +263,6 @@ func TestForward_SendsExactlyTheOriginalsAttachments(t *testing.T) {
 		got := s.Sent()
 		if len(got) != 1 {
 			t.Fatalf("n=%d: sent %d drafts, want 1", n, len(got))
-		}
-		if got[0].ForwardOf != nil {
-			t.Errorf("n=%d: ForwardOf = %v, want nil", n, got[0].ForwardOf)
 		}
 		if len(got[0].Attachments) != n {
 			t.Fatalf("n=%d: sent %d attachments", n, len(got[0].Attachments))

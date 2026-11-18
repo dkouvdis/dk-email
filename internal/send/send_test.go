@@ -10,8 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/emersion/go-message"
-
 	"github.com/dkouvdis/dk-email/internal/compose"
 	"github.com/dkouvdis/dk-email/internal/config"
 	"github.com/dkouvdis/dk-email/internal/mail"
@@ -210,160 +208,14 @@ func TestSend_Reply(t *testing.T) {
 	}
 }
 
-func TestSend_Forward(t *testing.T) {
-	r := newRig(acct())
-	r.st.raw = []byte("original raw")
-	var got []byte
-	r.s.extract = func(raw []byte) ([]compose.Attachment, error) {
-		got = raw
-		return []compose.Attachment{{Filename: "report.pdf", ContentType: "application/pdf", Data: []byte("%PDF-data")}}, nil
-	}
-	d := draft()
-	d.ForwardOf = &mail.MessageRef{Folder: "Archive", UID: 7}
-	if err := r.s.Send(context.Background(), d); err != nil {
-		t.Fatal(err)
-	}
-	if o, want := order(r), "raw,smtp,sentfolder,append"; o != want {
-		t.Fatalf("calls = %s, want %s", o, want)
-	}
-	if r.st.rawFolder != "Archive" || r.st.rawUID != 7 || string(got) != "original raw" {
-		t.Errorf("Raw(%q, %d), extractor got %q", r.st.rawFolder, r.st.rawUID, got)
-	}
-	if !bytes.Contains(r.t.msg, []byte("report.pdf")) {
-		t.Error("sent bytes don't contain the attachment")
-	}
-	if !bytes.Equal(r.st.appended, r.t.msg) {
-		t.Error("appended bytes differ from sent bytes")
-	}
-}
-
-// original builds the raw message being forwarded, attachments included.
-func original(t *testing.T, atts ...compose.Attachment) []byte {
-	t.Helper()
-	d := mail.Draft{
-		From:    mail.Address{Email: "alice@example.com"},
-		To:      []mail.Address{{Email: "me@example.com"}},
-		Subject: "Original",
-		Body:    "see attached",
-	}
-	raw, err := compose.Build(d, atts, time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), "orig@example.com")
-	if err != nil {
-		t.Fatal(err)
-	}
-	return raw
-}
-
-func forwardDraft() mail.Draft {
-	d := draft()
-	d.ForwardOf = &mail.MessageRef{Folder: "Archive", UID: 7}
-	return d
-}
-
-func TestSend_ForwardCopiesEveryAttachmentIntact(t *testing.T) {
-	binary := make([]byte, 5000)
-	for i := range binary {
-		binary[i] = byte(i * 31)
-	}
-	atts := []compose.Attachment{
-		{Filename: "report.pdf", ContentType: "application/pdf", Data: binary},
-		{Filename: "résumé €.txt", ContentType: "text/plain; charset=utf-8", Data: []byte("café\r\nline two\r\n")},
-		{Filename: "logo.png", ContentType: "image/png", Data: []byte("\x89PNG\r\n\x1a\n")},
-	}
-	r := newRig(acct())
-	r.st.raw = original(t, atts...)
-
-	if err := r.s.Send(context.Background(), forwardDraft()); err != nil {
-		t.Fatal(err)
-	}
-
-	if got, want := order(r), "raw,smtp,sentfolder,append"; got != want {
-		t.Fatalf("calls = %s, want %s (raw fetched exactly once, before anything is sent)", got, want)
-	}
-	if r.st.rawFolder != "Archive" || r.st.rawUID != 7 {
-		t.Errorf("Raw(%q, %d)", r.st.rawFolder, r.st.rawUID)
-	}
-	e, err := message.Read(bytes.NewReader(r.t.msg))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if mt, _, _ := e.Header.ContentType(); mt != "multipart/mixed" {
-		t.Fatalf("Content-Type = %q, want multipart/mixed", mt)
-	}
-	parts, err := render.Parts(r.t.msg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(parts) != len(atts) {
-		t.Fatalf("sent %d attachments, want %d", len(parts), len(atts))
-	}
-	for i, a := range atts {
-		if p := parts[i]; p.Filename != a.Filename || p.ContentType != a.ContentType || !bytes.Equal(p.Data, a.Data) {
-			t.Errorf("attachment %d = %q %q (%d bytes), want %q %q (%d bytes, identical)", i, p.Filename, p.ContentType, len(p.Data), a.Filename, a.ContentType, len(a.Data))
-		}
-	}
-	sent, err := parseSent(t, r.t.msg)
-	if err != nil || sent.Body != "the launch is on Friday" {
-		t.Errorf("body = %q, %v", sent.Body, err)
-	}
-	if !bytes.Equal(r.st.appended, r.t.msg) {
-		t.Error("appended bytes differ from sent bytes")
-	}
-}
-
-// parseSent reads the message the way the reader would.
-func parseSent(t *testing.T, raw []byte) (mail.Message, error) {
-	t.Helper()
-	return render.Parse(bytes.NewReader(raw))
-}
-
-func TestSend_ForwardWithoutAttachmentsIsPlainText(t *testing.T) {
-	r := newRig(acct())
-	r.st.raw = original(t)
-
-	if err := r.s.Send(context.Background(), forwardDraft()); err != nil {
-		t.Fatal(err)
-	}
-
-	e, err := message.Read(bytes.NewReader(r.t.msg))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if mt, _, _ := e.Header.ContentType(); mt != "text/plain" {
-		t.Errorf("Content-Type = %q, want text/plain", mt)
-	}
-	if got := order(r); got != "raw,smtp,sentfolder,append" {
-		t.Errorf("calls = %s", got)
-	}
-}
-
-func TestSend_ForwardOfUnreadableOriginalSendsNothing(t *testing.T) {
-	r := newRig(acct())
-	r.st.raw = []byte("not a header\x00\n")
-
-	err := r.s.Send(context.Background(), forwardDraft())
-
-	if err == nil || errors.Is(err, mail.ErrAfterDelivery) {
-		t.Fatalf("err = %v, want a pre-delivery error", err)
-	}
-	if got := order(r); got != "raw" || r.t.msg != nil || r.st.appended != nil {
-		t.Errorf("calls = %s, sent %q, appended %q; want only the fetch", got, r.t.msg, r.st.appended)
-	}
-}
-
 func TestSend_NothingSentErrors(t *testing.T) {
 	boom := errors.New("boom")
-	fwd := func(d *mail.Draft) { d.ForwardOf = &mail.MessageRef{Folder: "INBOX", UID: 1} }
 	tests := []struct {
 		name  string
 		setup func(r *rig, d *mail.Draft)
 		calls string
 	}{
 		{"smtp", func(r *rig, d *mail.Draft) { r.t.err = boom }, "smtp"},
-		{"raw", func(r *rig, d *mail.Draft) { r.st.rawErr = boom; fwd(d) }, "raw"},
-		{"extract", func(r *rig, d *mail.Draft) {
-			fwd(d)
-			r.s.extract = func([]byte) ([]compose.Attachment, error) { return nil, boom }
-		}, "raw"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -466,16 +318,13 @@ func TestSend_AfterDeliveryFailures(t *testing.T) {
 
 func TestSend_DebugLogHasNoPersonalData(t *testing.T) {
 	r := newRig(acct())
-	r.st.raw = []byte("original")
-	r.s.extract = func([]byte) ([]compose.Attachment, error) { return nil, nil }
 	d := draft()
-	d.ForwardOf = &mail.MessageRef{Folder: "INBOX", UID: 1}
 	d.ReplyTo = &mail.MessageRef{Folder: "INBOX", UID: 1}
 	if err := r.s.Send(context.Background(), d); err != nil {
 		t.Fatal(err)
 	}
 	logs := r.logs.String()
-	for _, step := range []string{"fetch-original", "build", "smtp", "save-sent", "mark-answered"} {
+	for _, step := range []string{"build", "smtp", "save-sent", "mark-answered"} {
 		if !strings.Contains(logs, "step="+step) {
 			t.Errorf("no log line for step %s:\n%s", step, logs)
 		}
@@ -525,25 +374,8 @@ func TestSend_DraftRemovalFailureIsAfterDelivery(t *testing.T) {
 	}
 }
 
-func TestSend_ResumedForwardFetchesAttachmentsBeforeDeletingTheDraft(t *testing.T) {
-	r := newRig(acct())
-	r.st.raw = original(t, compose.Attachment{Filename: "report.pdf", ContentType: "application/pdf", Data: []byte("%PDF")})
-	d := draft()
-	d.ForwardOf, d.DraftOf = &draftRef, &draftRef
-	if err := r.s.Send(context.Background(), d); err != nil {
-		t.Fatal(err)
-	}
-	if got, want := order(r), "raw,smtp,sentfolder,append,delete"; got != want {
-		t.Fatalf("calls = %s, want %s", got, want)
-	}
-	if !bytes.Contains(r.t.msg, []byte("report.pdf")) {
-		t.Error("sent bytes don't contain the attachment")
-	}
-}
-
 func TestSaveDraft(t *testing.T) {
 	boom := errors.New("boom")
-	atts := []compose.Attachment{{Filename: "report.pdf", ContentType: "application/pdf", Data: []byte("%PDF")}}
 	tests := []struct {
 		name      string
 		setup     func(r *rig, d *mail.Draft)
@@ -559,16 +391,11 @@ func TestSaveDraft(t *testing.T) {
 		{name: "no recipients and no From", setup: func(r *rig, d *mail.Draft) {
 			d.To, d.Cc, d.Bcc, d.From = nil, nil, nil, mail.Address{}
 		}, calls: "draftsfolder,append", saved: true, noRcpts: true, savedFrom: "me@example.com"},
-		{name: "forwarded attachments are kept", setup: func(r *rig, d *mail.Draft) {
-			r.st.raw = original(t, atts...)
-			d.ForwardOf = &mail.MessageRef{Folder: "Archive", UID: 7}
-		}, calls: "raw,draftsfolder,append", saved: true, wantAtt: true},
+		{name: "attachments are kept", setup: func(r *rig, d *mail.Draft) {
+			d.Attachments = twoFiles()
+		}, calls: "draftsfolder,append", saved: true, wantAtt: true},
 		{name: "replaces the old draft", setup: func(r *rig, d *mail.Draft) { d.DraftOf = &draftRef },
 			calls: "draftsfolder,append,delete", saved: true},
-		{name: "resumed forward fetches before deleting", setup: func(r *rig, d *mail.Draft) {
-			r.st.raw = original(t, atts...)
-			d.ForwardOf, d.DraftOf = &draftRef, &draftRef
-		}, calls: "raw,draftsfolder,append,delete", saved: true, wantAtt: true},
 		{name: "old draft can't be removed", setup: func(r *rig, d *mail.Draft) {
 			r.st.deleteErr = boom
 			d.DraftOf = &draftRef
@@ -582,10 +409,6 @@ func TestSaveDraft(t *testing.T) {
 			calls: "draftsfolder", err: "saving the draft: boom", cause: boom},
 		{name: "append fails", setup: func(r *rig, d *mail.Draft) { r.st.appendErr = boom; d.DraftOf = &draftRef },
 			calls: "draftsfolder,append", err: "saving the draft: boom", cause: boom},
-		{name: "forwarded original unreadable", setup: func(r *rig, d *mail.Draft) {
-			r.st.rawErr = boom
-			d.ForwardOf, d.DraftOf = &draftRef, &draftRef
-		}, calls: "raw", err: "fetching the original to forward: boom", cause: boom},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -635,7 +458,7 @@ func TestSaveDraft(t *testing.T) {
 			if tc.savedFrom != "" && !bytes.Contains(raw, []byte(tc.savedFrom)) {
 				t.Errorf("saved draft lacks the account From:\n%s", raw)
 			}
-			if tc.cause != nil || tc.name == "replaces the old draft" || tc.name == "resumed forward fetches before deleting" {
+			if tc.cause != nil || tc.name == "replaces the old draft" {
 				if r.st.deleteFolder != "Drafts" || !reflect.DeepEqual(r.st.deleteUIDs, []mail.UID{5}) {
 					t.Errorf("Delete(%q, %v)", r.st.deleteFolder, r.st.deleteUIDs)
 				}
@@ -681,18 +504,20 @@ func TestOpenDraft(t *testing.T) {
 		InReplyTo:  "parent@example.com",
 		References: []string{"root@example.com", "parent@example.com"},
 	}
-	att := compose.Attachment{Filename: "report.pdf", ContentType: "application/pdf", Data: []byte("%PDF")}
+	att := mail.File{Name: "report.pdf", ContentType: "application/pdf", Data: []byte("%PDF")}
 	tests := []struct {
 		name string
-		atts []compose.Attachment
+		atts []mail.File
 	}{
 		{"without attachments", nil},
-		{"with attachments", []compose.Attachment{att, {Filename: "notes.txt", ContentType: "text/plain; charset=utf-8", Data: []byte("two\r\n")}}},
+		{"with attachments", []mail.File{att, {Name: "notes.txt", ContentType: "text/plain; charset=utf-8", Data: []byte("two\r\n")}}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			r := newRig(acct())
-			raw, err := compose.BuildDraft(saved, tc.atts, r.s.now(), "x@example.com")
+			withAtts := saved
+			withAtts.Attachments = tc.atts
+			raw, err := compose.BuildDraft(withAtts, r.s.now(), "x@example.com")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -707,15 +532,8 @@ func TestOpenDraft(t *testing.T) {
 			if got.DraftOf == nil || *got.DraftOf != draftRef {
 				t.Errorf("DraftOf = %v, want %v", got.DraftOf, draftRef)
 			}
-			if got.ForwardOf != nil {
-				t.Errorf("ForwardOf = %v, want nil", got.ForwardOf)
-			}
-			var wantFiles []mail.File
-			for _, a := range tc.atts {
-				wantFiles = append(wantFiles, mail.File{Name: a.Filename, ContentType: a.ContentType, Data: a.Data})
-			}
-			if !reflect.DeepEqual(got.Attachments, wantFiles) {
-				t.Errorf("Attachments = %+v, want %+v", got.Attachments, wantFiles)
+			if !reflect.DeepEqual(got.Attachments, tc.atts) {
+				t.Errorf("Attachments = %+v, want %+v", got.Attachments, tc.atts)
 			}
 			if got.ReplyTo != nil {
 				t.Errorf("ReplyTo = %v, want nil", got.ReplyTo)
@@ -739,29 +557,6 @@ func TestOpenDraft_Errors(t *testing.T) {
 	r.st.raw = []byte("")
 	if _, err := r.s.OpenDraft(context.Background(), draftRef); err == nil {
 		t.Error("an unparseable draft opened")
-	}
-}
-
-func TestSaveThenOpenForwardMovesAttachmentsIntoTheList(t *testing.T) {
-	r := newRig(acct())
-	r.st.raw = original(t, compose.Attachment{Filename: "report.pdf", ContentType: "application/pdf", Data: []byte("%PDF")})
-	d := forwardDraft()
-	if err := r.s.SaveDraft(context.Background(), d); err != nil {
-		t.Fatal(err)
-	}
-	r.st.raw = r.st.appended
-	got, err := r.s.OpenDraft(context.Background(), draftRef)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got.ForwardOf != nil || got.DraftOf == nil {
-		t.Fatalf("ForwardOf=%v DraftOf=%v, want nil and set", got.ForwardOf, got.DraftOf)
-	}
-	if want := []mail.File{{Name: "report.pdf", ContentType: "application/pdf", Data: []byte("%PDF")}}; !reflect.DeepEqual(got.Attachments, want) {
-		t.Fatalf("Attachments = %+v, want %+v", got.Attachments, want)
-	}
-	if want := d.Bcc; !reflect.DeepEqual(got.Bcc, want) {
-		t.Errorf("Bcc = %v, want %v", got.Bcc, want)
 	}
 }
 
@@ -791,8 +586,8 @@ func TestSaveThenOpenDraftKeepsAttachmentsInTheList(t *testing.T) {
 	if !reflect.DeepEqual(got.Attachments, twoFiles()) {
 		t.Errorf("Attachments = %+v, want %+v", got.Attachments, twoFiles())
 	}
-	if got.ForwardOf != nil || got.DraftOf == nil || *got.DraftOf != draftRef {
-		t.Errorf("ForwardOf=%v DraftOf=%v", got.ForwardOf, got.DraftOf)
+	if got.DraftOf == nil || *got.DraftOf != draftRef {
+		t.Errorf("DraftOf=%v", got.DraftOf)
 	}
 }
 

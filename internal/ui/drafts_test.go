@@ -218,12 +218,11 @@ func TestDrafts_SavingAgainReplacesTheOpenedDraft(t *testing.T) {
 	}
 }
 
-func TestDrafts_SendingKeepsDraftOfAndForwardOf(t *testing.T) {
+func TestDrafts_SendingKeepsDraftOf(t *testing.T) {
 	m, f, u := draftsFixture(t, &mailtest.DraftSender{})
 	s := f.personalSender.(*mailtest.DraftSender)
-	orig := mail.MessageRef{Folder: "INBOX", UID: 2}
 	ref := mail.MessageRef{Folder: "Drafts", UID: u.solo}
-	s.AddDraft(ref, mail.Draft{To: []mail.Address{{Email: "carol@example.com"}}, Subject: "Fwd: Lunch?", Body: "FYI", ForwardOf: &orig})
+	s.AddDraft(ref, mail.Draft{To: []mail.Address{{Email: "carol@example.com"}}, Subject: "Fwd: Lunch?", Body: "FYI"})
 	m = send(t, m, click(60, 3)) // the Solo draft
 	m = openedDraft(t, m)
 
@@ -234,8 +233,8 @@ func TestDrafts_SendingKeepsDraftOfAndForwardOf(t *testing.T) {
 		t.Fatalf("sent %d, want 1", len(sent))
 	}
 	d := sent[0]
-	if d.DraftOf == nil || *d.DraftOf != ref || d.ForwardOf == nil || *d.ForwardOf != orig {
-		t.Errorf("sent = %+v; want DraftOf %v and ForwardOf %v kept", d, ref, orig)
+	if d.DraftOf == nil || *d.DraftOf != ref {
+		t.Errorf("sent = %+v; want DraftOf %v kept", d, ref)
 	}
 	if m.composing() || !strings.HasPrefix(m.status, "Sent to carol@example.com") {
 		t.Errorf("composing %v, status %q", m.composing(), m.status)
@@ -260,8 +259,8 @@ func TestDrafts_SendingAReopenedDraftPassesItsAttachments(t *testing.T) {
 	if len(sent) != 1 {
 		t.Fatalf("sent %d, want 1", len(sent))
 	}
-	if !reflect.DeepEqual(sent[0].Attachments, files) || sent[0].ForwardOf != nil {
-		t.Errorf("sent Attachments = %+v, ForwardOf = %v; want %+v and nil", sent[0].Attachments, sent[0].ForwardOf, files)
+	if !reflect.DeepEqual(sent[0].Attachments, files) {
+		t.Errorf("sent Attachments = %+v, want %+v", sent[0].Attachments, files)
 	}
 	if m.composing() {
 		t.Error("still composing after send")

@@ -1,7 +1,6 @@
 package compose
 
 import (
-	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -40,7 +39,7 @@ func TestForward_Golden(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if d.Subject != "Fwd: Lunch on Friday" || d.Body != base.Body || d.ForwardOf == nil || d.From != me {
+	if d.Subject != "Fwd: Lunch on Friday" || d.Body != base.Body || d.From != me {
 		t.Errorf("Draft(filled fields) = %#v", d)
 	}
 }
@@ -53,9 +52,6 @@ func TestForward_Fields(t *testing.T) {
 	d := Forward(msg, "Archive", mine)
 	if d.From != me {
 		t.Errorf("From = %v", d.From)
-	}
-	if want := (&mail.MessageRef{Folder: "Archive", UID: 42}); !reflect.DeepEqual(d.ForwardOf, want) {
-		t.Errorf("ForwardOf = %v, want %v", d.ForwardOf, want)
 	}
 	if len(d.To)+len(d.Cc)+len(d.Bcc) != 0 {
 		t.Errorf("recipients = %v %v %v, want none", d.To, d.Cc, d.Bcc)

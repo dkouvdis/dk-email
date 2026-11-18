@@ -46,7 +46,6 @@ func TestFields_Draft_KeepsBaseFields(t *testing.T) {
 		InReplyTo:  "m1@example.com",
 		References: []string{"m0@example.com", "m1@example.com"},
 		ReplyTo:    &mail.MessageRef{Folder: "INBOX", UID: 7},
-		ForwardOf:  &mail.MessageRef{Folder: "Archive", UID: 9},
 	}
 	got, err := Fields{To: "new@example.com", Subject: "new", Body: "new body"}.Draft(base)
 	if err != nil {

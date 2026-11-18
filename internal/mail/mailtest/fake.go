@@ -593,10 +593,6 @@ func cloneDraft(d mail.Draft) mail.Draft {
 		ref := *d.ReplyTo
 		d.ReplyTo = &ref
 	}
-	if d.ForwardOf != nil {
-		ref := *d.ForwardOf
-		d.ForwardOf = &ref
-	}
 	if d.DraftOf != nil {
 		ref := *d.DraftOf
 		d.DraftOf = &ref

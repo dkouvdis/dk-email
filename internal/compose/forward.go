@@ -9,8 +9,7 @@ import (
 // Forward drafts a forward of msg, which lives in folder. mine are the
 // addresses the account sends as (mine[0] is the account address); From is
 // chosen as in Reply. The recipients are empty for the user to fill in, and
-// there is no threading: no In-Reply-To, References or ReplyTo. ForwardOf
-// points at msg so the sender copies its attachments.
+// there is no threading: no In-Reply-To, References or ReplyTo.
 //
 // Body starts with an empty line for the user's text, a blank line, then the
 // forwarded-message block with msg.Body unquoted, ending with a newline. The
@@ -33,10 +32,9 @@ import (
 //	Shall we try the new place?
 func Forward(msg mail.Message, folder string, mine []mail.Address) mail.Draft {
 	return mail.Draft{
-		From:      pickFrom(msg, mine),
-		Subject:   forwardSubject(msg.Subject),
-		Body:      "\n\n" + forwardBlock(msg),
-		ForwardOf: &mail.MessageRef{Folder: folder, UID: msg.UID},
+		From:    pickFrom(msg, mine),
+		Subject: forwardSubject(msg.Subject),
+		Body:    "\n\n" + forwardBlock(msg),
 	}
 }
 

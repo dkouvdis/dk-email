@@ -162,8 +162,6 @@ func (m Model) startMessageDraft(account int, folder string, msg mail.Message, f
 		return m.startDraft(account, compose.ReplyAll(msg, folder, mine), kind)
 	case composeForward:
 		d := compose.Forward(msg, folder, mine)
-		// The attachments travel with the draft; ForwardOf is going away.
-		d.ForwardOf = nil
 		d.Attachments = files
 		return m.startDraft(account, d, kind)
 	}

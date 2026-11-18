@@ -18,7 +18,7 @@ import (
 // and tolerates drafts made by other clients. Body is the first text/plain
 // part that isn't an attachment, decoded, with LF line endings; with none, an
 // HTML part is converted to text the way the reader does, and with no body at
-// all Body is "". ReplyTo, ForwardOf and DraftOf are left for the caller.
+// all Body is "". Attachments are not read (send.OpenDraft reads them); ReplyTo and DraftOf are left for the caller.
 func FromRaw(raw []byte) (mail.Draft, error) {
 	e, err := message.Read(bytes.NewReader(raw))
 	if e == nil || (err != nil && !message.IsUnknownCharset(err) && !message.IsUnknownEncoding(err)) {

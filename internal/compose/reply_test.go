@@ -75,7 +75,7 @@ func TestReply_Fields(t *testing.T) {
 	if want := (&mail.MessageRef{Folder: "Archive", UID: 42}); !reflect.DeepEqual(d.ReplyTo, want) {
 		t.Errorf("ReplyTo = %v, want %v", d.ReplyTo, want)
 	}
-	if d.ForwardOf != nil || len(d.Cc) != 0 || len(d.Bcc) != 0 {
+	if len(d.Cc) != 0 || len(d.Bcc) != 0 {
 		t.Errorf("unexpected fields: %#v", d)
 	}
 }

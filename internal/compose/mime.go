@@ -17,13 +17,6 @@ import (
 	"github.com/dkouvdis/dk-email/internal/mail"
 )
 
-// Attachment is a file copied into an outgoing message.
-type Attachment struct {
-	Filename    string
-	ContentType string // e.g. "application/pdf"; "" means application/octet-stream
-	Data        []byte
-}
-
 // BodyPart is the single seam for the message body. It returns the
 // Content-Type and Content-Transfer-Encoding header of the body part and the
 // unencoded body bytes; Build writes them through go-message, which applies
@@ -40,23 +33,23 @@ func BodyPart(d mail.Draft) (message.Header, []byte) {
 
 // Build writes d as an RFC 5322 message with CRLF line endings. The Bcc
 // header is never written: Bcc recipients are only passed to the transport.
-// Use BuildDraft for a copy that keeps them. d.Attachments are written first,
-// then atts, as attachment parts. The output is deterministic for
-// the same (d, atts, now, msgID), including the multipart boundary, which is
+// Use BuildDraft for a copy that keeps them. d.Attachments are written as
+// attachment parts. The output is deterministic for
+// the same (d, now, msgID), including the multipart boundary, which is
 // derived from msgID. msgID is a Message-ID without angle brackets, as
 // MessageID returns it.
-func Build(d mail.Draft, atts []Attachment, now time.Time, msgID string) ([]byte, error) {
-	return build(d, atts, now, msgID, false)
+func Build(d mail.Draft, now time.Time, msgID string) ([]byte, error) {
+	return build(d, now, msgID, false)
 }
 
 // BuildDraft is Build for a message saved to Drafts, which also writes the
 // Bcc header (when d has Bcc recipients) so reopening the draft restores
 // them. Never send its output.
-func BuildDraft(d mail.Draft, atts []Attachment, now time.Time, msgID string) ([]byte, error) {
-	return build(d, atts, now, msgID, true)
+func BuildDraft(d mail.Draft, now time.Time, msgID string) ([]byte, error) {
+	return build(d, now, msgID, true)
 }
 
-func build(d mail.Draft, atts []Attachment, now time.Time, msgID string, withBcc bool) ([]byte, error) {
+func build(d mail.Draft, now time.Time, msgID string, withBcc bool) ([]byte, error) {
 	partHeader, body := BodyPart(d)
 
 	// go-message writes header fields in reverse order of insertion.
@@ -75,14 +68,8 @@ func build(d mail.Draft, atts []Attachment, now time.Time, msgID string, withBcc
 	add(func(h *gomail.Header) { h.SetMsgIDList("In-Reply-To", ids(d.InReplyTo)) })
 	add(func(h *gomail.Header) { h.SetMsgIDList("References", ids(strings.Join(d.References, " "))) })
 
-	all := make([]Attachment, 0, len(d.Attachments)+len(atts))
-	for _, f := range d.Attachments {
-		all = append(all, Attachment{Filename: f.Name, ContentType: f.ContentType, Data: f.Data})
-	}
-	atts = append(all, atts...)
-
 	var h gomail.Header
-	if len(atts) == 0 {
+	if len(d.Attachments) == 0 {
 		for _, k := range []string{"Content-Transfer-Encoding", "Content-Type"} {
 			h.Set(k, partHeader.Get(k))
 		}
@@ -98,7 +85,7 @@ func build(d mail.Draft, atts []Attachment, now time.Time, msgID string, withBcc
 	if err != nil {
 		return nil, err
 	}
-	if len(atts) == 0 {
+	if len(d.Attachments) == 0 {
 		if _, err := w.Write(body); err != nil {
 			return nil, err
 		}
@@ -118,7 +105,7 @@ func build(d mail.Draft, atts []Attachment, now time.Time, msgID string, withBcc
 	if err := tw.Close(); err != nil {
 		return nil, err
 	}
-	for _, a := range atts {
+	for _, a := range d.Attachments {
 		aw, err := w.CreatePart(attachmentHeader(a))
 		if err != nil {
 			return nil, err
@@ -136,7 +123,7 @@ func build(d mail.Draft, atts []Attachment, now time.Time, msgID string, withBcc
 	return out.Bytes(), nil
 }
 
-func attachmentHeader(a Attachment) message.Header {
+func attachmentHeader(a mail.File) message.Header {
 	ct := "application/octet-stream"
 	var params map[string]string
 	if mt, p, err := mime.ParseMediaType(a.ContentType); err == nil {
@@ -147,7 +134,7 @@ func attachmentHeader(a Attachment) message.Header {
 			return '_'
 		}
 		return r
-	}, filepath.Base(strings.ReplaceAll(a.Filename, `\`, "/")))
+	}, filepath.Base(strings.ReplaceAll(a.Name, `\`, "/")))
 	if name == "." || name == "/" || name == "" {
 		name = "attachment"
 	}

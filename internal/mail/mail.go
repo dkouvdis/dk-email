@@ -217,7 +217,6 @@ type Draft struct {
 	InReplyTo   string // Message-ID being replied to, or ""
 	References  []string
 	ReplyTo     *MessageRef // marked \Answered after delivery
-	ForwardOf   *MessageRef // attachments are copied from here
 	DraftOf     *MessageRef // the saved draft this one replaces; removed once it is saved again or sent
 }
 
