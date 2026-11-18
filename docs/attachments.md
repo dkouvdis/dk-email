@@ -4,13 +4,17 @@ This guide covers attaching files to a message you're writing and opening
 the attachments of messages you receive.
 
 - [Attaching files](#attaching-files)
+  - [The attach prompt](#the-attach-prompt)
+  - [Drag and drop](#drag-and-drop)
+  - [The Attachments row](#the-attachments-row)
 - [Opening attachments](#opening-attachments)
 
 ## Attaching files
 
-Press `ctrl+o` in the composer, or drop files onto the terminal. Every
-attachment is listed in the composer, whether you added it, it came with a
-forward or it was saved in a draft.
+There are two ways to attach a file while writing a message: press `ctrl+o`
+and type its path, or drag it from Finder (or your file manager) and drop it
+onto the terminal window. Every attachment is listed in the composer, whether
+you added it, it came with a forward or it was saved in a draft.
 
 ### The attach prompt
 
@@ -27,17 +31,29 @@ dk-email was started in. `tab` completes a unique match, and lists the
 choices when several match. A problem, such as a folder or a file that doesn't
 exist, shows in the prompt, which stays open so you can fix the path.
 
-### Dropping files
+### Drag and drop
 
-Drop files from your file manager onto the terminal and dk-email attaches
-them. This works when what's pasted is only file paths: escaped or quoted
-paths, or `file://` URLs. If any of them isn't a readable file, the whole
-paste is inserted as text instead.
+1. Open the composer (`c`, `r`, `R` or `f`).
+2. Drag one or more files from Finder, your file manager or the desktop.
+3. Drop them anywhere on the terminal window: on the body, a header field or
+   the attach prompt.
 
-To paste a path as text, type it, or remove the attachment afterwards.
+dk-email attaches them, lists them on the `Attach` row, and the status line
+says `Attached <name>.` The body is left as it was.
 
-Dropping is designed for Ghostty, iTerm2, Terminal.app, kitty, WezTerm,
-GNOME Terminal and Windows Terminal. It hasn't been tested in all of them.
+How it works: when you drop files on a terminal, it pastes their paths.
+dk-email treats a paste as a drop when it's only file paths (escaped or quoted
+paths, or `file://` URLs), and each one is a readable file. If any of them
+isn't, such as a folder or a file that's gone, the whole paste is inserted as
+ordinary text instead. Pasted text that merely mentions a file, like
+`see notes.txt`, is never treated as a drop.
+
+To put a file's path in your message as text, type it, or drop the file and
+then remove the attachment and type the path.
+
+Drag and drop is designed for Ghostty, iTerm2, Terminal.app, kitty, WezTerm,
+GNOME Terminal and Windows Terminal. It hasn't been tested in all of them; if
+a drop in your terminal ends up as text, please report what was pasted.
 
 ### The Attachments row
 

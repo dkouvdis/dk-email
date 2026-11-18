@@ -5,10 +5,10 @@ import "testing"
 func TestHelp_ComposerListsAttachKeys(t *testing.T) {
 	m := New(testConfig(), nil, nil)
 	want := map[string]string{
-		"ctrl+o":     "attach a file",
-		"drop files": "attach them",
-		"←/→":        "choose attachment",
-		"d":          "remove attachment",
+		"ctrl+o":      "attach a file",
+		"drag & drop": "attach files",
+		"←/→":         "choose attachment",
+		"d":           "remove attachment",
 	}
 	for _, sec := range m.keys.HelpSections() {
 		if sec.Title != "Composer" {

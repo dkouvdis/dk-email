@@ -91,7 +91,7 @@ func (k KeyMap) HelpSections() []popup.Section {
 			help("enter / ←/→", "choose From"),
 			help("enter", "next field (in a header)"),
 			help("ctrl+o", "attach a file"),
-			help("drop files", "attach them"),
+			help("drag & drop", "attach files"),
 			help("←/→", "choose attachment"),
 			help("d", "remove attachment"),
 			help("esc", "close, or save / discard"),

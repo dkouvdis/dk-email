@@ -243,7 +243,7 @@ Actions on a **collapsed thread** apply to every message in it. On an expanded r
 | Key | Action |
 |---|---|
 | `ctrl+s` | send |
-| `ctrl+o` | attach a file; dropping file paths onto the terminal attaches them too |
+| `ctrl+o` | attach a file; drag and drop onto the terminal attaches files too |
 | `←` / `→`, `d` / `backspace` | on the Attach row, choose / remove an attachment |
 | `tab` / `shift+tab` | next / previous field |
 | `enter` | in a header field, next field (in the body, a new line); on From, open the address list |

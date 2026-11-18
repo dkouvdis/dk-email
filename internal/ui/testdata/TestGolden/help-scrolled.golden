@@ -5,7 +5,7 @@
 │   All Mail                   ││  │                                               │                                   │
 │   Trash                      ││  │   enter            next field (in a header)   │                                   │
 │   Receipts                 1 ││  │   ctrl+o           attach a file              │                                   │
-│                              ││  │   drop files       attach them                │                                   │
+│                              ││  │   drag & drop      attach files               │                                   │
 │ Work                         ││  │   ←/→              choose attachment          │                                   │
 │   Inbox                    1 ││  │   d                remove attachment          │                                   │
 │   Archive                    ││  │   esc              close, or save / discard   │                                   │

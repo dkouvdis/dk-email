@@ -9,7 +9,7 @@ A keyboard-driven terminal email client for triaging several IMAP accounts (Gmai
 - Replies, reply-alls, forwards and new messages are written in a built-in composer and sent over SMTP. See [Sending mail](#sending-mail).
 - Reads passwords from 1Password (`op read`), any other command, or the OS keychain. They are never stored in a plain-text file.
 - Signs in to Microsoft 365, Outlook.com and Google with **OAuth 2.0** (`XOAUTH2` over IMAP and SMTP), using your own app registration. Tokens live in the OS keychain and refresh on their own. See [Signing in with OAuth 2.0](docs/oauth.md).
-- Attaches files in the composer (`ctrl+o`, or drop files onto the terminal) and opens attachments with `o` in the reader: saved to Downloads, then opened with the system's default app. See [Attachments](docs/attachments.md).
+- Attaches files in the composer (`ctrl+o`, or drag and drop files onto the terminal) and opens attachments with `o` in the reader: saved to Downloads, then opened with the system's default app. See [Attachments](docs/attachments.md).
 
 v0.x is a personal tool: it reads, triages and sends mail. Nothing is cached on disk.
 
@@ -248,7 +248,7 @@ save_sent    = false               # optional, save a copy to Sent; default: fal
 | Key | Action |
 |---|---|
 | `ctrl+s` | send |
-| `ctrl+o` | attach a file (or drop files onto the terminal) |
+| `ctrl+o` | attach a file (or drag and drop files onto the terminal) |
 | `tab` / `shift+tab` | next / previous field |
 | `←` / `→`, `d` | on the Attach row, choose / remove an attachment |
 | `enter` | in a header field, move to the next field (in the body, a new line) |
@@ -273,7 +273,7 @@ save_sent    = false               # optional, save a copy to Sent; default: fal
 - **Reply** goes to the message's `Reply-To`, else its sender. If the message is from you, it goes to its original recipients. The subject gets `Re: `, and `In-Reply-To` and `References` are set so the reply threads correctly. Only the target message is quoted. After sending, the original is marked answered.
 - **Reply all** also includes the original's To and Cc, minus your own address, with duplicates removed.
 - **Forward** starts with an empty `To` and the subject `Fwd: …`. The original's attachments are listed on the Attach row with their original names and types, and you can remove any of them.
-- Outgoing mail is plain text. Attach files with `ctrl+o` or by dropping them; see [Attachments](docs/attachments.md#attaching-files).
+- Outgoing mail is plain text. Attach files with `ctrl+o` or by drag and drop; see [Attachments](docs/attachments.md#attaching-files).
 - `Bcc` recipients get the message, but the `Bcc` header is never written to a sent message. Only the saved draft keeps it.
 
 ### Connect popup
