@@ -78,11 +78,11 @@ code, except `mail.go` and `keys.go`.
 
 ### Phase 1: Open attachments
 
-- [ ] Task 1: `Raw` on `mail.Mailbox`, raw messages in `mailtest.Fake`
-- [ ] Task 2: `internal/download` and `internal/sysopen`
-- [ ] Task 3: `o` saves and opens the only attachment
-- [ ] Task 4: Attachment picker, grouped by message, with sizes
-- [ ] Task 5: Help dialog, SPEC, and `docs/attachments.md` (opening)
+- [x] Task 1: `Raw` on `mail.Mailbox`, raw messages in `mailtest.Fake`
+- [x] Task 2: `internal/download` and `internal/sysopen`
+- [x] Task 3: `o` saves and opens the only attachment
+- [x] Task 4: Attachment picker, grouped by message, with sizes
+- [x] Task 5: Help dialog, SPEC, and `docs/attachments.md` (opening)
 
 ### Checkpoint: Opening
 

@@ -15,10 +15,9 @@ must keep possible.
 
 ## High Priority
 
-- **Save and open attachments**: the reader only lists attachments. Add
-  saving one to disk and opening it with the system's default app. Refined
-  into `o` (save to Downloads, then open); see
-  [open-attachments.md](open-attachments.md).
+- **Save and open attachments**: shipped as `o` in the reader (save to
+  Downloads, then open); see [docs/attachments.md](../docs/attachments.md).
+  Design: [open-attachments.md](open-attachments.md).
 - **Undo for delete, archive and move**: `d` deletes without confirmation by
   design, so offer a short undo (e.g. `z` within a few seconds). The
   optimistic updates in `internal/ui/actions.go` already keep what's needed to

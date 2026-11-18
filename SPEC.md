@@ -46,7 +46,7 @@ The selected thread row and the selected sidebar folder are drawn in white text 
 
 ### Reader popup
 
-Messages in the conversation are stacked oldest to newest. The latest (or first unread) message is expanded; earlier ones are collapsed to one line each. Each header shows From, To, Cc and Date. `text/plain` bodies are preferred; if only HTML exists, it's converted to text. Attachments are listed by name and size only.
+Messages in the conversation are stacked oldest to newest. The latest (or first unread) message is expanded; earlier ones are collapsed to one line each. Each header shows From, To, Cc and Date. `text/plain` bodies are preferred; if only HTML exists, it's converted to text. Attachments are listed by name and size. `o` saves an attachment to the Downloads folder and opens it with the system's default app: the only attachment of the expanded messages at once, otherwise via a picker grouped by message. Files that can run code are saved but never opened, and nothing is opened over SSH or without a display. See [docs/attachments.md](docs/attachments.md).
 
 ## Assumptions
 
@@ -229,7 +229,7 @@ password_cmd = "op read op://Personal/Gmail/app-password"   # omit to use the ke
 | `r` | reply | `R` | reply all |
 | `f` | forward | `c` | new message |
 | `a` | focus folders (narrow) / folder picker (list) | `A` | connect account |
-| `E` | edit or delete account | | |
+| `E` | edit or delete account | `o` | open attachment (reader) |
 | `/` | filter folders (sidebar) / server search (thread list) | `v` | toggle split ↔ list + popup |
 | `?` | full key help | `esc` | close popup / back |
 | `q` | close the open popup, otherwise quit | `ctrl+c` | quit, even with a popup open |
@@ -377,7 +377,7 @@ Sending was originally out of scope; it's now specified in [tasks/smtp-spec.md](
 - Search
 - Offline sync and an on-disk cache
 - IMAP IDLE
-- Opening or saving attachments
+- Attaching local files
 - Rich HTML rendering
 - Custom keybindings and themes
 - Mouse support

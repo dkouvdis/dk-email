@@ -9,6 +9,7 @@ A keyboard-driven terminal email client for triaging several IMAP accounts (Gmai
 - Replies, reply-alls, forwards and new messages are written in a built-in composer and sent over SMTP. See [Sending mail](#sending-mail).
 - Reads passwords from 1Password (`op read`), any other command, or the OS keychain. They are never stored in a plain-text file.
 - Signs in to Microsoft 365, Outlook.com and Google with **OAuth 2.0** (`XOAUTH2` over IMAP and SMTP), using your own app registration. Tokens live in the OS keychain and refresh on their own. See [Signing in with OAuth 2.0](docs/oauth.md).
+- Opens attachments with `o` in the reader: saved to Downloads, then opened with the system's default app. See [Attachments](docs/attachments.md).
 
 v0.x is a personal tool: it reads, triages and sends mail. Nothing is cached on disk.
 
@@ -303,7 +304,7 @@ subject:"weekly report" before:2026-07-01
 | `r` | reply | `R` | reply all |
 | `f` | forward | `c` | new message |
 | `a` | focus folders (narrow) / folder picker (list) | `A` | connect account |
-| `E` | edit or delete account | | |
+| `E` | edit or delete account | `o` | open attachment (reader) |
 | `/` | filter folders (sidebar) / search (thread list) | `v` | toggle split ↔ list + popup |
 | `?` | key help | `esc` | close popup / back |
 | `q` | close the open popup, otherwise quit | `ctrl+c` | quit, even with a popup open |

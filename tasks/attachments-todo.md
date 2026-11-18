@@ -19,15 +19,15 @@ if that keeps `mailtest` within its imports, else taking both), a
 `MethodRaw` call record, and `Fail` support.
 
 **Acceptance criteria:**
-- [ ] `var _ mail.Mailbox = (*imap.Client)(nil)` and `(*mailtest.Fake)(nil)`
+- [x] `var _ mail.Mailbox = (*imap.Client)(nil)` and `(*mailtest.Fake)(nil)`
   compile.
-- [ ] The fake returns the stored bytes, records the call, and returns
+- [x] The fake returns the stored bytes, records the call, and returns
   `mail.ErrFolderNotFound` / the injected error like its other methods.
-- [ ] `internal/mail` stays standard-library only (existing test passes).
+- [x] `internal/mail` stays standard-library only (existing test passes).
 
 **Verification:**
-- [ ] Tests pass: `go test -race ./internal/mail/...`
-- [ ] Build succeeds: `go build -o bin/dk-email ./cmd/dk-email`
+- [x] Tests pass: `go test -race ./internal/mail/...`
+- [x] Build succeeds: `go build -o bin/dk-email ./cmd/dk-email`
 - [ ] Manual check: none.
 
 **Dependencies:** None
@@ -56,19 +56,19 @@ inside SSH, or without the opener on `PATH`. `cmd/dk-email/signin.go` calls
 `sysopen.Open`.
 
 **Acceptance criteria:**
-- [ ] Sanitizing: `../../.zshrc` → `zshrc`, control characters and `/`/`\`
+- [x] Sanitizing: `../../.zshrc` → `zshrc`, control characters and `/`/`\`
   dropped, length capped keeping the extension, empty → `attachment`;
   table-tested.
-- [ ] Saving twice with the same bytes returns the same path; different
+- [x] Saving twice with the same bytes returns the same path; different
   bytes give `name (1).ext`; an existing file is never modified (temp dir
   tests).
-- [ ] `Runnable` covers at least `.command .sh .app .pkg .jar .desktop .exe
+- [x] `Runnable` covers at least `.command .sh .app .pkg .jar .desktop .exe
   .bat .cmd .ps1 .msi .scr`, case-insensitive; `CanOpen` is tested through
   injected env/lookPath.
 
 **Verification:**
-- [ ] Tests pass: `go test -race ./internal/download ./internal/sysopen ./cmd/dk-email`
-- [ ] Build succeeds
+- [x] Tests pass: `go test -race ./internal/download ./internal/sysopen ./cmd/dk-email`
+- [x] Build succeeds
 - [ ] Manual check: OAuth sign-in still opens the browser.
 
 **Dependencies:** None
@@ -96,17 +96,17 @@ message reports `Saved <path>`, `Saved <path> — not opened: it can run code`,
 `ui.Model.WithOpener`; tests use fakes.
 
 **Acceptance criteria:**
-- [ ] With the fake mailbox and a temp Downloads dir, `o` on a thread with
+- [x] With the fake mailbox and a temp Downloads dir, `o` on a thread with
   one attachment writes its exact bytes and calls the fake opener with the
   path; the status names the path.
-- [ ] A runnable attachment is saved and the opener is not called; a fetch
+- [x] A runnable attachment is saved and the opener is not called; a fetch
   error shows in the status and writes nothing.
-- [ ] `o` does nothing on the thread list with no thread open; the reader's
+- [x] `o` does nothing on the thread list with no thread open; the reader's
   key hints include `o`.
 
 **Verification:**
-- [ ] Tests pass: `go test -race ./internal/ui/...`
-- [ ] Build succeeds
+- [x] Tests pass: `go test -race ./internal/ui/...`
+- [x] Build succeeds
 - [ ] Manual check: open a PDF from a real account; it lands in Downloads and
   opens in Preview.
 
@@ -132,15 +132,15 @@ and index; `esc`/`q` close. Messages whose body hasn't loaded yet are fetched
 first or shown as loading, so the picker never offers a stale index.
 
 **Acceptance criteria:**
-- [ ] A thread with two messages, one and two attachments, shows two groups
+- [x] A thread with two messages, one and two attachments, shows two groups
   and three items; choosing the second item of the second group saves that
   part.
-- [ ] A thread with one attachment still skips the picker.
-- [ ] `esc` closes the picker and returns to the reader without side effects.
+- [x] A thread with one attachment still skips the picker.
+- [x] `esc` closes the picker and returns to the reader without side effects.
 
 **Verification:**
-- [ ] Tests pass: `go test -race ./internal/ui/...`
-- [ ] Build succeeds
+- [x] Tests pass: `go test -race ./internal/ui/...`
+- [x] Build succeeds
 - [ ] Manual check: a thread with several attachments in a narrow terminal
   truncates long names cleanly.
 
@@ -164,11 +164,11 @@ happens over SSH. Link it from the README. Mark the future-plans entry as
 shipped.
 
 **Acceptance criteria:**
-- [ ] Help-dialog test covers `o`; the hint bar shows it in the reader.
-- [ ] `docs/attachments.md` exists, linked from README; SPEC keymap lists `o`.
+- [x] Help-dialog test covers `o`; the hint bar shows it in the reader.
+- [x] `docs/attachments.md` exists, linked from README; SPEC keymap lists `o`.
 
 **Verification:**
-- [ ] Tests pass: `go test -race ./internal/ui/...`
+- [x] Tests pass: `go test -race ./internal/ui/...`
 - [ ] Manual check: `?` in the app shows `o`; read the doc against the app.
 
 **Dependencies:** Task 4
