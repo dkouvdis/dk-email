@@ -40,7 +40,7 @@ must keep possible.
 
 ### Search
 
-Folder search (`/`) shipped; see `docs/search.md`. Follow-ups:
+See `docs/search.md` for how folder search (`/`) works today.
 
 - **More date formats**: `since:`/`after:`/`before:` take only `YYYY-MM-DD`
   and `YYYY/MM/DD`; anything else silently becomes text and finds nothing.
@@ -70,7 +70,7 @@ Folder search (`/`) shipped; see `docs/search.md`. Follow-ups:
 
 ### Attachments
 
-Opening and attaching shipped; see [Shipped](#shipped). Follow-ups:
+See [docs/attachments.md](../docs/attachments.md) for how they work today.
 
 - **Fetch one part, not the whole message**: opening an attachment and
   forwarding both download the full message (`BODY.PEEK[]`). Fetching only
@@ -123,14 +123,3 @@ Opening and attaching shipped; see [Shipped](#shipped). Follow-ups:
   the system browser.
 - **Local cache**: keep folders and messages on disk for faster startup and
   reading offline. A large change; defer until the rest is settled.
-
-## Shipped
-
-- **Save and open attachments**: `o` in the reader saves to Downloads, then
-  opens with the default app; see [docs/attachments.md](../docs/attachments.md).
-  Design: [open-attachments.md](open-attachments.md).
-- **Attach local files**: `ctrl+o` or drag and drop in the composer, an
-  Attach row to review and remove attachments (forwards and reopened drafts
-  included); see [docs/attachments.md](../docs/attachments.md). Design:
-  [attach-files.md](attach-files.md); plan:
-  [attachments-plan.md](attachments-plan.md).
