@@ -46,7 +46,7 @@ The selected thread row and the selected sidebar folder are drawn in white text 
 
 ### Reader popup
 
-Messages in the conversation are stacked oldest to newest. The latest (or first unread) message is expanded; earlier ones are collapsed to one line each. Each header shows From, To, Cc and Date. `text/plain` bodies are preferred; if only HTML exists, it's converted to text. Attachments are listed by name and size. `o` saves an attachment to the Downloads folder and opens it with the system's default app: the only attachment of the expanded messages at once, otherwise via a picker grouped by message. Files that can run code are saved but never opened, and nothing is opened over SSH or without a display. See [docs/attachments.md](docs/attachments.md).
+Messages in the conversation are stacked oldest to newest. The latest (or first unread) message is expanded; earlier ones are collapsed to one line each. Each header shows From, To, Cc and Date. `text/plain` bodies are preferred; if only HTML exists, it's converted to text. Attachments are listed by name and size. `o` saves an attachment to the Downloads folder and opens it with the system's default app: the only attachment of the expanded messages at once, otherwise via a picker. Files that can run code are saved but never opened, and nothing is opened over SSH or without a display. See [docs/attachments.md](docs/attachments.md).
 
 ## Assumptions
 

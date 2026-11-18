@@ -37,7 +37,8 @@ func (it Item[T]) path() string {
 }
 
 // Group is a heading with its items, e.g. an account and its folders. Note
-// is shown under the heading, e.g. why an account has no folders.
+// is shown under the heading, e.g. why an account has no folders. A group
+// with no Name has no heading and no blank line above it.
 type Group[T any] struct {
 	Name  string
 	Note  string
@@ -64,6 +65,7 @@ type Picker[T any] struct {
 	offset     int
 	maxW, maxH int
 	filter     textinput.Model
+	noFilter   bool // / does nothing and no filter line is drawn
 	keys       struct{ up, down, top, bottom, choose, cancel, filter, arrowUp, arrowDown key.Binding }
 	st         helpStyles
 	cursorSt   lipgloss.Style
@@ -100,6 +102,13 @@ func NewPicker[T any](th theme.Theme, title string, groups []Group[T]) Picker[T]
 	}
 	p.all = len(p.lines(1))
 	return p
+}
+
+// DisableFilter turns the filter off, for short lists: / does nothing and no
+// filter line is drawn, which frees its row for items.
+func (p *Picker[T]) DisableFilter() {
+	p.noFilter = true
+	p.scrollToCursor()
 }
 
 // shown reports whether an item is listed: every item without a filter,
@@ -206,7 +215,7 @@ func (p Picker[T]) Update(msg tea.KeyPressMsg) (Picker[T], Result) {
 	}
 
 	switch {
-	case key.Matches(msg, p.keys.filter):
+	case key.Matches(msg, p.keys.filter) && !p.noFilter:
 		p.filter.Focus()
 		return p, Pending
 	case key.Matches(msg, p.keys.cancel):
@@ -261,10 +270,12 @@ func (p Picker[T]) lines(width int) []pickerLine {
 		if p.filtered() && len(items) == 0 {
 			continue
 		}
-		if len(out) > 0 {
-			out = append(out, pickerLine{})
+		if grp.Name != "" {
+			if len(out) > 0 {
+				out = append(out, pickerLine{})
+			}
+			out = append(out, pickerLine{text: p.st.section.Render(grp.Name), header: true})
 		}
-		out = append(out, pickerLine{text: p.st.section.Render(grp.Name), header: true})
 		if grp.Note != "" && !p.filtered() {
 			out = append(out, pickerLine{text: "  " + p.st.dim.Render(grp.Note)})
 		}
@@ -308,6 +319,9 @@ func (p Picker[T]) Hints() []key.Binding {
 	if p.filter.Focused() {
 		return []key.Binding{b("↑/↓", "move"), b("enter", "open"), b("esc", "clear")}
 	}
+	if p.noFilter {
+		return []key.Binding{b("j/k", "move"), b("enter", "open"), b("esc/q", "close")}
+	}
 	return []key.Binding{b("/", "filter"), b("j/k", "move"), b("enter", "open"), b("esc/q", "close")}
 }
 
@@ -330,7 +344,11 @@ func (p Picker[T]) innerW() int { return min(p.contentW(), p.maxW-helpChromeCols
 // viewH is how many item lines fit. It's based on the unfiltered list so
 // the box keeps its size while filtering.
 func (p Picker[T]) viewH() int {
-	return max(min(p.all, p.maxH-helpChromeRows-helpFilterRows), 0)
+	rows := helpChromeRows
+	if !p.noFilter {
+		rows += helpFilterRows
+	}
+	return max(min(p.all, p.maxH-rows), 0)
 }
 
 func (p *Picker[T]) scrollToCursor() {
@@ -373,15 +391,18 @@ func (p Picker[T]) View() string {
 	}
 	header := p.st.title.Render(p.title)
 
-	f := p.filter
-	f.SetWidth(max(innerW-ansi.StringWidth(f.Prompt)-1, 1))
-	filterLine := ansi.Truncate(f.View(), innerW, "…")
-	if !f.Focused() && f.Value() == "" {
-		filterLine = p.st.dim.Render(ansi.Truncate(f.Prompt+f.Placeholder, innerW, "…"))
-	}
-
 	lines := p.lines(innerW)
-	content := []string{ansi.Truncate(header, innerW, ""), filterLine, ""}
+	content := []string{ansi.Truncate(header, innerW, "")}
+	if !p.noFilter {
+		f := p.filter
+		f.SetWidth(max(innerW-ansi.StringWidth(f.Prompt)-1, 1))
+		filterLine := ansi.Truncate(f.View(), innerW, "…")
+		if !f.Focused() && f.Value() == "" {
+			filterLine = p.st.dim.Render(ansi.Truncate(f.Prompt+f.Placeholder, innerW, "…"))
+		}
+		content = append(content, filterLine)
+	}
+	content = append(content, "")
 	for i := range vh {
 		line := ""
 		if p.offset+i < len(lines) {

@@ -40,36 +40,34 @@ type attachmentMsg struct {
 }
 
 // openAttachment opens the only attachment of the loaded messages in the
-// reader, or lists them all in the picker.
+// reader, or lists them all in one picker, with sizes, in thread order. The
+// list is short, so it has no headings and no filter.
 func (m Model) openAttachment() (Model, tea.Cmd) {
-	var groups []popup.Group[pick]
-	count := 0
+	var items []popup.Item[pick]
 	for _, msg := range m.read.Loaded() {
 		if len(msg.Attachments) == 0 {
 			continue
 		}
-		g := popup.Group[pick]{Name: msg.From.DisplayName() + " · " + msg.Date.Format("2 Jan 2006 15:04")}
 		for i, a := range msg.Attachments {
-			g.Items = append(g.Items, popup.Item[pick]{
+			items = append(items, popup.Item[pick]{
 				Label: a.Name + "  " + reader.FormatSize(a.Size),
 				Value: pick{account: m.open.account, folder: m.open.folder, uid: msg.UID, part: i, name: a.Name},
 			})
 		}
-		groups = append(groups, g)
-		count += len(g.Items)
 	}
-	switch count {
+	switch len(items) {
 	case 0:
 		m.setStatus("No attachments.")
 		return m, nil
 	case 1:
-		return m.saveAttachment(groups[0].Items[0].Value)
+		return m.saveAttachment(items[0].Value)
 	}
-	m.picker = popup.NewPicker(m.theme, "Open attachment", groups)
+	m.picker = popup.NewPicker(m.theme, "Open attachment", []popup.Group[pick]{{Items: items}})
+	m.picker.DisableFilter()
 	m.picker.SetSize(m.panes.Popup.W, m.panes.Popup.H)
 	m.showPicker = true
 	m.pickingAttachment = true
-	m.log.Debug("popup opened", "popup", "attachment picker", "attachments", count)
+	m.log.Debug("popup opened", "popup", "attachment picker", "attachments", len(items))
 	return m, nil
 }
 

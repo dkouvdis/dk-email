@@ -85,13 +85,12 @@ the draft or discard it.
 ## Opening attachments
 
 Press `o` in the reader. With one attachment, dk-email saves it and opens it
-at once. With several, a picker lists them grouped by message (sender and
-date), each with its size:
+at once. With several, a picker lists every attachment with its size, in thread
+order. The reader shows `press o to open` next to its `Attachments:` line.
 
 | Key | What it does |
 |---|---|
 | `enter` | Save and open the selected attachment. |
-| `/` | Filter the list. |
 | `esc` | Close the picker. |
 
 Only messages expanded in the reader, the ones whose bodies are loaded, are

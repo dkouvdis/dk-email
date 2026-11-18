@@ -182,7 +182,7 @@ func twoMessages() [][]byte {
 	}
 }
 
-func TestAttachment_PickerGroupsByMessage(t *testing.T) {
+func TestAttachment_PickerListsEveryAttachment(t *testing.T) {
 	m, fake, op, dir := attachFixture(t, true, twoMessages()...)
 
 	m = send(t, m, press("o"))
@@ -191,9 +191,15 @@ func TestAttachment_PickerGroupsByMessage(t *testing.T) {
 		t.Fatalf("picker %v, attachment picker %v, raw fetches %d", m.showPicker, m.pickingAttachment, rawFetches(fake))
 	}
 	view := plain(m)
-	for _, want := range []string{"Open attachment", "Zed · ", "Yan · ", "one.txt  5 B", "two.txt  6 B", "three.txt  5 B"} {
+	for _, want := range []string{"Open attachment", "one.txt  5 B", "two.txt  6 B", "three.txt  5 B"} {
 		if !strings.Contains(view, want) {
 			t.Errorf("picker missing %q:\n%s", want, view)
+		}
+	}
+
+	for _, bad := range []string{"/ ", "· "} {
+		if strings.Contains(view, bad) {
+			t.Errorf("picker has %q (a filter line or a heading):\n%s", bad, view)
 		}
 	}
 

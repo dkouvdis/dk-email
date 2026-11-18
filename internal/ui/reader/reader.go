@@ -433,7 +433,7 @@ func (m Model) expandedLines(s mail.Summary, width int) []string {
 	}
 	out = append(out, b.lines...)
 	if len(b.msg.Attachments) > 0 {
-		out = append(out, "", m.st.label.Render("Attachments:"))
+		out = append(out, "", m.st.label.Render("Attachments:")+m.st.dim.Render("  press o to open"))
 		for _, a := range b.msg.Attachments {
 			out = append(out, "  "+a.Name+m.st.dim.Render(fmt.Sprintf("  %s, %s", a.ContentType, FormatSize(a.Size))))
 		}

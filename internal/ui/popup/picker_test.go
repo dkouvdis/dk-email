@@ -319,3 +319,50 @@ func TestPicker_NestedAndDisabledItems(t *testing.T) {
 		t.Errorf("a disabled item shouldn't match:\n%s", ansi.Strip(q.View()))
 	}
 }
+
+func TestPicker_DisableFilter(t *testing.T) {
+	items := []Item[string]{{Label: "a.txt  1 B", Value: "a"}, {Label: "b.txt  2 B", Value: "b"}}
+	p := NewPicker(theme.Default(), "Open attachment", []Group[string]{{Items: items}})
+	p.DisableFilter()
+	p.SetSize(80, 30)
+
+	p = typeKeys(p, "/")
+	if p.Filtering() {
+		t.Error("/ started filtering with the filter disabled")
+	}
+	plain := ansi.Strip(p.View())
+	if strings.Contains(plain, "/ ") || strings.Contains(plain, "filter") {
+		t.Errorf("view has a filter line:\n%s", plain)
+	}
+	if got := hintText(p.Hints()); got != "Move: j/k | Open: enter | Close: esc/q" {
+		t.Errorf("hints = %q", got)
+	}
+	// Title, blank line, then the items straight away.
+	rows := strings.Split(plain, "\n")
+	var body []string
+	for _, r := range rows {
+		body = append(body, strings.TrimSpace(strings.Trim(strings.TrimSpace(r), "│╭╮╰╯─")))
+	}
+	if !slices.Contains(body, "Open attachment") || !strings.Contains(plain, "▸ a.txt") || !strings.Contains(plain, "b.txt") {
+		t.Errorf("view:\n%s", plain)
+	}
+}
+
+func TestPicker_UnnamedGroupHasNoHeading(t *testing.T) {
+	p := NewPicker(theme.Default(), "x", []Group[string]{
+		{Items: []Item[string]{{Label: "one", Value: "1"}}},
+		{Name: "Named", Items: []Item[string]{{Label: "two", Value: "2"}}},
+	})
+	lines := p.lines(40)
+	var texts []string
+	for _, l := range lines {
+		texts = append(texts, ansi.Strip(l.text))
+	}
+	// one, blank, Named, two: no heading or blank line before the unnamed group.
+	if len(texts) != 4 || !strings.Contains(texts[0], "one") || texts[1] != "" || texts[2] != "Named" {
+		t.Errorf("lines = %q", texts)
+	}
+	if p.all != 4 {
+		t.Errorf("all = %d, want 4", p.all)
+	}
+}
