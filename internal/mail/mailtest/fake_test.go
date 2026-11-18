@@ -656,3 +656,89 @@ func TestSearch_UnknownFolder(t *testing.T) {
 		t.Errorf("error = %v, want ErrFolderNotFound", err)
 	}
 }
+
+const rawWithAttachment = "From: Jane <jane@example.com>\r\n" +
+	"To: me@example.com\r\n" +
+	"Subject: With file\r\n" +
+	"Date: Sun, 08 Nov 2026 12:00:00 +0000\r\n" +
+	"Message-ID: <raw1@example.com>\r\n" +
+	"MIME-Version: 1.0\r\n" +
+	"Content-Type: multipart/mixed; boundary=XX\r\n\r\n" +
+	"--XX\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nhello\r\n" +
+	"--XX\r\nContent-Type: text/plain; name=\"note.txt\"\r\n" +
+	"Content-Disposition: attachment; filename=\"note.txt\"\r\n\r\nattached\r\n" +
+	"--XX--\r\n"
+
+func TestRaw_RoundTrip(t *testing.T) {
+	f := inbox()
+	uid := f.AddRaw("INBOX", []byte(rawWithAttachment))
+	got, err := f.Raw(ctx, "INBOX", uid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != rawWithAttachment {
+		t.Errorf("Raw = %q, want the added bytes", got)
+	}
+	got[0] = 'X' // a returned copy must not alias the stored bytes
+	again, _ := f.Raw(ctx, "INBOX", uid)
+	if string(again) != rawWithAttachment {
+		t.Error("mutating a returned slice changed the stored bytes")
+	}
+	m, err := f.Message(ctx, "INBOX", uid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m.Subject != "With file" || m.UID != uid {
+		t.Errorf("Message = %q UID %d", m.Subject, m.UID)
+	}
+	if len(m.Attachments) != 1 || m.Attachments[0].Name != "note.txt" {
+		t.Errorf("Attachments = %+v, want note.txt", m.Attachments)
+	}
+}
+
+func TestRaw_RecordsCall(t *testing.T) {
+	f := inbox()
+	uid := f.AddRaw("INBOX", []byte(rawWithAttachment))
+	if _, err := f.Raw(ctx, "INBOX", uid); err != nil {
+		t.Fatal(err)
+	}
+	calls := f.Calls()
+	if len(calls) != 1 || calls[0].Method != MethodRaw || calls[0].Folder != "INBOX" || !slices.Equal(calls[0].UIDs, []mail.UID{uid}) {
+		t.Errorf("calls = %+v", calls)
+	}
+}
+
+func TestRaw_Errors(t *testing.T) {
+	f := inbox()
+	plain := f.AddMessage("INBOX", msg("plain", false))
+	if _, err := f.Raw(ctx, "Nope", 1); !errors.Is(err, mail.ErrFolderNotFound) {
+		t.Errorf("unknown folder: err = %v", err)
+	}
+	if _, err := f.Raw(ctx, "INBOX", 99); !errors.Is(err, mail.ErrMessageNotFound) {
+		t.Errorf("unknown UID: err = %v", err)
+	}
+	if _, err := f.Raw(ctx, "INBOX", plain); !errors.Is(err, mail.ErrMessageNotFound) {
+		t.Errorf("AddMessage-only: err = %v", err)
+	}
+	boom := errors.New("boom")
+	f.Fail(MethodRaw, boom)
+	if _, err := f.Raw(ctx, "INBOX", plain); !errors.Is(err, boom) {
+		t.Errorf("Fail: err = %v", err)
+	}
+}
+
+func TestRaw_FollowsMove(t *testing.T) {
+	f := inbox()
+	uid := f.AddRaw("INBOX", []byte(rawWithAttachment))
+	if err := f.Move(ctx, "INBOX", []mail.UID{uid}, "[Gmail]/Trash"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.Raw(ctx, "INBOX", uid); !errors.Is(err, mail.ErrMessageNotFound) {
+		t.Errorf("source after move: err = %v", err)
+	}
+	moved := f.Messages("[Gmail]/Trash")
+	got, err := f.Raw(ctx, "[Gmail]/Trash", moved[0].UID)
+	if err != nil || string(got) != rawWithAttachment {
+		t.Errorf("destination Raw = %q, %v", got, err)
+	}
+}

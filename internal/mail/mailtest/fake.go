@@ -3,6 +3,7 @@
 package mailtest
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"slices"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/dkouvdis/dk-email/internal/mail"
+	"github.com/dkouvdis/dk-email/internal/render"
 )
 
 type Method string
@@ -20,6 +22,7 @@ const (
 	MethodSummaries Method = "Summaries"
 	MethodSearch    Method = "Search"
 	MethodMessage   Method = "Message"
+	MethodRaw       Method = "Raw"
 	MethodSetFlag   Method = "SetFlag"
 	MethodMove      Method = "Move"
 )
@@ -37,7 +40,8 @@ type Call struct {
 
 type folder struct {
 	info     mail.Folder
-	messages []mail.Message // ascending UID
+	messages []mail.Message      // ascending UID
+	raw      map[mail.UID][]byte // exact bytes of messages added with AddRaw
 	nextUID  mail.UID
 }
 
@@ -79,6 +83,28 @@ func (f *Fake) AddMessage(name string, m mail.Message) mail.UID {
 		panic(fmt.Sprintf("mailtest: AddMessage to unknown folder %q", name))
 	}
 	return fl.append(m)
+}
+
+// AddRaw parses raw as an RFC 5322 message and appends it like AddMessage,
+// keeping a copy of the bytes for Raw. It panics if the folder doesn't exist
+// or raw doesn't parse, since that's a test setup bug.
+func (f *Fake) AddRaw(name string, raw []byte) mail.UID {
+	m, err := render.Parse(bytes.NewReader(raw))
+	if err != nil {
+		panic(fmt.Sprintf("mailtest: AddRaw parse: %v", err))
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	fl, ok := f.folders[name]
+	if !ok {
+		panic(fmt.Sprintf("mailtest: AddRaw to unknown folder %q", name))
+	}
+	uid := fl.append(m)
+	if fl.raw == nil {
+		fl.raw = map[mail.UID][]byte{}
+	}
+	fl.raw[uid] = slices.Clone(raw)
+	return uid
 }
 
 // Messages returns a copy of the folder's current messages in UID order.
@@ -281,6 +307,29 @@ func (f *Fake) Message(ctx context.Context, name string, uid mail.UID) (mail.Mes
 	return mail.Message{}, fmt.Errorf("%s UID %d: %w", name, uid, mail.ErrMessageNotFound)
 }
 
+// Raw returns a copy of the bytes stored by AddRaw.
+func (f *Fake) Raw(ctx context.Context, name string, uid mail.UID) ([]byte, error) {
+	if err := f.begin(ctx, Call{Method: MethodRaw, Folder: name, UIDs: []mail.UID{uid}}); err != nil {
+		return nil, err
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	fl, err := f.folder(name)
+	if err != nil {
+		return nil, err
+	}
+	for _, m := range fl.messages {
+		if m.UID == uid {
+			raw, ok := fl.raw[uid]
+			if !ok {
+				return nil, fmt.Errorf("%s UID %d has no raw bytes (use AddRaw): %w", name, uid, mail.ErrMessageNotFound)
+			}
+			return slices.Clone(raw), nil
+		}
+	}
+	return nil, fmt.Errorf("%s UID %d: %w", name, uid, mail.ErrMessageNotFound)
+}
+
 func (f *Fake) SetFlag(ctx context.Context, name string, uids []mail.UID, flag mail.Flag, on bool) error {
 	if err := f.begin(ctx, Call{Method: MethodSetFlag, Folder: name, UIDs: slices.Clone(uids), Flag: flag, On: on}); err != nil {
 		return err
@@ -332,7 +381,15 @@ func (f *Fake) Move(ctx context.Context, from string, uids []mail.UID, to string
 	kept := src.messages[:0]
 	for _, m := range src.messages {
 		if slices.Contains(uids, m.UID) {
-			dst.append(m)
+			raw, hasRaw := src.raw[m.UID]
+			delete(src.raw, m.UID)
+			newUID := dst.append(m)
+			if hasRaw {
+				if dst.raw == nil {
+					dst.raw = map[mail.UID][]byte{}
+				}
+				dst.raw[newUID] = raw
+			}
 			continue
 		}
 		kept = append(kept, m)

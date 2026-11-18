@@ -242,6 +242,8 @@ type Mailbox interface {
 	Search(ctx context.Context, folder string, q SearchQuery, before UID, limit int) ([]Summary, int, error)
 	// Message fetches and parses a full message without marking it seen.
 	Message(ctx context.Context, folder string, uid UID) (Message, error)
+	// Raw returns a message's exact stored bytes (RFC 5322) without marking it read.
+	Raw(ctx context.Context, folder string, uid UID) ([]byte, error)
 	SetFlag(ctx context.Context, folder string, uids []UID, f Flag, on bool) error
 	Move(ctx context.Context, from string, uids []UID, to string) error
 	Close() error
