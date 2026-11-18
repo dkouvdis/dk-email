@@ -238,6 +238,8 @@ func (m Model) updateComposer(msg tea.Msg) (Model, tea.Cmd) {
 			d.pop.SetAttachments(attachmentLabels(d.base.Attachments))
 			m.log.Debug("attachment removed", "left", len(d.base.Attachments))
 		}
+	case popup.ComposeComplete, popup.ComposeAttachFile:
+		return m, tea.Batch(cmd, m.attachPrompt(res))
 	case popup.ComposeClose:
 		m.closeDraft()
 	case popup.ComposeDiscard:

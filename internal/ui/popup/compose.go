@@ -28,6 +28,12 @@ const (
 	// ComposeRemoveAttachment is d, backspace or delete on the Attachments
 	// row; the UI drops the one AttachmentIndex names.
 	ComposeRemoveAttachment
+	// ComposeComplete is tab in the attach prompt; the UI completes the path
+	// and answers with SetAttachInput.
+	ComposeComplete
+	// ComposeAttachFile is enter in the attach prompt with a path typed; the
+	// UI reads the file and answers with CloseAttach or SetAttachError.
+	ComposeAttachFile
 )
 
 // ComposeField is a field of the composer, in focus order.
@@ -53,7 +59,9 @@ type ComposeValues struct{ To, Cc, Bcc, Subject, Body string }
 
 const (
 	composeLabelW = 9 // "Subject" and the gap after it
-	composeRows   = 6 // the 4 header rows, the rule and the footer around the body
+	// attachLabelW is "Attach file:" and the gap after it.
+	attachLabelW = 13
+	composeRows  = 6 // the 4 header rows, the rule and the footer around the body
 	// composeErrLines is the most rows an error may take.
 	composeErrLines = 3
 )
@@ -82,6 +90,14 @@ type Compose struct {
 	atts, initialAtts []string
 	attSel            int
 
+	// attaching is set while the attach prompt is open. attachIn is its input,
+	// attachChoices the completions listed under it and attachErr why the last
+	// attempt failed.
+	attaching     bool
+	attachIn      textinput.Model
+	attachChoices []string
+	attachErr     string
+
 	title     string
 	w, h      int
 	err, busy string
@@ -109,6 +125,14 @@ func NewCompose(th theme.Theme, title string, v ComposeValues, focus ComposeFiel
 		in.CursorEnd()
 		c.headers[i] = in
 	}
+
+	c.attachIn = textinput.New()
+	c.attachIn.Prompt = ""
+	c.attachIn.Placeholder = "path, tab completes"
+	ast := c.attachIn.Styles()
+	ast.Focused.Text, ast.Blurred.Text = plain, plain
+	ast.Cursor.Color, ast.Cursor.Blink = nil, false
+	c.attachIn.SetStyles(ast)
 
 	ta := textarea.New()
 	ta.Prompt = ""
@@ -146,6 +170,7 @@ func (c *Compose) layout() {
 	for i := range c.headers {
 		c.headers[i].SetWidth(max(innerW-composeLabelW-1, 1))
 	}
+	c.attachIn.SetWidth(max(innerW-attachLabelW-1, 1))
 	c.body.SetWidth(max(innerW, 1))
 	c.body.SetHeight(max(innerH-composeRows-c.extraRows()-(len(c.footerLines(innerW))-1), 1))
 }
@@ -190,6 +215,36 @@ func (c *Compose) SetAttachments(labels []string) {
 // AttachmentIndex is the selected attachment.
 func (c Compose) AttachmentIndex() int { return c.attSel }
 
+// SetAttachInput sets the attach prompt's text, with the cursor at the end,
+// and lists choices under it when there are two or more.
+func (c *Compose) SetAttachInput(value string, choices []string) {
+	c.attachIn.SetValue(value)
+	c.attachIn.CursorEnd()
+	c.attachChoices, c.attachErr = nil, ""
+	if len(choices) >= 2 {
+		c.attachChoices = slices.Clone(choices)
+	}
+}
+
+// SetAttachError shows msg under the attach prompt, which stays open.
+func (c *Compose) SetAttachError(msg string) {
+	c.attachErr, c.attachChoices = msg, nil
+}
+
+// CloseAttach closes the attach prompt.
+func (c *Compose) CloseAttach() {
+	c.attaching = false
+	c.attachIn.Blur()
+	c.attachChoices, c.attachErr = nil, ""
+	c.layout()
+}
+
+// Attaching reports whether the attach prompt is open.
+func (c Compose) Attaching() bool { return c.attaching }
+
+// AttachPath is what is typed in the attach prompt, trimmed.
+func (c Compose) AttachPath() string { return strings.TrimSpace(c.attachIn.Value()) }
+
 // SetTitle replaces the popup title.
 func (c *Compose) SetTitle(t string) { c.title = t }
 
@@ -219,6 +274,7 @@ func (c *Compose) SetBusy(label string) {
 	if label != "" {
 		c.err = ""
 		c.prompting = false
+		c.attaching = false
 	} else {
 		c.cancellable = false
 	}
@@ -322,6 +378,9 @@ func (c Compose) Update(msg tea.Msg) (Compose, ComposeResult, tea.Cmd) {
 		if c.prompting {
 			return c.updatePrompt(msg)
 		}
+		if c.attaching {
+			return c.updateAttach(msg)
+		}
 		if c.fromOpen {
 			return c.updateDropdown(msg), ComposeNone, nil
 		}
@@ -330,10 +389,22 @@ func (c Compose) Update(msg tea.Msg) (Compose, ComposeResult, tea.Cmd) {
 		if c.busy != "" || c.prompting || c.fromOpen {
 			return c, ComposeNone, nil
 		}
+		if c.attaching {
+			c.attachChoices, c.attachErr = nil, ""
+			msg.Content = headerLine(msg.Content)
+			var cmd tea.Cmd
+			c.attachIn, cmd = c.attachIn.Update(msg)
+			return c, ComposeNone, cmd
+		}
 		if c.focus != ComposeBody {
 			msg.Content = headerLine(msg.Content)
 		}
 		return c, ComposeNone, c.forward(msg)
+	}
+	if c.attaching {
+		var cmd tea.Cmd
+		c.attachIn, cmd = c.attachIn.Update(msg)
+		return c, ComposeNone, cmd
 	}
 	return c, ComposeNone, c.forward(msg)
 }
@@ -358,6 +429,12 @@ func (c Compose) updateKey(msg tea.KeyPressMsg) (Compose, ComposeResult, tea.Cmd
 	switch msg.String() {
 	case "ctrl+s":
 		return c, ComposeSend, nil
+	case "ctrl+o":
+		c.attaching = true
+		c.attachIn.SetValue("")
+		c.attachChoices, c.attachErr = nil, ""
+		c.layout()
+		return c, ComposeNone, c.attachIn.Focus()
 	case "esc":
 		if !c.Dirty() {
 			return c, ComposeClose, nil
@@ -417,6 +494,27 @@ func (c Compose) updatePrompt(msg tea.KeyPressMsg) (Compose, ComposeResult, tea.
 		}
 	}
 	return c, ComposeNone, nil
+}
+
+// updateAttach handles keys while the attach prompt is open; it takes every
+// key but the three it acts on.
+func (c Compose) updateAttach(msg tea.KeyPressMsg) (Compose, ComposeResult, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		c.CloseAttach()
+		return c, ComposeNone, nil
+	case "tab":
+		return c, ComposeComplete, nil
+	case "enter":
+		if c.AttachPath() == "" {
+			return c, ComposeNone, nil
+		}
+		return c, ComposeAttachFile, nil
+	}
+	c.attachChoices, c.attachErr = nil, ""
+	var cmd tea.Cmd
+	c.attachIn, cmd = c.attachIn.Update(msg)
+	return c, ComposeNone, cmd
 }
 
 // headerLine makes pasted text fit a single-line field.
@@ -568,12 +666,22 @@ func splice(line, over string, col int) string {
 	return left + over + ansi.TruncateLeft(line, col+ansi.StringWidth(over), "")
 }
 
-// footerLines are the last rows: the close prompt, an error or the busy
+// footerLines are the last rows: the attach prompt, the close prompt, an error or the busy
 // label. The keys themselves are in the hint bar (see Hints); with nothing to
 // say the row stays blank so the body doesn't move. An error wraps onto up to
 // composeErrLines rows, fewer when the popup is short.
 func (c Compose) footerLines(w int) []string {
 	switch {
+	case c.attaching:
+		line := c.th.Accent.Render(fmt.Sprintf("%-*s", attachLabelW, "Attach file:")) + c.attachIn.View()
+		under := ""
+		switch {
+		case c.attachErr != "":
+			under = c.th.Error.Render(ansi.Truncate(oneLine(c.attachErr), w, "…"))
+		case len(c.attachChoices) > 0:
+			under = c.th.Muted.Render(ansi.Truncate(strings.Join(c.attachChoices, "  "), w, "…"))
+		}
+		return []string{ansi.Truncate(line, w, "…"), under}
 	case c.prompting:
 		return []string{ansi.Truncate(c.th.Cursor.Padding(0, 1).Render(c.promptQuestion()+"  "+HintLine(c.Hints())), w, "…")}
 	case c.err != "":
@@ -614,10 +722,13 @@ func (c Compose) Hints() []key.Binding {
 	case c.prompting:
 		return []key.Binding{h("d", "discard"), h("e", "keep editing")}
 	}
+	if c.attaching {
+		return []key.Binding{h("tab", "complete"), h("enter", "attach"), h("esc", "cancel")}
+	}
 	if c.fromOpen {
 		return []key.Binding{h("↑/↓", "move"), h("enter", "pick"), h("esc", "close")}
 	}
-	keys := []key.Binding{h("ctrl+s", "send"), h("tab", "next field"), h("shift+tab", "previous field"), h("esc", "close")}
+	keys := []key.Binding{h("ctrl+s", "send"), h("ctrl+o", "attach"), h("tab", "next field"), h("shift+tab", "previous field"), h("esc", "close")}
 	if c.focus == ComposeAttachments {
 		keys = append([]key.Binding{h("←/→", "choose"), h("d", "remove")}, keys...)
 	}

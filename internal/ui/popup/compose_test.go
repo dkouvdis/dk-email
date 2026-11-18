@@ -10,7 +10,10 @@ import (
 	"github.com/dkouvdis/dk-email/internal/ui/theme"
 )
 
-var ctrlS = tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl}
+var (
+	ctrlS = tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl}
+	ctrlO = tea.KeyPressMsg{Code: 'o', Mod: tea.ModCtrl}
+)
 
 func newTestCompose(v ComposeValues, focus ComposeField) Compose {
 	c := NewCompose(theme.Default(), "Reply · Re: Lunch? · me@x.com", v, focus)
@@ -23,8 +26,11 @@ func press(c Compose, ks ...string) (Compose, ComposeResult) {
 	var r ComposeResult
 	for _, k := range ks {
 		msg := ck(k)
-		if k == "ctrl+s" {
+		switch k {
+		case "ctrl+s":
 			msg = ctrlS
+		case "ctrl+o":
+			msg = ctrlO
 		}
 		c, r, _ = c.Update(msg)
 	}
@@ -203,7 +209,7 @@ func TestCompose_Hints(t *testing.T) {
 		c    Compose
 		want string
 	}{
-		"normal":    {normal, "Send: ctrl+s | Next field: tab | Previous field: shift+tab | Close: esc"},
+		"normal":    {normal, "Send: ctrl+s | Attach: ctrl+o | Next field: tab | Previous field: shift+tab | Close: esc"},
 		"prompting": {dirty(true), "Save: s | Discard: d | Keep editing: e | Save & close: esc"},
 		"no save":   {noSave, "Discard: d | Keep editing: e"},
 		"busy":      {busy, "Quit now: ctrl+c"},
@@ -843,6 +849,141 @@ func TestComposeAttachments_ViewFitsAndKeepsSelectionVisible(t *testing.T) {
 			if sz[0] == 40 && sel > 0 && !strings.Contains(row, "… ") {
 				t.Errorf("%v sel %d: no leading ellipsis: %q", sz, sel, row)
 			}
+		}
+	}
+}
+
+func TestCompose_CtrlOOpensTheAttachPrompt(t *testing.T) {
+	c := newTestCompose(ComposeValues{To: "a@x.com"}, ComposeBody)
+	c, r := press(c, "ctrl+o")
+	if r != ComposeNone || !c.Attaching() {
+		t.Fatalf("ctrl+o: result %v, attaching %v", r, c.Attaching())
+	}
+	v := ansi.Strip(c.View())
+	for _, want := range []string{"Attach file:", "path, tab completes"} {
+		if !strings.Contains(v, want) {
+			t.Errorf("view lacks %q:\n%s", want, v)
+		}
+	}
+	if got, want := hintText(c.Hints()), "Complete: tab | Attach: enter | Cancel: esc"; got != want {
+		t.Errorf("hints = %q, want %q", got, want)
+	}
+}
+
+func TestCompose_AttachPromptTakesTheKeys(t *testing.T) {
+	c := newTestCompose(ComposeValues{To: "a@x.com"}, ComposeBody)
+	c, _ = press(c, "ctrl+o")
+	c = composeType(c, " ~/a.txt ")
+	c, _ = press(c, "ctrl+s", "d")
+	if got := c.AttachPath(); got != "~/a.txt d" { // ctrl+s is ignored, d is text
+		t.Errorf("AttachPath = %q", got)
+	}
+	if v := c.Values(); v.Body != "" {
+		t.Errorf("body = %q, want it untouched", v.Body)
+	}
+	c, _, _ = c.Update(tea.PasteMsg{Content: "x\ny"})
+	if got := c.AttachPath(); got != "~/a.txt dx y" {
+		t.Errorf("after paste AttachPath = %q", got)
+	}
+}
+
+func TestCompose_AttachPromptResults(t *testing.T) {
+	c := newTestCompose(ComposeValues{}, ComposeTo)
+	c, _ = press(c, "ctrl+o")
+	if _, r := press(c, "enter"); r != ComposeNone {
+		t.Errorf("enter with nothing typed = %v, want none", r)
+	}
+	c = composeType(c, "/tmp/f")
+	if _, r := press(c, "tab"); r != ComposeComplete {
+		t.Errorf("tab = %v, want ComposeComplete", r)
+	}
+	if c2, r := press(c, "enter"); r != ComposeAttachFile || c2.AttachPath() != "/tmp/f" {
+		t.Errorf("enter = %v, path %q", r, c2.AttachPath())
+	}
+	if !c.Attaching() {
+		t.Error("the prompt should stay open until the UI closes it")
+	}
+}
+
+func TestCompose_EscClosesOnlyTheAttachPrompt(t *testing.T) {
+	c := newTestCompose(ComposeValues{To: "a@x.com"}, ComposeBody)
+	c, _ = press(c, "ctrl+o")
+	c = composeType(c, "abc")
+	c, r := press(c, "esc")
+	if r != ComposeNone || c.Attaching() || c.Prompting() {
+		t.Fatalf("esc: result %v, attaching %v, prompting %v", r, c.Attaching(), c.Prompting())
+	}
+	if got := c.Values().To; got != "a@x.com" {
+		t.Errorf("To = %q", got)
+	}
+	if got, want := hintText(c.Hints()), "Send: ctrl+s | Attach: ctrl+o"; !strings.HasPrefix(got, want) {
+		t.Errorf("hints after esc = %q", got)
+	}
+	c, _ = press(c, "ctrl+o")
+	if c.AttachPath() != "" {
+		t.Errorf("reopened prompt holds %q", c.AttachPath())
+	}
+}
+
+func TestCompose_CtrlOIgnoredWhileBusyOrPrompting(t *testing.T) {
+	busy := newTestCompose(ComposeValues{}, ComposeTo)
+	busy.SetBusy("Sending…")
+	if busy, _ = press(busy, "ctrl+o"); busy.Attaching() {
+		t.Error("ctrl+o opened the prompt while busy")
+	}
+	p, _ := press(dirty(true), "ctrl+o")
+	if p.Attaching() || !p.Prompting() {
+		t.Error("ctrl+o should do nothing in the close prompt")
+	}
+}
+
+func TestCompose_AttachChoicesAndError(t *testing.T) {
+	c := newTestCompose(ComposeValues{}, ComposeTo)
+	c, _ = press(c, "ctrl+o")
+	long := []string{"alpha.txt", "alpine/", "alps.pdf", strings.Repeat("z", 100)}
+	c.SetAttachInput("~/al", long)
+	if got := c.AttachPath(); got != "~/al" {
+		t.Errorf("AttachPath = %q", got)
+	}
+	v := ansi.Strip(c.View())
+	if !strings.Contains(v, "alpha.txt  alpine/  alps.pdf  zzz") || !strings.Contains(v, "…") {
+		t.Errorf("choices line missing or not truncated:\n%s", v)
+	}
+	checkWidth(t, c)
+
+	c.SetAttachInput("~/alp", []string{"only/"})
+	if v := ansi.Strip(c.View()); strings.Contains(v, "only/") {
+		t.Errorf("a single choice should not be listed:\n%s", v)
+	}
+
+	c.SetAttachError("no such file: ~/nope " + strings.Repeat("x", 200))
+	if v := ansi.Strip(c.View()); !strings.Contains(v, "no such file: ~/nope") || !c.Attaching() {
+		t.Errorf("error not shown, or prompt closed:\n%s", v)
+	}
+	checkWidth(t, c)
+
+	c, _ = press(c, "x")
+	if v := ansi.Strip(c.View()); strings.Contains(v, "no such file") {
+		t.Errorf("typing should clear the error:\n%s", v)
+	}
+	c.SetAttachInput("a", []string{"ab", "ac"})
+	c, _ = press(c, "x")
+	if v := ansi.Strip(c.View()); strings.Contains(v, "ab  ac") {
+		t.Errorf("typing should clear the choices:\n%s", v)
+	}
+}
+
+// checkWidth fails when a line of c's view is wider than the popup, or the
+// view is not the popup's height.
+func checkWidth(t *testing.T, c Compose) {
+	t.Helper()
+	lines := strings.Split(c.View(), "\n")
+	if len(lines) != 24 {
+		t.Errorf("view is %d rows, want 24", len(lines))
+	}
+	for _, l := range lines {
+		if w := ansi.StringWidth(l); w != 80 {
+			t.Errorf("line %q is %d wide, want 80", ansi.Strip(l), w)
 		}
 	}
 }

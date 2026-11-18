@@ -254,6 +254,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleDraftOpened(msg)
 	case attachmentMsg:
 		return m.handleAttachment(msg)
+	case completedMsg:
+		return m.handleCompleted(msg)
+	case attachReadMsg:
+		return m.handleAttachRead(msg)
 	default:
 		// Whatever else the composer's inputs wait for, such as a clipboard read.
 		if m.composing() {

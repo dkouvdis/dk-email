@@ -144,7 +144,7 @@ func TestCompose_HintsRowShowsComposerKeys(t *testing.T) {
 	m, _ := composeFixture(t)
 	m, _ = keyCmd(t, m, "c")
 
-	if h := strings.TrimSpace(ansi.Strip(m.renderHints())); h != "Send: ctrl+s | Next field: tab | Previous field: shift+tab | Close: esc" {
+	if h := strings.TrimSpace(ansi.Strip(m.renderHints())); h != "Send: ctrl+s | Attach: ctrl+o | Next field: tab | Previous field: shift+tab | Close: esc" {
 		t.Errorf("hints = %q", h)
 	}
 	if view := plain(m); strings.Contains(view, "ctrl+s send") || strings.Count(view, "ctrl+s") != 1 {
@@ -845,7 +845,7 @@ func TestCompose_RemovingAnAttachmentSendsTheRest(t *testing.T) {
 func TestCompose_RemovingTheLastAttachmentHidesTheRow(t *testing.T) {
 	m, _ := attachmentsOpen(t)
 	m = send(t, m, press("d"), press("d"))
-	if v := plain(m); strings.Contains(v, "Attach") || len(m.draft.base.Attachments) != 0 {
+	if v := plain(m); strings.Contains(v, "report.pdf") || len(m.draft.base.Attachments) != 0 {
 		t.Errorf("row still shown:\n%s", v)
 	}
 }

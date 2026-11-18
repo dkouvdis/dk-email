@@ -40,6 +40,8 @@ func press(k string) tea.KeyPressMsg {
 		return tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl}
 	case "ctrl+s":
 		return tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl}
+	case "ctrl+o":
+		return tea.KeyPressMsg{Code: 'o', Mod: tea.ModCtrl}
 	case "ctrl+r":
 		return tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl}
 	case "enter":
@@ -546,7 +548,7 @@ func TestModel_HintBarShowsThePopupKeys(t *testing.T) {
 		m    Model
 		want string
 	}{
-		{"composer", composing, "Send: ctrl+s | Next field: tab | Previous field: shift+tab | Close: esc"},
+		{"composer", composing, "Send: ctrl+s | Attach: ctrl+o | Next field: tab | Previous field: shift+tab | Close: esc"},
 		{"composer prompt", prompting, "Save: s | Discard: d | Keep editing: e | Save & close: esc"},
 		{"composer busy", busy, "Quit now: ctrl+c"},
 		{"help", pressSettled(t, base, "?"), "Up: k/↑ | Down: j/↓ | Page: pgup/pgdn | Top/bottom: g/G | Filter: / | Close: esc/q/?"},
