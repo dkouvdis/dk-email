@@ -183,7 +183,7 @@ shipped.
 
 ## Checkpoint: Opening
 
-- [ ] `go test -race ./...`, `go vet ./...`, `gofmt -l .` clean; build OK
+- [x] `go test -race ./...`, `go vet ./...`, `gofmt -l .` clean; build OK
 - [ ] Manual: PDF and image open on macOS; over SSH the status reports the
   saved path; a `.sh` is saved and not opened
 - [ ] Review with human before Phase 2
@@ -329,7 +329,7 @@ removed attachments.
 
 ## Checkpoint: Attachment model
 
-- [ ] Full suite green; forwarding, saving and reopening drafts work, with
+- [x] Full suite green; forwarding, saving and reopening drafts work, with
   attachments visible and removable
 - [ ] Review with human
 
@@ -347,15 +347,15 @@ the prompt. A file whose name and bytes match one already on the list is
 skipped with `<name> is already attached`. Footer hints include `ctrl+o`.
 
 **Acceptance criteria:**
-- [ ] Attaching a temp file adds it to the row and it is sent with the
+- [x] Attaching a temp file adds it to the row and it is sent with the
   right content type and bytes.
-- [ ] Tab completes a unique prefix and lists choices for an ambiguous one;
+- [x] Tab completes a unique prefix and lists choices for an ambiguous one;
   a directory path or missing file shows an error and attaches nothing.
-- [ ] Attaching the same file twice leaves one copy and shows the note.
+- [x] Attaching the same file twice leaves one copy and shows the note.
 
 **Verification:**
-- [ ] Tests pass: `go test -race ./internal/ui/...`
-- [ ] Build succeeds
+- [x] Tests pass: `go test -race ./internal/ui/...`
+- [x] Build succeeds
 - [ ] Manual check: attach `~/Downloads/<file>` with tab completion and send
   to yourself.
 
@@ -380,13 +380,13 @@ Windows paths, several separated by spaces or newlines. In the composer, a
 field; the status names what was attached. Anything else pastes as before.
 
 **Acceptance criteria:**
-- [ ] Table tests cover each format, mixed text (stays text), a missing
+- [x] Table tests cover each format, mixed text (stays text), a missing
   file (stays text) and multiple files.
-- [ ] Pasting two existing files' paths into the body attaches both and
+- [x] Pasting two existing files' paths into the body attaches both and
   leaves the body unchanged.
 
 **Verification:**
-- [ ] Tests pass: `go test -race ./internal/ui/...`
+- [x] Tests pass: `go test -race ./internal/ui/...`
 - [ ] Manual check: drag one and two files into the composer in Ghostty,
   iTerm2 and Terminal.app (and a Linux terminal if available); note any
   terminal whose format isn't handled.
@@ -410,8 +410,8 @@ the prompt, dropping (and the terminals tested), the row, duplicates,
 forwards and drafts. Update SPEC.md and the future-plans entry.
 
 **Acceptance criteria:**
-- [ ] Help-dialog test covers the new composer keys.
-- [ ] `docs/attachments.md` documents attaching; SPEC matches the behaviour.
+- [x] Help-dialog test covers the new composer keys.
+- [x] `docs/attachments.md` documents attaching; SPEC matches the behaviour.
 
 **Verification:**
 - [ ] Tests pass: `go test -race ./...`; `go vet ./...`; `gofmt -l .`;

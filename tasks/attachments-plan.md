@@ -86,7 +86,7 @@ code, except `mail.go` and `keys.go`.
 
 ### Checkpoint: Opening
 
-- [ ] `go test -race ./...`, `go vet ./...`, `gofmt -l .` clean; build OK
+- [x] `go test -race ./...`, `go vet ./...`, `gofmt -l .` clean; build OK
 - [ ] Manual: open a PDF and an image on macOS; on Linux over SSH the status
   reports the saved path; a `.sh` is saved and not opened
 - [ ] Review with human before Phase 2
@@ -100,7 +100,7 @@ code, except `mail.go` and `keys.go`.
 
 ### Checkpoint: Attachment model
 
-- [ ] Full suite green; forwarding, saving and reopening drafts behave as
+- [x] Full suite green; forwarding, saving and reopening drafts behave as
   before, now with attachments visible
 - [ ] Review with human
 
