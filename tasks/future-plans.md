@@ -12,12 +12,16 @@ must keep possible.
   probes with `LIST "" ""` and reconnects, and logs drops and reconnects to
   the debug log. Confirm with an overnight run under `DK_EMAIL_DEBUG=1`; see
   [reconnect-plan.md](reconnect-plan.md).
+- **Attachments, to confirm by hand**: opening (`o`) and attaching (`ctrl+o`,
+  drag and drop) pass the test suite but haven't been run against a real
+  account. Drag and drop is the riskiest: each terminal pastes a drop in its
+  own format, and only the formats in `internal/ui/drop.go`'s tests are
+  handled. Try Ghostty, iTerm2, Terminal.app and a Linux terminal; a drop
+  that lands as text means a format to add. Windows is untested. The checks
+  are listed in [attachments-todo.md](attachments-todo.md).
 
 ## High Priority
 
-- **Save and open attachments**: shipped as `o` in the reader (save to
-  Downloads, then open); see [docs/attachments.md](../docs/attachments.md).
-  Design: [open-attachments.md](open-attachments.md).
 - **Undo for delete, archive and move**: `d` deletes without confirmation by
   design, so offer a short undo (e.g. `z` within a few seconds). The
   optimistic updates in `internal/ui/actions.go` already keep what's needed to
@@ -58,14 +62,36 @@ Folder search (`/`) shipped; see `docs/search.md`. Follow-ups:
   `multipart/alternative` (plain text + HTML) so links like `[here](https://…)`
   render as clickable text. Body building stays behind a seam so this can be
   added without a rewrite.
-- **Attach local files**: shipped as `ctrl+o` or drop in the composer; see
-  [docs/attachments.md](../docs/attachments.md). Design:
-  [attach-files.md](attach-files.md).
 - **Mark the original answered for resumed replies**: a reply saved to Drafts
   and sent later keeps its threading headers, but the original isn't flagged
   `\Answered` because the link to it isn't stored with the draft.
 - **Signature**: a per-account signature added to new messages, replies and
   forwards, shared by the account's aliases.
+
+### Attachments
+
+Opening and attaching shipped; see [Shipped](#shipped). Follow-ups:
+
+- **Fetch one part, not the whole message**: opening an attachment and
+  forwarding both download the full message (`BODY.PEEK[]`). Fetching only
+  the needed part (`BODY.PEEK[n]`) would make large mail fast. `render.Parts`
+  ordering is the contract the part numbers must follow.
+- **Collapsed messages in the `o` picker**: only expanded messages (bodies
+  loaded) are listed, so attachments of collapsed ones need a `space` first.
+  Fetch the missing bodies when `o` is pressed instead.
+- **Size warning before sending**: dk-email sets no limit and the server's
+  rejection is the only signal. Warn in the composer when the encoded size
+  passes a threshold (attachments grow about a third when encoded).
+- **Pipe an attachment to a command** (`|`): the useful action over SSH or
+  without a display, e.g. `| pdftotext - -`.
+- **Save all attachments** of a message or thread at once; needs a
+  multi-select picker.
+- **`download_dir` setting**: Downloads is fixed today; add the config key
+  when someone asks.
+- **Per-type openers**: choose the app per MIME type (as mailcap or aerc's
+  `[openers]`) instead of the system default.
+- **Attach from another message**: add an attachment of a different email,
+  reusing the `Draft.Attachments` list.
 
 ### General
 
@@ -97,3 +123,14 @@ Folder search (`/`) shipped; see `docs/search.md`. Follow-ups:
   the system browser.
 - **Local cache**: keep folders and messages on disk for faster startup and
   reading offline. A large change; defer until the rest is settled.
+
+## Shipped
+
+- **Save and open attachments**: `o` in the reader saves to Downloads, then
+  opens with the default app; see [docs/attachments.md](../docs/attachments.md).
+  Design: [open-attachments.md](open-attachments.md).
+- **Attach local files**: `ctrl+o` or drag and drop in the composer, an
+  Attach row to review and remove attachments (forwards and reopened drafts
+  included); see [docs/attachments.md](../docs/attachments.md). Design:
+  [attach-files.md](attach-files.md); plan:
+  [attachments-plan.md](attachments-plan.md).
