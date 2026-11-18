@@ -1,10 +1,12 @@
 package imap
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"os"
 	"path/filepath"
@@ -94,6 +96,109 @@ func TestFolders_ReconnectsAfterServerDropsConnection(t *testing.T) {
 	}
 	if n := srv.ln.accepted(); n != 2 {
 		t.Errorf("accepted %d connections, want 2", n)
+	}
+}
+
+func TestFolders_ReconnectsAfterSessionExpires(t *testing.T) {
+	srv := startServer(t, modeImplicit, capsListStatus)
+	c := srv.newClient(t, modeImplicit)
+	if _, err := c.Folders(timeoutCtx(t, 10*time.Second)); err != nil {
+		t.Fatalf("first Folders() error = %v", err)
+	}
+
+	srv.expireSessions()
+	got, err := c.Folders(timeoutCtx(t, 10*time.Second))
+
+	if err != nil {
+		t.Fatalf("Folders() after expiry error = %v", err)
+	}
+	if !slices.Equal(got, wantSeededFolders) {
+		t.Errorf("Folders() after expiry = %+v, want %+v", got, wantSeededFolders)
+	}
+	if n := srv.ln.accepted(); n != 2 {
+		t.Errorf("accepted %d connections, want 2", n)
+	}
+}
+
+// captureLog makes c log at debug level into the returned buffer. Calls are
+// serialized by the client, so read it only after they return.
+func captureLog(c *Client) *bytes.Buffer {
+	buf := &bytes.Buffer{}
+	c.log = slog.New(slog.NewTextHandler(buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	return buf
+}
+
+func TestDo_LogsExpiredSessionAndReconnect(t *testing.T) {
+	srv := startServer(t, modeImplicit, capsListStatus)
+	c := srv.newClient(t, modeImplicit)
+	logs := captureLog(c)
+	if _, err := c.Folders(timeoutCtx(t, 10*time.Second)); err != nil {
+		t.Fatalf("first Folders() error = %v", err)
+	}
+
+	srv.expireSessions()
+	if _, err := c.Folders(timeoutCtx(t, 10*time.Second)); err != nil {
+		t.Fatalf("Folders() after expiry error = %v", err)
+	}
+
+	got := logs.String()
+	for _, want := range []string{`"imap session expired"`, "op=Folders", "replaces=true"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("log does not contain %q:\n%s", want, got)
+		}
+	}
+	if !strings.Contains(got, `msg="imap connected"`) {
+		t.Errorf("log has no imap connected record:\n%s", got)
+	}
+	if strings.Contains(got, testPassword) {
+		t.Errorf("log contains the password:\n%s", got)
+	}
+}
+
+func TestDo_LogNeverContainsToken(t *testing.T) {
+	srv := startServer(t, modeImplicit, capsListStatus)
+	tok := "tok-bad"
+	c := oauthClient(t, srv, func(context.Context) (mail.Login, error) { return mail.Login{Token: tok}, nil })
+	logs := captureLog(c)
+	if _, err := c.Folders(timeoutCtx(t, 10*time.Second)); err == nil {
+		t.Fatal("Folders() with a rejected token error = nil, want a login failure")
+	}
+
+	srv.acceptToken("tok-good")
+	tok = "tok-good"
+	if _, err := c.Folders(timeoutCtx(t, 10*time.Second)); err != nil {
+		t.Fatalf("Folders() with a good token error = %v", err)
+	}
+	srv.expireSessions()
+	if _, err := c.Folders(timeoutCtx(t, 10*time.Second)); err != nil {
+		t.Fatalf("Folders() after expiry error = %v", err)
+	}
+
+	got := logs.String()
+	if !strings.Contains(got, `msg="imap connect failed"`) {
+		t.Errorf("log has no imap connect failed record:\n%s", got)
+	}
+	for _, secret := range []string{"tok-bad", "tok-good"} {
+		if strings.Contains(got, secret) {
+			t.Errorf("log contains token %q:\n%s", secret, got)
+		}
+	}
+}
+
+func TestMessage_ServerErrorOnHealthySessionKeepsConnection(t *testing.T) {
+	srv := startServer(t, modeImplicit, capsListStatus)
+	c := srv.newClient(t, modeImplicit)
+	if _, err := c.Folders(timeoutCtx(t, 10*time.Second)); err != nil {
+		t.Fatalf("first Folders() error = %v", err)
+	}
+
+	_, err := c.Message(timeoutCtx(t, 10*time.Second), "Nope", 1)
+
+	if !errors.Is(err, mail.ErrFolderNotFound) {
+		t.Fatalf("Message() error = %v, want ErrFolderNotFound", err)
+	}
+	if n := srv.ln.accepted(); n != 1 {
+		t.Errorf("accepted %d connections, want 1", n)
 	}
 }
 
@@ -612,7 +717,7 @@ func TestDial_CredentialsErrorKeepsChain(t *testing.T) {
 	sentinel := errors.New("refresh failed")
 	creds := func(context.Context) (mail.Login, error) { return mail.Login{}, sentinel }
 
-	_, err := DialWithCredentials(timeoutCtx(t, 10*time.Second), srv.account(modeImplicit), creds)
+	_, err := DialWithCredentials(timeoutCtx(t, 10*time.Second), srv.account(modeImplicit), creds, nil)
 
 	if !errors.Is(err, sentinel) {
 		t.Fatalf("DialWithCredentials() error = %v, want it to wrap the credentials error", err)

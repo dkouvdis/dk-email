@@ -1,9 +1,11 @@
 // Package imap implements mail.Mailbox on top of an IMAP server.
 //
 // A Client keeps one lazily opened connection per account. Calls are
-// serialized by a mutex, a broken connection is dropped, and the next call
-// reconnects. go-imap's client methods take no context, so cancellation and
-// deadlines are enforced by closing the TCP connection when the context ends.
+// serialized by a mutex, and a broken connection, or a session the server
+// expired (found by a LIST probe after a server error), is dropped and the
+// next call reconnects. go-imap's client methods take no context, so
+// cancellation and deadlines are enforced by closing the TCP connection when
+// the context ends.
 package imap
 
 import (
@@ -11,6 +13,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"strconv"
 	"strings"
@@ -34,6 +37,7 @@ var _ mail.Mailbox = (*Client)(nil)
 type Client struct {
 	acct  config.Account
 	creds mail.Credentials
+	log   *slog.Logger // debug log; never nil, discards by default
 
 	// tlsConfig is a base TLS configuration. It is only set from tests, to
 	// trust a self-signed certificate.
@@ -43,6 +47,8 @@ type Client struct {
 	conn   *imapclient.Client
 	raw    net.Conn // the TCP connection under conn, closed to abort a call
 	closed bool
+	// connected records that a connection was opened before, so a new one replaces it.
+	connected bool
 	// uidValidity remembers each folder's last seen UIDVALIDITY.
 	uidValidity map[string]uint32
 }
@@ -63,19 +69,23 @@ func New(acct config.Account, password string) *Client {
 // NewWithCredentials is New with a login source. creds is called for every
 // connection, including reconnects, so OAuth tokens are fetched fresh.
 func NewWithCredentials(acct config.Account, creds mail.Credentials) *Client {
-	return &Client{acct: acct, creds: creds}
+	return &Client{acct: acct, creds: creds, log: slog.New(slog.DiscardHandler)}
 }
 
 // Dial is New followed by an eager connect and login, so bad settings and
 // credentials surface immediately.
 func Dial(ctx context.Context, acct config.Account, password string) (*Client, error) {
-	return DialWithCredentials(ctx, acct, mail.StaticPassword(password))
+	return DialWithCredentials(ctx, acct, mail.StaticPassword(password), nil)
 }
 
 // DialWithCredentials is NewWithCredentials followed by an eager connect and
-// login.
-func DialWithCredentials(ctx context.Context, acct config.Account, creds mail.Credentials) (*Client, error) {
-	return dial(ctx, NewWithCredentials(acct, creds))
+// login. A non-nil log receives debug records of drops and reconnects.
+func DialWithCredentials(ctx context.Context, acct config.Account, creds mail.Credentials, log *slog.Logger) (*Client, error) {
+	c := NewWithCredentials(acct, creds)
+	if log != nil {
+		c.log = log
+	}
+	return dial(ctx, c)
 }
 
 func dial(ctx context.Context, c *Client) (*Client, error) {
@@ -115,7 +125,8 @@ func (c *Client) Close() error {
 
 // do runs fn on the account's connection, opening it if needed. If a
 // connection that was already open fails, do reconnects and runs fn once more,
-// so fn must be safe to repeat.
+// so fn must be safe to repeat. A server error (NO/BAD) on a reused connection
+// reconnects only if a probe shows the session itself has expired.
 func (c *Client) do(ctx context.Context, op string, fn func(*imapclient.Client) error) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -137,18 +148,45 @@ func (c *Client) do(ctx context.Context, op string, fn func(*imapclient.Client) 
 			return nil
 		}
 		if ctxErr := ctx.Err(); ctxErr != nil {
+			c.log.Debug("imap call ended", "account", c.acct.Name, "op", op, "err", ctxErr)
 			return fmt.Errorf("imap: %s: %w", op, ctxErr)
 		}
 		var serverErr *goimap.Error
 		var final finalError
-		if errors.As(err, &serverErr) || errors.As(err, &final) {
+		if errors.As(err, &final) {
 			return fmt.Errorf("imap: %s: %w", op, err)
+		}
+		if errors.As(err, &serverErr) {
+			if !reused || c.sessionAlive(ctx, conn) {
+				return fmt.Errorf("imap: %s: %w", op, err)
+			}
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				c.log.Debug("imap call ended", "account", c.acct.Name, "op", op, "err", ctxErr)
+				return fmt.Errorf("imap: %s: %w", op, ctxErr)
+			}
+			c.log.Debug("imap session expired", "account", c.acct.Name, "op", op, "err", err)
+		} else {
+			c.log.Debug("imap connection dropped", "account", c.acct.Name, "op", op, "err", err)
 		}
 		c.dropLocked()
 		if !reused {
 			return fmt.Errorf("imap: %s: %w", op, err)
 		}
 	}
+}
+
+// sessionAlive reports whether conn's session still answers commands. A server
+// that expired the session may leave the TCP connection open and answer every
+// command with NO or BAD, which looks like an ordinary server error. LIST is
+// only valid once authenticated, unlike NOOP or CAPABILITY, which a logged-out
+// session still accepts.
+func (c *Client) sessionAlive(ctx context.Context, conn *imapclient.Client) bool {
+	return c.runLocked(ctx, conn, probeSession) == nil
+}
+
+func probeSession(conn *imapclient.Client) error {
+	_, err := conn.List("", "", nil).Collect()
+	return err
 }
 
 func (c *Client) runLocked(ctx context.Context, conn *imapclient.Client, fn func(*imapclient.Client) error) error {
@@ -176,19 +214,24 @@ func (c *Client) connectLocked(ctx context.Context) (conn *imapclient.Client, re
 	if c.conn != nil {
 		select {
 		case <-c.conn.Closed():
+			c.log.Debug("imap connection closed by server", "account", c.acct.Name)
 			c.dropLocked()
 		default:
 			return c.conn, true, nil
 		}
 	}
 
+	start := time.Now()
 	conn, raw, err := c.open(ctx)
 	if err != nil {
+		c.log.Debug("imap connect failed", "account", c.acct.Name, "err", err)
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			return nil, false, ctxErr
 		}
 		return nil, false, err
 	}
+	c.log.Debug("imap connected", "account", c.acct.Name, "replaces", c.connected, "took", time.Since(start).Round(time.Millisecond))
+	c.connected = true
 	c.conn, c.raw = conn, raw
 	return conn, false, nil
 }

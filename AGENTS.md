@@ -68,7 +68,7 @@ Supporting modules:
 - Config updates preserve user formatting/comments: adding an account appends a TOML block instead of re-encoding the file.
 - Bubble Tea pattern is consistent: perform I/O in `tea.Cmd`, return typed messages, keep `Update` as the state transition point.
 - `internal/mail` stays provider-agnostic and standard-library-only; IMAP-specific behavior belongs in `internal/mail/imap`.
-- IMAP client behavior is deliberate: one lazily opened connection per account, serialized calls, reconnect on dropped connection, and context-driven cancellation.
+- IMAP client behavior is deliberate: one lazily opened connection per account, serialized calls, reconnect on a dropped connection or an expired session (a server `NO`/`BAD` on a reused connection is checked with a `LIST "" ""` probe), and context-driven cancellation. Drops and reconnects go to the debug log.
 - Threading behavior is deliberate: prefer header-based linkage, use subject fallback only for reply-like messages without references.
 - Releases are tag-driven SemVer (`v*`) via GoReleaser; versions are injected via ldflags (no hardcoded version constants).
 - Commit messages follow Conventional Commits (`feat:`, `fix:`, etc.) because release notes are grouped/filtered from commit prefixes.

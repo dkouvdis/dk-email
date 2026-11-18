@@ -176,8 +176,8 @@ type imapConn interface {
 
 // dialIMAP logs in over IMAP; tests replace it to avoid the network. On
 // failure it returns a nil interface, never a typed nil.
-var dialIMAP = func(ctx context.Context, acct config.Account, creds mail.Credentials) (imapConn, error) {
-	c, err := imap.DialWithCredentials(ctx, acct, creds)
+var dialIMAP = func(ctx context.Context, acct config.Account, creds mail.Credentials, log *slog.Logger) (imapConn, error) {
+	c, err := imap.DialWithCredentials(ctx, acct, creds, log)
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +189,7 @@ var dialIMAP = func(ctx context.Context, acct config.Account, creds mail.Credent
 // failure.
 func dial(ctx context.Context, acct config.Account, creds mail.Credentials, log *slog.Logger) (ui.Conn, error) {
 	start := time.Now()
-	c, err := dialIMAP(ctx, acct, creds)
+	c, err := dialIMAP(ctx, acct, creds, log)
 	log.Debug("imap login", "account", acct.Name, "ok", err == nil, "took", time.Since(start).Round(time.Millisecond))
 	if err != nil {
 		return ui.Conn{}, err

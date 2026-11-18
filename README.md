@@ -325,7 +325,7 @@ Below 80 columns, list mode is forced.
 DK_EMAIL_DEBUG=1 dk-email
 ```
 
-This appends to `$XDG_CACHE_HOME/dk-email/debug.log` (default `~/.cache/dk-email/debug.log`). The log records timings and metadata only, never passwords or message bodies.
+This appends to `$XDG_CACHE_HOME/dk-email/debug.log` (default `~/.cache/dk-email/debug.log`). The log records timings and metadata only, never passwords or message bodies. It also records IMAP drops and reconnects, and may contain folder names and email addresses from server errors (never passwords or tokens), so check it before sharing.
 
 ## Development
 

@@ -92,6 +92,9 @@ type testServer struct {
 
 	// hangList makes LIST block until the test ends.
 	hangList atomic.Bool
+	// expireGen is bumped by expireSessions; a session created before the
+	// current value is expired.
+	expireGen atomic.Int64
 	// noSentRole makes LIST report "Sent" without its \Sent attribute.
 	noSentRole atomic.Bool
 	// withDrafts makes LIST also report the "Drafts" mailbox, which a test
@@ -155,7 +158,7 @@ func startServer(t *testing.T, mode string, caps goimap.CapSet) *testServer {
 
 	opts := &imapserver.Options{
 		NewSession: func(*imapserver.Conn) (imapserver.Session, *imapserver.GreetingData, error) {
-			return &testSession{UserSession: imapmemserver.NewUserSession(user), user: user, srv: s}, nil, nil
+			return &testSession{UserSession: imapmemserver.NewUserSession(user), user: user, srv: s, gen: s.expireGen.Load()}, nil, nil
 		},
 		Caps:   caps,
 		Logger: log.New(io.Discard, "", 0),
@@ -248,12 +251,37 @@ func newLiteral(s string) literal {
 
 func (l literal) Size() int64 { return l.size }
 
+// errSessionExpired is what an expired session answers to LIST, SELECT and STATUS.
+var errSessionExpired = &goimap.Error{Type: goimap.StatusResponseTypeNo, Text: "Session expired, please log in again"}
+
+// expireSessions expires every session that is open now while new sessions stay
+// healthy. Expired sessions keep their connection open but answer every
+// LIST/SELECT/STATUS with NO, as a server does once it has expired a session.
+func (s *testServer) expireSessions() { s.expireGen.Add(1) }
+
 // testSession serves the seeded mailboxes through imapmemserver but reports
-// special-use attributes itself, and can hang LIST.
+// special-use attributes itself, can hang LIST, and can expire.
 type testSession struct {
 	*imapmemserver.UserSession
 	user *imapmemserver.User
 	srv  *testServer
+	gen  int64 // srv.expireGen when the session was created
+}
+
+func (s *testSession) expired() bool { return s.gen < s.srv.expireGen.Load() }
+
+func (s *testSession) Select(name string, options *goimap.SelectOptions) (*goimap.SelectData, error) {
+	if s.expired() {
+		return nil, errSessionExpired
+	}
+	return s.UserSession.Select(name, options)
+}
+
+func (s *testSession) Status(name string, options *goimap.StatusOptions) (*goimap.StatusData, error) {
+	if s.expired() {
+		return nil, errSessionExpired
+	}
+	return s.UserSession.Status(name, options)
 }
 
 func (s *testSession) AuthenticateMechanisms() []string { return []string{sasl.Plain, "XOAUTH2"} }
@@ -310,6 +338,9 @@ func (x *xoauth2Server) Next(resp []byte) ([]byte, bool, error) {
 }
 
 func (s *testSession) List(w *imapserver.ListWriter, ref string, patterns []string, options *goimap.ListOptions) error {
+	if s.expired() {
+		return errSessionExpired
+	}
 	if s.srv.hangList.Load() {
 		<-s.srv.release
 		return nil

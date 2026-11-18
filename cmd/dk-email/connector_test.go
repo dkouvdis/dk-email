@@ -189,7 +189,7 @@ func stubDial(t *testing.T) *[]mail.Login {
 	t.Helper()
 	var logins []mail.Login
 	old := dialIMAP
-	dialIMAP = func(ctx context.Context, _ config.Account, creds mail.Credentials) (imapConn, error) {
+	dialIMAP = func(ctx context.Context, _ config.Account, creds mail.Credentials, _ *slog.Logger) (imapConn, error) {
 		login, err := creds(ctx)
 		if err != nil {
 			return nil, err

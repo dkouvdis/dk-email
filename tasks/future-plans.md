@@ -6,11 +6,12 @@ must keep possible.
 
 ## Bugs
 
-- **Authentication lost overnight**: with the app left open overnight, the
-  account stops working and the app has to be restarted. The IMAP client is
-  meant to reconnect on a dropped connection, so find out why that path fails
-  (expired session, stale TLS connection, a context that never cancels).
-  Plan together with IDLE below: both are about long-lived connections.
+- **Authentication lost overnight** (fix pending confirmation): an IMAP
+  session the server expired while keeping the connection open was reused
+  forever, because a server `NO`/`BAD` counted as final. `imap.Client` now
+  probes with `LIST "" ""` and reconnects, and logs drops and reconnects to
+  the debug log. Confirm with an overnight run under `DK_EMAIL_DEBUG=1`; see
+  [reconnect-plan.md](reconnect-plan.md).
 
 ## High Priority
 
@@ -27,7 +28,8 @@ must keep possible.
 
 - **New mail push and notifications**: use IMAP `IDLE` instead of polling on
   `refresh_interval`, and announce new mail with a terminal bell or desktop
-  notification. Shares the reconnect work with the overnight bug above.
+  notification. Builds on the reconnect and expired-session handling from
+  the overnight bug fix.
 - **Multi-select and bulk actions**: mark several threads, then archive,
   delete, move or mark them read at once. Includes "mark folder as read".
 
@@ -74,13 +76,12 @@ Folder search (`/`) shipped; see `docs/search.md`. Follow-ups:
   account's current command as saved, not only `op read` ones, which
   `opReference` in `internal/ui/popup/connect.go` limits today. Today other
   password managers (pass, gpg, Bitwarden) need `config.toml` edited by hand.
-- **Cache `password_cmd` between reconnects**: a password account runs
-  `password_cmd` on every connect, so each reconnect (see the overnight bug
-  above) can bring up another 1Password or pinentry prompt. Keep the
-  password in memory for the session, optionally with a lifetime, and drop it
-  when the server rejects it so the next try runs the command again. The
-  password never touches disk. Plan together with IDLE and the overnight
-  bug.
+- **Cache `password_cmd` between reconnects**: `imap.Client` reuses the
+  password it was created with, but reconnecting a failed account (`ctrl+r`)
+  runs `password_cmd` again and can bring up another 1Password or pinentry
+  prompt. Keep the password in memory for the session, optionally with a
+  lifetime, and drop it when the server rejects it so the next try runs the
+  command again. The password never touches disk. Plan together with IDLE.
 - **Settings in the app**: change UI settings without editing the config file
   by hand.
 
