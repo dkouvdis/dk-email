@@ -14,6 +14,11 @@ import (
 type pick struct {
 	account int
 	folder  string
+	// The attachment picker also sets the message, the attachment's index in
+	// it and its name, to spot a message that changed since it was listed.
+	uid  mail.UID
+	part int
+	name string
 }
 
 // openPicker shows every account's folders, with the open one current. In
@@ -49,7 +54,7 @@ func treeItem(account int, e sidebar.Entry) popup.Item[pick] {
 		Path:     e.Path,
 		Depth:    e.Depth,
 		Count:    e.Unread,
-		Value:    pick{account, e.Name},
+		Value:    pick{account: account, folder: e.Name},
 		Disabled: !e.Folder,
 	}
 }
@@ -86,15 +91,18 @@ func (m Model) openMovePicker(targets []mail.Summary) (Model, tea.Cmd) {
 func (m Model) handlePickerKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	var r popup.Result
 	m.picker, r = m.picker.Update(msg)
-	targets := m.moveTargets
+	targets, attaching := m.moveTargets, m.pickingAttachment
 	switch r {
 	case popup.Cancelled:
-		m.showPicker, m.moveTargets = false, nil
+		m.showPicker, m.moveTargets, m.pickingAttachment = false, nil, false
 		m.log.Debug("popup closed", "popup", "picker")
 	case popup.Chosen:
-		m.showPicker, m.moveTargets = false, nil
+		m.showPicker, m.moveTargets, m.pickingAttachment = false, nil, false
 		p, _ := m.picker.Selected()
 		m.log.Debug("popup closed", "popup", "picker", "chose", true)
+		if attaching {
+			return m.saveAttachment(p)
+		}
 		if targets != nil {
 			label := p.folder
 			if f, ok := m.side.Folder(p.account, p.folder); ok {

@@ -18,6 +18,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/dkouvdis/dk-email/internal/config"
+	"github.com/dkouvdis/dk-email/internal/download"
 	"github.com/dkouvdis/dk-email/internal/mail"
 	"github.com/dkouvdis/dk-email/internal/ui/popup"
 	"github.com/dkouvdis/dk-email/internal/ui/reader"
@@ -104,8 +105,12 @@ type Model struct {
 	needsPassword map[int]bool
 	// moveTargets is set while the picker chooses where to move them.
 	moveTargets []mail.Summary
-	status      string
-	statusErr   bool
+	// pickingAttachment is set while the picker chooses an attachment to open.
+	pickingAttachment bool
+	// files saves and opens attachments.
+	files     fileOpener
+	status    string
+	statusErr bool
 	// draft is the message being composed, nil when there is none; sending
 	// is set while it is being delivered and saving while it is being saved
 	// to Drafts. The composer popup edits draft.
@@ -153,6 +158,7 @@ func New(cfg config.Config, connect Connector, log *slog.Logger) Model {
 		helpPop:       popup.NewHelp(th, keys.HelpSections()),
 		mode:          mode,
 		focus:         PaneList,
+		files:         fileOpener{dir: download.Dir, canOpen: func() bool { return false }},
 	}
 	m.search.input = textinput.New()
 	m.search.input.Prompt = "/ "
@@ -246,6 +252,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleReplyFetched(msg)
 	case draftOpenedMsg:
 		return m.handleDraftOpened(msg)
+	case attachmentMsg:
+		return m.handleAttachment(msg)
 	default:
 		// Whatever else the composer's inputs wait for, such as a clipboard read.
 		if m.composing() {
@@ -358,6 +366,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m.startReply(true)
 		case key.Matches(msg, m.keys.Forward):
 			return m.startForward()
+		case key.Matches(msg, m.keys.OpenAttachment):
+			return m.openAttachment()
 		case m.isTriageKey(msg):
 			return m.triage(msg)
 		}
@@ -434,7 +444,7 @@ func (m *Model) closeTopPopup() bool {
 	case m.showHelp:
 		m.showHelp, name = false, "help"
 	case m.showPicker:
-		m.showPicker, m.moveTargets, name = false, nil, "picker"
+		m.showPicker, m.moveTargets, m.pickingAttachment, name = false, nil, false, "picker"
 	case m.readerPopup:
 		m.readerPopup, name = false, "reader"
 	default:

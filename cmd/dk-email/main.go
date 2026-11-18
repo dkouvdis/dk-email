@@ -20,6 +20,7 @@ import (
 	"github.com/dkouvdis/dk-email/internal/oauth"
 	"github.com/dkouvdis/dk-email/internal/secret"
 	"github.com/dkouvdis/dk-email/internal/send"
+	"github.com/dkouvdis/dk-email/internal/sysopen"
 	"github.com/dkouvdis/dk-email/internal/ui"
 )
 
@@ -69,7 +70,7 @@ func startUI(cfg *config.Config) error {
 	resolver := secret.New()
 	onboarding := newOnboarding(cfg.Path, resolver, secret.Store, log)
 	onboarding.SignIn = signIn(resolver)
-	model := ui.New(*cfg, newConnector(resolver, log), log).WithOnboarding(onboarding)
+	model := ui.New(*cfg, newConnector(resolver, log), log).WithOnboarding(onboarding).WithOpener(sysopen.Open, sysopen.CanOpen)
 	final, err := tea.NewProgram(model).Run()
 	if m, ok := final.(ui.Model); ok {
 		_ = m.Close()

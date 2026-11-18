@@ -382,7 +382,7 @@ func TestReply_HintsAdvertiseReply(t *testing.T) {
 		t.Errorf("list hints = %q", h)
 	}
 	m = pressSettled(t, m, "enter")
-	if h := hints(); !strings.Contains(h, "Reply: r | Forward: f | New message: c") {
+	if h := hints(); !strings.Contains(h, "Reply: r | Forward: f | Open attachment: o | New message: c") {
 		t.Errorf("reader hints = %q", h)
 	}
 }

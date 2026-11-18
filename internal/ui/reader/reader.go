@@ -180,6 +180,18 @@ func (m Model) Message(uid mail.UID) (mail.Message, bool) {
 	return b.msg, ok && b.state == loaded
 }
 
+// Loaded returns the messages of the open thread whose bodies have loaded,
+// in thread order.
+func (m Model) Loaded() []mail.Message {
+	var out []mail.Message
+	for _, s := range m.th.Messages {
+		if msg, ok := m.Message(s.UID); ok {
+			out = append(out, msg)
+		}
+	}
+	return out
+}
+
 // SetSeen updates read markers after a flag change.
 func (m Model) SetSeen(uids []mail.UID, seen bool) Model {
 	return m.update(uids, func(s *mail.Summary) { s.Seen = seen })

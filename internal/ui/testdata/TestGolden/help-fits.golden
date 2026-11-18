@@ -24,6 +24,7 @@
 │                              ││  │   d                delete                   ┃ │                                   │
 │                              ││  │   m                move                     ┃ │                                   │
 │                              ││  │   ctrl+r           refresh                  ┃ │                                   │
+│                              ││  │   o                open attachment          ┃ │                                   │
 │                              ││  │                                             ┃ │                                   │
 │                              ││  │ Search (thread list)                        ┃ │                                   │
 │                              ││  │   /                search this folder       ┃ │                                   │
@@ -31,8 +32,8 @@
 │                              ││  │   esc              clear the search         ┃ │                                   │
 │                              ││  │   ctrl+r           run the search again     ┃ │                                   │
 │                              ││  │   from: to: cc:    match an address         ┃ │                                   │
-│                              ││  │   subject: body:   match a field            ┃ │                                   │
-│                              ││  │   is:unread        also is:read, is:starred ┃ │                                   │
+│                              ││  │   subject: body:   match a field              │                                   │
+│                              ││  │   is:unread        also is:read, is:starred   │                                   │
 │                              ││  │   since: before:   dates as YYYY-MM-DD        │                                   │
 │                              ││  │   -word            exclude a term             │                                   │
 │                              ││  │   "a phrase"       match exact words          │                                   │
@@ -45,7 +46,6 @@
 │                              ││  │   enter            edit draft (in Drafts)     │                                   │
 │                              ││  │                                               │                                   │
 │                              ││  │ Composer                                      │                                   │
-│                              ││  │   ctrl+s           send                       │                                   │
 │                              ││  ╰───────────────────────────────────────────────╯                                   │
 │                              ││                                                                                      │
 │                              ││                                                                                      │
