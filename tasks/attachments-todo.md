@@ -202,15 +202,15 @@ setting `ForwardOf` to the draft itself; `SaveDraft`/`Send` write the list.
 Forwards still use `ForwardOf` until Task 7.
 
 **Acceptance criteria:**
-- [ ] Saving a draft with two `Attachments` and reopening it yields the same
+- [x] Saving a draft with two `Attachments` and reopening it yields the same
   names, types and bytes, and `ForwardOf` is nil.
-- [ ] Sending a reopened draft carries its attachments exactly once (no copy
+- [x] Sending a reopened draft carries its attachments exactly once (no copy
   from both the list and `ForwardOf`).
-- [ ] Existing forward tests pass unchanged.
+- [x] Existing forward tests pass unchanged.
 
 **Verification:**
-- [ ] Tests pass: `go test -race ./internal/mail/... ./internal/compose ./internal/send ./internal/ui/...`
-- [ ] Build succeeds
+- [x] Tests pass: `go test -race ./internal/mail/... ./internal/compose ./internal/send ./internal/ui/...`
+- [x] Build succeeds
 - [ ] Manual check: reopen a draft with attachments saved by the current
   release; send it to yourself; attachments arrive.
 
@@ -239,17 +239,17 @@ longer set `ForwardOf`; the field and the send-time copy stay in place,
 unused, until 7b. There is no loading or failed state inside the composer.
 
 **Acceptance criteria:**
-- [ ] A UI test forwards a message with N attachments (N = 0, 1, 3) through
+- [x] A UI test forwards a message with N attachments (N = 0, 1, 3) through
   the fake mailbox and a capturing fake sender: the sent draft has exactly N
   attachments with the original names, types and bytes, and `ForwardOf` is
   nil.
-- [ ] A failed `Raw` fetch leaves no composer open, frees the draft slot and
+- [x] A failed `Raw` fetch leaves no composer open, frees the draft slot and
   shows the error; a second `f` retries.
-- [ ] All existing forward tests pass unchanged (the old path still exists).
+- [x] All existing forward tests pass unchanged (the old path still exists).
 
 **Verification:**
-- [ ] Tests pass: `go test -race ./...`
-- [ ] Build succeeds
+- [x] Tests pass: `go test -race ./...`
+- [x] Build succeeds
 - [ ] Manual check: forward a message with a PDF to yourself, from the list
   and from the reader.
 
@@ -272,15 +272,15 @@ hook if `OpenDraft` no longer needs it separately, and `compose.Attachment`
 change.
 
 **Acceptance criteria:**
-- [ ] `ForwardOf` and `compose.Attachment` no longer exist; `go vet` is
+- [x] `ForwardOf` and `compose.Attachment` no longer exist; `go vet` is
   clean.
-- [ ] The full suite passes, including 7a's forward test and Task 6's draft
+- [x] The full suite passes, including 7a's forward test and Task 6's draft
   round trip; tests that only covered the deleted path are removed, not
   rewritten to pass.
 
 **Verification:**
-- [ ] Tests pass: `go test -race ./...`
-- [ ] Build succeeds
+- [x] Tests pass: `go test -race ./...`
+- [x] Build succeeds
 - [ ] Manual check: forward with attachments, and reopen and send a draft
   with attachments.
 
@@ -305,16 +305,16 @@ only when the list isn't empty, in tab order then. It shows
 removed attachments.
 
 **Acceptance criteria:**
-- [ ] A forward or reopened draft shows its attachments; removing one and
+- [x] A forward or reopened draft shows its attachments; removing one and
   sending sends the rest.
-- [ ] Removing an attachment then pressing `esc` brings up the save/discard
+- [x] Removing an attachment then pressing `esc` brings up the save/discard
   prompt; with no changes, `esc` closes directly.
-- [ ] With no attachments the row is absent and tab order is unchanged
+- [x] With no attachments the row is absent and tab order is unchanged
   (existing composer tests pass).
 
 **Verification:**
-- [ ] Tests pass: `go test -race ./internal/ui/...`
-- [ ] Build succeeds
+- [x] Tests pass: `go test -race ./internal/ui/...`
+- [x] Build succeeds
 - [ ] Manual check: the row in a narrow and a wide terminal.
 
 **Dependencies:** Task 7b

@@ -1,8 +1,86 @@
 # Attachments
 
-This guide covers opening attachments. Attaching files is coming.
+This guide covers attaching files to a message you're writing and opening
+the attachments of messages you receive.
 
+- [Attaching files](#attaching-files)
 - [Opening attachments](#opening-attachments)
+
+## Attaching files
+
+Press `ctrl+o` in the composer, or drop files onto the terminal. Every
+attachment is listed in the composer, whether you added it, it came with a
+forward or it was saved in a draft.
+
+### The attach prompt
+
+`ctrl+o` opens a path prompt under the fields:
+
+| Key | What it does |
+|---|---|
+| `tab` | Complete the path. |
+| `enter` | Attach the file. |
+| `esc` | Close the prompt. |
+
+`~` and relative paths work. Relative paths start from the directory
+dk-email was started in. `tab` completes a unique match, and lists the
+choices when several match. A problem, such as a folder or a file that doesn't
+exist, shows in the prompt, which stays open so you can fix the path.
+
+### Dropping files
+
+Drop files from your file manager onto the terminal and dk-email attaches
+them. This works when what's pasted is only file paths: escaped or quoted
+paths, or `file://` URLs. If any of them isn't a readable file, the whole
+paste is inserted as text instead.
+
+To paste a path as text, type it, or remove the attachment afterwards.
+
+Dropping is designed for Ghostty, iTerm2, Terminal.app, kitty, WezTerm,
+GNOME Terminal and Windows Terminal. It hasn't been tested in all of them.
+
+### The Attachments row
+
+The `Attach` row sits under Subject. It lists every attachment with its size.
+It only shows when there is something attached.
+
+| Key | What it does |
+|---|---|
+| `tab` | Move to the row. |
+| `←` / `→` | Choose an attachment. |
+| `d` or `backspace` | Remove the chosen attachment. |
+
+Adding or removing an attachment counts as a change, so `esc` offers to save
+the draft or discard it.
+
+### Details
+
+- **Duplicates:** a file with the same name and contents as one already
+  attached is skipped, and the status line says `<name> is already attached.`
+- **Content type:** taken from the extension. If there's none we know, it's
+  detected from the contents, and failing that it's `application/octet-stream`.
+- **Forwards:** the original's attachments are loaded before the composer
+  opens, and the status line shows `Loading message…`. If that fails, the
+  composer doesn't open, so a forward never goes out without them. Remove the
+  ones you don't want.
+- **Drafts:** saving a draft keeps its attachments, and reopening it lists
+  them again.
+- **Size:** dk-email sets no limit. Providers reject large messages, often
+  around 20 to 25 MB, and attachments grow by about a third when encoded.
+  The error comes from the server.
+
+### Status messages
+
+| Message | Meaning |
+|---|---|
+| `Loading message…` | A forward's original is being fetched. |
+| `Attached <name>.` | The file was added. |
+| `Attached <a>, <b>.` | Several files were added (dropped). |
+| `<name> is already attached.` | The same name and contents are already attached. |
+| `Attached <a>; <b> is already attached.` | Some files were added, some skipped. |
+| `open message: <reason>` | A forward's original couldn't be fetched; the composer didn't open. |
+| `no such file: <path>` | In the prompt: the path doesn't exist. |
+| `<path> is a folder` | In the prompt: only files can be attached. |
 
 ## Opening attachments
 

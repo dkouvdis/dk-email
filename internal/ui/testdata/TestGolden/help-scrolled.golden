@@ -3,11 +3,11 @@
 │ ▶ Inbox                    2 ││  │ Keys                                          │                             13:30 │
 │   Sent Mail                  ││  │ / press / to filter by key or description     │                             Nov 8 │
 │   All Mail                   ││  │                                               │                                   │
-│   Trash                      ││  │   ctrl+s           send                       │                                   │
-│   Receipts                 1 ││  │   tab              next field                 │                                   │
-│                              ││  │   shift+tab        previous field             │                                   │
-│ Work                         ││  │   enter / ←/→      choose From                │                                   │
-│   Inbox                    1 ││  │   enter            next field (in a header)   │                                   │
+│   Trash                      ││  │   enter            next field (in a header)   │                                   │
+│   Receipts                 1 ││  │   ctrl+o           attach a file              │                                   │
+│                              ││  │   drop files       attach them                │                                   │
+│ Work                         ││  │   ←/→              choose attachment          │                                   │
+│   Inbox                    1 ││  │   d                remove attachment          │                                   │
 │   Archive                    ││  │   esc              close, or save / discard   │                                   │
 │                              ││  │   ctrl+c           quit now                   │                                   │
 │                              ││  │                                               │                                   │

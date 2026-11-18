@@ -243,6 +243,8 @@ Actions on a **collapsed thread** apply to every message in it. On an expanded r
 | Key | Action |
 |---|---|
 | `ctrl+s` | send |
+| `ctrl+o` | attach a file; dropping file paths onto the terminal attaches them too |
+| `←` / `→`, `d` / `backspace` | on the Attach row, choose / remove an attachment |
 | `tab` / `shift+tab` | next / previous field |
 | `enter` | in a header field, next field (in the body, a new line); on From, open the address list |
 | `←` / `→` or `space` | on From, previous / next address |
@@ -250,9 +252,9 @@ Actions on a **collapsed thread** apply to every message in it. On an expanded r
 | `ctrl+c` | quit, even while composing |
 
 - **From:** chosen from the account address and its aliases, never typed. The list opens below the row with a border and dims the rest of the composer; `↑`/`↓` or `k`/`j` move, `enter` picks, `esc` closes it. Replies and forwards start from the address you sent it from (for your own message), else the first of yours in To, then Cc, else the account address. Reply-all drops every one of your addresses. A reopened draft keeps its From even if it's no longer configured.
-- Replies start in the body above the quote. New messages and forwards start in To. The body is sent exactly as typed, soft-wrapped on screen only, with tabs becoming 4 spaces. A forward's attachments are still sent, but aren't listed.
+- Replies start in the body above the quote. New messages and forwards start in To. The body is sent exactly as typed, soft-wrapped on screen only, with tabs becoming 4 spaces. **Attachments:** an Attach row under Subject lists every attachment with its size (yours, a forward's, a reopened draft's). `ctrl+o` opens a path prompt (`tab` completes, `enter` attaches, `esc` closes); a paste of only readable file paths attaches them instead of inserting text. A file with the same name and contents is skipped, and adding or removing counts as a change. A forward's attachments are fetched before the composer opens, and it doesn't open if that fails. No size limit is enforced locally. See [docs/attachments.md](docs/attachments.md).
 - A parse or send error shows in the composer's footer row (the keys themselves are in the hint bar), and `ctrl+s` retries. If the message was delivered but a follow-up (Sent copy, `\Answered`, removing the draft) failed, the composer closes with the error in the status bar and the message is never resent.
-- **Drafts:** saving stores the message in the account's Drafts-role folder flagged `\Draft` and `\Seen`. It needs no recipients, and keeps Bcc, threading headers and forwarded attachments. `enter` (or a click to open) on a message in the Drafts folder reopens it in the composer. Saving again replaces the old copy, and sending removes it. `esc` while saving cancels the save. Removing one message needs the IMAP UIDPLUS extension; without it the old copy is kept and the status says so. A resumed reply still threads, but doesn't mark the original `\Answered`.
+- **Drafts:** saving stores the message in the account's Drafts-role folder flagged `\Draft` and `\Seen`. It needs no recipients, and keeps Bcc, threading headers and attachments. `enter` (or a click to open) on a message in the Drafts folder reopens it in the composer. Saving again replaces the old copy, and sending removes it. `esc` while saving cancels the save. Removing one message needs the IMAP UIDPLUS extension; without it the old copy is kept and the status says so. A resumed reply still threads, but doesn't mark the original `\Answered`.
 
 The **`?` help popup** is sized to its content, groups keys into sections (including Compose and Composer), and scrolls with `j`/`k`, `↑`/`↓`, `pgup`/`pgdn` and `g`/`G`. Inside it, `/` filters the keys by key or description.
 
@@ -377,7 +379,6 @@ Sending was originally out of scope; it's now specified in [tasks/smtp-spec.md](
 - Search
 - Offline sync and an on-disk cache
 - IMAP IDLE
-- Attaching local files
 - Rich HTML rendering
 - Custom keybindings and themes
 - Mouse support

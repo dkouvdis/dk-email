@@ -93,10 +93,10 @@ code, except `mail.go` and `keys.go`.
 
 ### Phase 2: Attach local files
 
-- [ ] Task 6: Draft attachment type; drafts keep attachments via the list
-- [ ] Task 7a: Forwards fill `d.Attachments` before the composer opens
-- [ ] Task 7b: Remove `ForwardOf` and what only served it
-- [ ] Task 8: Attachments row in the composer: show and remove
+- [x] Task 6: Draft attachment type; drafts keep attachments via the list
+- [x] Task 7a: Forwards fill `d.Attachments` before the composer opens
+- [x] Task 7b: Remove `ForwardOf` and what only served it
+- [x] Task 8: Attachments row in the composer: show and remove
 
 ### Checkpoint: Attachment model
 
@@ -104,9 +104,9 @@ code, except `mail.go` and `keys.go`.
   before, now with attachments visible
 - [ ] Review with human
 
-- [ ] Task 9: `ctrl+o` attach prompt with tab completion
-- [ ] Task 10: Drop files to attach
-- [ ] Task 11: Help dialog, SPEC, and `docs/attachments.md` (attaching)
+- [x] Task 9: `ctrl+o` attach prompt with tab completion
+- [x] Task 10: Drop files to attach
+- [x] Task 11: Help dialog, SPEC, and `docs/attachments.md` (attaching)
 
 ### Checkpoint: Complete
 

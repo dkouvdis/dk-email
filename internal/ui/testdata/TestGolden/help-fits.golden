@@ -30,8 +30,8 @@
 │                              ││  │   /                search this folder       ┃ │                                   │
 │                              ││  │   enter            run the search           ┃ │                                   │
 │                              ││  │   esc              clear the search         ┃ │                                   │
-│                              ││  │   ctrl+r           run the search again     ┃ │                                   │
-│                              ││  │   from: to: cc:    match an address         ┃ │                                   │
+│                              ││  │   ctrl+r           run the search again       │                                   │
+│                              ││  │   from: to: cc:    match an address           │                                   │
 │                              ││  │   subject: body:   match a field              │                                   │
 │                              ││  │   is:unread        also is:read, is:starred   │                                   │
 │                              ││  │   since: before:   dates as YYYY-MM-DD        │                                   │

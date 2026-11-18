@@ -58,10 +58,9 @@ Folder search (`/`) shipped; see `docs/search.md`. Follow-ups:
   `multipart/alternative` (plain text + HTML) so links like `[here](https://…)`
   render as clickable text. Body building stays behind a seam so this can be
   added without a rewrite.
-- **Attach local files**: add files from disk to replies and new messages
-  (e.g. a file picker in the composer). Forwarding the original message's
-  attachments already works. Refined into `ctrl+o` or drop to attach, with
-  one attachment list on the draft; see [attach-files.md](attach-files.md).
+- **Attach local files**: shipped as `ctrl+o` or drop in the composer; see
+  [docs/attachments.md](../docs/attachments.md). Design:
+  [attach-files.md](attach-files.md).
 - **Mark the original answered for resumed replies**: a reply saved to Drafts
   and sent later keeps its threading headers, but the original isn't flagged
   `\Answered` because the link to it isn't stored with the draft.
