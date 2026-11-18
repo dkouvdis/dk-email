@@ -199,6 +199,13 @@ type MessageRef struct {
 	UID    UID
 }
 
+// File is an attachment of an outgoing message, with its content.
+type File struct {
+	Name        string
+	ContentType string // e.g. "application/pdf"; "" means application/octet-stream
+	Data        []byte
+}
+
 // Draft is an outgoing message as the user wrote it. Addresses are already
 // parsed; Body is plain text.
 type Draft struct {
@@ -206,6 +213,7 @@ type Draft struct {
 	To, Cc, Bcc []Address
 	Subject     string
 	Body        string
+	Attachments []File // sent with the message, in this order
 	InReplyTo   string // Message-ID being replied to, or ""
 	References  []string
 	ReplyTo     *MessageRef // marked \Answered after delivery

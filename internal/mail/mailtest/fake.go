@@ -601,5 +601,13 @@ func cloneDraft(d mail.Draft) mail.Draft {
 		ref := *d.DraftOf
 		d.DraftOf = &ref
 	}
+	if d.Attachments != nil {
+		files := make([]mail.File, len(d.Attachments))
+		for i, f := range d.Attachments {
+			f.Data = slices.Clone(f.Data)
+			files[i] = f
+		}
+		d.Attachments = files
+	}
 	return d
 }

@@ -4,8 +4,10 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	dkmail "github.com/dkouvdis/dk-email/internal/mail"
+	"github.com/dkouvdis/dk-email/internal/render"
 )
 
 func TestBuildDraft_WritesBccAndBuildDoesNot(t *testing.T) {
@@ -104,6 +106,57 @@ func TestFromRaw_Malformed(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			if d, err := FromRaw([]byte(raw)); err == nil {
 				t.Errorf("FromRaw = %+v, want an error", d)
+			}
+		})
+	}
+}
+
+func TestBuild_DraftAttachmentsComeBeforeAtts(t *testing.T) {
+	d := dkmail.Draft{
+		From:    alice,
+		To:      []dkmail.Address{bob},
+		Subject: "Files",
+		Body:    "see attached",
+		Attachments: []dkmail.File{
+			{Name: "a.pdf", ContentType: "application/pdf", Data: []byte("%PDF\x00\xff")},
+			{Name: "b.txt", ContentType: "text/plain; charset=utf-8", Data: []byte("café\r\n")},
+		},
+	}
+	extra := Attachment{Filename: "c.png", ContentType: "image/png", Data: []byte("\x89PNG")}
+	for name, build := range map[string]func(dkmail.Draft, []Attachment, time.Time, string) ([]byte, error){
+		"Build": Build, "BuildDraft": BuildDraft,
+	} {
+		t.Run(name, func(t *testing.T) {
+			for _, tc := range []struct {
+				atts []Attachment
+				want []string
+			}{
+				{nil, []string{"a.pdf", "b.txt"}},
+				{[]Attachment{extra}, []string{"a.pdf", "b.txt", "c.png"}},
+			} {
+				raw, err := build(d, tc.atts, fixedNow, fixedID)
+				if err != nil {
+					t.Fatal(err)
+				}
+				parts, err := render.Parts(raw)
+				if err != nil {
+					t.Fatal(err)
+				}
+				var names []string
+				for _, p := range parts {
+					names = append(names, p.Filename)
+				}
+				if !reflect.DeepEqual(names, tc.want) {
+					t.Fatalf("parts = %v, want %v", names, tc.want)
+				}
+				for i, f := range d.Attachments {
+					if parts[i].ContentType != f.ContentType || !reflect.DeepEqual(parts[i].Data, f.Data) {
+						t.Errorf("part %d = %q %q, want %q %q", i, parts[i].ContentType, parts[i].Data, f.ContentType, f.Data)
+					}
+				}
+				if !strings.Contains(string(raw), "multipart/mixed") {
+					t.Error("not multipart/mixed")
+				}
 			}
 		})
 	}

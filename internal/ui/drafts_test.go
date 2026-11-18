@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -238,6 +239,32 @@ func TestDrafts_SendingKeepsDraftOfAndForwardOf(t *testing.T) {
 	}
 	if m.composing() || !strings.HasPrefix(m.status, "Sent to carol@example.com") {
 		t.Errorf("composing %v, status %q", m.composing(), m.status)
+	}
+}
+
+func TestDrafts_SendingAReopenedDraftPassesItsAttachments(t *testing.T) {
+	m, f, u := draftsFixture(t, &mailtest.DraftSender{})
+	s := f.personalSender.(*mailtest.DraftSender)
+	ref := mail.MessageRef{Folder: "Drafts", UID: u.solo}
+	files := []mail.File{
+		{Name: "a.pdf", ContentType: "application/pdf", Data: []byte("%PDF")},
+		{Name: "b.txt", ContentType: "text/plain", Data: []byte("two")},
+	}
+	s.AddDraft(ref, mail.Draft{To: []mail.Address{{Email: "carol@example.com"}}, Subject: "Files", Body: "see attached", Attachments: files})
+	m = send(t, m, click(60, 3)) // the Solo draft
+	m = openedDraft(t, m)
+
+	m = sendKey(t, m)
+
+	sent := s.Sent()
+	if len(sent) != 1 {
+		t.Fatalf("sent %d, want 1", len(sent))
+	}
+	if !reflect.DeepEqual(sent[0].Attachments, files) || sent[0].ForwardOf != nil {
+		t.Errorf("sent Attachments = %+v, ForwardOf = %v; want %+v and nil", sent[0].Attachments, sent[0].ForwardOf, files)
+	}
+	if m.composing() {
+		t.Error("still composing after send")
 	}
 }
 

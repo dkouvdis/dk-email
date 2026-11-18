@@ -687,7 +687,7 @@ func TestOpenDraft(t *testing.T) {
 		atts []compose.Attachment
 	}{
 		{"without attachments", nil},
-		{"with attachments", []compose.Attachment{att}},
+		{"with attachments", []compose.Attachment{att, {Filename: "notes.txt", ContentType: "text/plain; charset=utf-8", Data: []byte("two\r\n")}}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -707,13 +707,20 @@ func TestOpenDraft(t *testing.T) {
 			if got.DraftOf == nil || *got.DraftOf != draftRef {
 				t.Errorf("DraftOf = %v, want %v", got.DraftOf, draftRef)
 			}
-			if hasAtt := got.ForwardOf != nil; hasAtt != (len(tc.atts) > 0) || (hasAtt && *got.ForwardOf != draftRef) {
-				t.Errorf("ForwardOf = %v with %d attachments", got.ForwardOf, len(tc.atts))
+			if got.ForwardOf != nil {
+				t.Errorf("ForwardOf = %v, want nil", got.ForwardOf)
+			}
+			var wantFiles []mail.File
+			for _, a := range tc.atts {
+				wantFiles = append(wantFiles, mail.File{Name: a.Filename, ContentType: a.ContentType, Data: a.Data})
+			}
+			if !reflect.DeepEqual(got.Attachments, wantFiles) {
+				t.Errorf("Attachments = %+v, want %+v", got.Attachments, wantFiles)
 			}
 			if got.ReplyTo != nil {
 				t.Errorf("ReplyTo = %v, want nil", got.ReplyTo)
 			}
-			got.DraftOf, got.ForwardOf = nil, nil
+			got.DraftOf, got.Attachments = nil, nil
 			if !reflect.DeepEqual(got, saved) {
 				t.Errorf("draft = %+v, want %+v", got, saved)
 			}
@@ -735,7 +742,7 @@ func TestOpenDraft_Errors(t *testing.T) {
 	}
 }
 
-func TestSaveThenOpenResumedForwardKeepsAttachments(t *testing.T) {
+func TestSaveThenOpenForwardMovesAttachmentsIntoTheList(t *testing.T) {
 	r := newRig(acct())
 	r.st.raw = original(t, compose.Attachment{Filename: "report.pdf", ContentType: "application/pdf", Data: []byte("%PDF")})
 	d := forwardDraft()
@@ -747,10 +754,76 @@ func TestSaveThenOpenResumedForwardKeepsAttachments(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.ForwardOf == nil || got.DraftOf == nil {
-		t.Fatalf("ForwardOf=%v DraftOf=%v, want both set", got.ForwardOf, got.DraftOf)
+	if got.ForwardOf != nil || got.DraftOf == nil {
+		t.Fatalf("ForwardOf=%v DraftOf=%v, want nil and set", got.ForwardOf, got.DraftOf)
+	}
+	if want := []mail.File{{Name: "report.pdf", ContentType: "application/pdf", Data: []byte("%PDF")}}; !reflect.DeepEqual(got.Attachments, want) {
+		t.Fatalf("Attachments = %+v, want %+v", got.Attachments, want)
 	}
 	if want := d.Bcc; !reflect.DeepEqual(got.Bcc, want) {
 		t.Errorf("Bcc = %v, want %v", got.Bcc, want)
+	}
+}
+
+// twoFiles are the attachments the draft round-trip tests carry.
+func twoFiles() []mail.File {
+	return []mail.File{
+		{Name: "report.pdf", ContentType: "application/pdf", Data: []byte("%PDF-1.4\x00\xff")},
+		{Name: "résumé.txt", ContentType: "text/plain; charset=utf-8", Data: []byte("café\r\n")},
+	}
+}
+
+func TestSaveThenOpenDraftKeepsAttachmentsInTheList(t *testing.T) {
+	r := newRig(acct())
+	d := draft()
+	d.Attachments = twoFiles()
+	if err := r.s.SaveDraft(context.Background(), d); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := order(r), "draftsfolder,append"; got != want {
+		t.Fatalf("calls = %s, want %s", got, want)
+	}
+	r.st.raw = r.st.appended
+	got, err := r.s.OpenDraft(context.Background(), draftRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got.Attachments, twoFiles()) {
+		t.Errorf("Attachments = %+v, want %+v", got.Attachments, twoFiles())
+	}
+	if got.ForwardOf != nil || got.DraftOf == nil || *got.DraftOf != draftRef {
+		t.Errorf("ForwardOf=%v DraftOf=%v", got.ForwardOf, got.DraftOf)
+	}
+}
+
+func TestSend_ReopenedDraftCarriesAttachmentsOnce(t *testing.T) {
+	r := newRig(acct())
+	d := draft()
+	d.Attachments = twoFiles()
+	if err := r.s.SaveDraft(context.Background(), d); err != nil {
+		t.Fatal(err)
+	}
+	r.st.raw = r.st.appended
+	reopened, err := r.s.OpenDraft(context.Background(), draftRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+	*r.calls = nil
+	if err := r.s.Send(context.Background(), reopened); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := order(r), "smtp,sentfolder,append,delete"; got != want {
+		t.Fatalf("calls = %s, want %s (no Raw at send time)", got, want)
+	}
+	parts, err := render.Parts(r.t.msg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []mail.File
+	for _, p := range parts {
+		got = append(got, mail.File{Name: p.Filename, ContentType: p.ContentType, Data: p.Data})
+	}
+	if !reflect.DeepEqual(got, twoFiles()) {
+		t.Errorf("sent attachments = %+v, want %+v", got, twoFiles())
 	}
 }

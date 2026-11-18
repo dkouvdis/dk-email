@@ -127,8 +127,7 @@ func (e *draftSavedError) Unwrap() []error { return []error{mail.ErrDraftSaved, 
 // draft d.DraftOf. Errors from the first three steps mean nothing was sent.
 // Errors from the rest are joined into one error matching
 // mail.ErrAfterDelivery, and each later step is still attempted when an
-// earlier one failed. The draft is removed last, after the attachments of a
-// resumed forward (d.ForwardOf is the draft) were fetched.
+// earlier one failed. The draft is removed last, once the message is out.
 //
 // An empty d.From.Email falls back to the account email and from_name.
 func (s *Sender) Send(ctx context.Context, d mail.Draft) error {
@@ -266,9 +265,9 @@ func (s *Sender) SaveDraft(ctx context.Context, d mail.Draft) error {
 }
 
 // OpenDraft reads the saved draft at ref for editing. The result's DraftOf is
-// ref, so saving or sending it replaces the stored copy. A draft with
-// attachments also gets ForwardOf = ref, so they are copied back in on save
-// or send; ReplyTo stays unset.
+// ref, so saving or sending it replaces the stored copy. Its attachments are
+// read into d.Attachments, so save and send write them from memory; ForwardOf
+// and ReplyTo stay unset.
 func (s *Sender) OpenDraft(ctx context.Context, ref mail.MessageRef) (mail.Draft, error) {
 	if s.st == nil {
 		return mail.Draft{}, errors.New("open draft: opening drafts isn't set up for this account")
@@ -288,8 +287,8 @@ func (s *Sender) OpenDraft(ctx context.Context, ref mail.MessageRef) (mail.Draft
 		return mail.Draft{}, fmt.Errorf("opening the draft: %w", err)
 	}
 	d.DraftOf = &ref
-	if len(atts) > 0 {
-		d.ForwardOf = &ref
+	for _, a := range atts {
+		d.Attachments = append(d.Attachments, mail.File{Name: a.Filename, ContentType: a.ContentType, Data: a.Data})
 	}
 	return d, nil
 }

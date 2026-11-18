@@ -742,3 +742,30 @@ func TestRaw_FollowsMove(t *testing.T) {
 		t.Errorf("destination Raw = %q, %v", got, err)
 	}
 }
+
+func TestDraftSender_KeepsAttachmentsWithoutAliasingData(t *testing.T) {
+	s := &DraftSender{}
+	ref := mail.MessageRef{Folder: "Drafts", UID: 7}
+	data := []byte("%PDF")
+	s.AddDraft(ref, mail.Draft{Attachments: []mail.File{{Name: "a.pdf", ContentType: "application/pdf", Data: data}}})
+	data[0] = 'X'
+
+	d, err := s.OpenDraft(ctx, ref)
+	if err != nil || len(d.Attachments) != 1 || d.Attachments[0].Name != "a.pdf" || string(d.Attachments[0].Data) != "%PDF" {
+		t.Fatalf("OpenDraft = %+v, %v", d, err)
+	}
+	d.Attachments[0].Data[1] = 'X'
+	d.Attachments[0].Name = "changed"
+	again, _ := s.OpenDraft(ctx, ref)
+	if again.Attachments[0].Name != "a.pdf" || string(again.Attachments[0].Data) != "%PDF" {
+		t.Errorf("second open = %+v, the first open's edits leaked into the store", again.Attachments)
+	}
+
+	if err := s.SaveDraft(ctx, mail.Draft{Attachments: again.Attachments}); err != nil {
+		t.Fatal(err)
+	}
+	again.Attachments[0].Data[2] = 'X'
+	if got := s.Saved()[0].Attachments; len(got) != 1 || string(got[0].Data) != "%PDF" {
+		t.Errorf("saved = %+v, aliases the caller's data", got)
+	}
+}

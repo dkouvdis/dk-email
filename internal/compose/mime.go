@@ -40,7 +40,8 @@ func BodyPart(d mail.Draft) (message.Header, []byte) {
 
 // Build writes d as an RFC 5322 message with CRLF line endings. The Bcc
 // header is never written: Bcc recipients are only passed to the transport.
-// Use BuildDraft for a copy that keeps them. The output is deterministic for
+// Use BuildDraft for a copy that keeps them. d.Attachments are written first,
+// then atts, as attachment parts. The output is deterministic for
 // the same (d, atts, now, msgID), including the multipart boundary, which is
 // derived from msgID. msgID is a Message-ID without angle brackets, as
 // MessageID returns it.
@@ -73,6 +74,12 @@ func build(d mail.Draft, atts []Attachment, now time.Time, msgID string, withBcc
 	add(func(h *gomail.Header) { h.SetText("Subject", singleLine(d.Subject)) })
 	add(func(h *gomail.Header) { h.SetMsgIDList("In-Reply-To", ids(d.InReplyTo)) })
 	add(func(h *gomail.Header) { h.SetMsgIDList("References", ids(strings.Join(d.References, " "))) })
+
+	all := make([]Attachment, 0, len(d.Attachments)+len(atts))
+	for _, f := range d.Attachments {
+		all = append(all, Attachment{Filename: f.Name, ContentType: f.ContentType, Data: f.Data})
+	}
+	atts = append(all, atts...)
 
 	var h gomail.Header
 	if len(atts) == 0 {
