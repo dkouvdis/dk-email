@@ -16,7 +16,9 @@ must keep possible.
 ## High Priority
 
 - **Save and open attachments**: the reader only lists attachments. Add
-  saving one to disk and opening it with the system's default app.
+  saving one to disk and opening it with the system's default app. Refined
+  into `o` (save to Downloads, then open); see
+  [open-attachments.md](open-attachments.md).
 - **Undo for delete, archive and move**: `d` deletes without confirmation by
   design, so offer a short undo (e.g. `z` within a few seconds). The
   optimistic updates in `internal/ui/actions.go` already keep what's needed to
@@ -59,7 +61,8 @@ Folder search (`/`) shipped; see `docs/search.md`. Follow-ups:
   added without a rewrite.
 - **Attach local files**: add files from disk to replies and new messages
   (e.g. a file picker in the composer). Forwarding the original message's
-  attachments already works.
+  attachments already works. Refined into `ctrl+o` or drop to attach, with
+  one attachment list on the draft; see [attach-files.md](attach-files.md).
 - **Mark the original answered for resumed replies**: a reply saved to Drafts
   and sent later keeps its threading headers, but the original isn't flagged
   `\Answered` because the link to it isn't stored with the draft.
