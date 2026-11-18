@@ -3,33 +3,17 @@ package main
 import (
 	"context"
 	"errors"
-	"os/exec"
-	"runtime"
 	"sync"
 
 	"github.com/dkouvdis/dk-email/internal/config"
 	"github.com/dkouvdis/dk-email/internal/oauth"
+	"github.com/dkouvdis/dk-email/internal/sysopen"
 	"github.com/dkouvdis/dk-email/internal/ui"
 	"github.com/dkouvdis/dk-email/internal/ui/popup"
 )
 
 // openBrowser opens url in the user's browser; tests replace it.
-var openBrowser = func(url string) error {
-	var cmd *exec.Cmd
-	switch runtime.GOOS {
-	case "darwin":
-		cmd = exec.Command("open", url)
-	case "windows":
-		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
-	default: // Linux and the BSDs
-		cmd = exec.Command("xdg-open", url)
-	}
-	if err := cmd.Start(); err != nil {
-		return err
-	}
-	go func() { _ = cmd.Wait() }() // reap it; the browser outlives us anyway
-	return nil
-}
+var openBrowser = sysopen.Open
 
 // runLoopback and runDeviceCode run the OAuth sign-in flows; tests replace
 // them to avoid the network.
