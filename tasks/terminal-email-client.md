@@ -1,6 +1,6 @@
 # Intent: Terminal Email Client
 
-Confirmed statement of intent (interview, 2026-11-08). Downstream: [SPEC.md](../../SPEC.md).
+Confirmed statement of intent (interview, 2026-11-08). Downstream: [SPEC.md](../SPEC.md).
 
 ## Outcome
 

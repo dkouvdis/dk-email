@@ -2,72 +2,29 @@
 
 A keyboard-driven terminal email client for triaging several IMAP accounts (Gmail included). It shows a folders sidebar beside a thread list, opens conversations in a popup, and uses lazygit-style single-key actions.
 
-- Shows each account's folders as a tree with unread counts (none on Trash). Special folders (Inbox, Sent, Trash…) stay at the top, and accounts other than the one you're in are dimmed.
-- Groups replies into threads, ordered by newest activity.
-- Lets you mark read/unread, star, archive, delete (to Trash) and move mail without leaving the keyboard.
-- Has two layouts: narrow (folders │ threads, the default) and list (threads only), toggled with `v`. List is forced below 80 columns.
-- Replies, reply-alls, forwards and new messages are written in a built-in composer and sent over SMTP. See [Sending mail](#sending-mail).
-- Reads passwords from 1Password (`op read`), any other command, or the OS keychain. They are never stored in a plain-text file.
-- Signs in to Microsoft 365, Outlook.com and Google with **OAuth 2.0** (`XOAUTH2` over IMAP and SMTP), using your own app registration. Tokens live in the OS keychain and refresh on their own. See [Signing in with OAuth 2.0](docs/oauth.md).
-- Attaches files in the composer (`ctrl+o`, or drag and drop files onto the terminal) and opens attachments with `o` in the reader: saved to Downloads, then opened with the system's default app. See [Attachments](docs/attachments.md).
-- Announces new INBOX mail with a bell, a desktop notification and the unread count in the window title, as a count only, pushed within seconds over IMAP IDLE. While you're looking at an INBOX, mail arriving there doesn't alert. See [New-mail notifications](docs/notifications.md).
+## Features
+
+- Triage several accounts at once, with a folders tree, unread counts and threaded conversations. [Usage](docs/usage.md)
+- Work from the keyboard (mark, star, archive, delete, move) or with the mouse. [Usage](docs/usage.md)
+- Write, reply, forward and save drafts in a built-in composer, sent over SMTP. [Sending mail](docs/sending.md)
+- Send from your aliases and custom domains. [Sending from aliases](docs/send-as.md)
+- Attach files and open attachments. [Attachments](docs/attachments.md)
+- Search a folder with Gmail-style operators. [Searching](docs/search.md)
+- Keep passwords out of the config: 1Password, any command, the OS keychain or GPG. [Passwords](docs/passwords.md)
+- Sign in to Microsoft 365, Outlook.com and Google with OAuth 2.0. [OAuth](docs/oauth.md)
+- Get new-mail alerts (bell, desktop, window title), pushed within seconds. [Notifications](docs/notifications.md)
 
 v0.x is a personal tool: it reads, triages and sends mail. Nothing is cached on disk.
 
 ## Install
 
-### Homebrew (macOS, Linux)
-
 ```sh
 brew install dkouvdis/tap/dk-email
 ```
 
-That one command is all you need. It taps `dkouvdis/homebrew-tap` on first use, and `brew upgrade dk-email` picks up new releases. Keep the tap: `brew untap` stops upgrades.
+For Linux, the release archive and Go, see [Installing dk-email](docs/install.md).
 
-dk-email is published as a cask with builds for macOS and Linux, on Intel/AMD and ARM.
-
-- **macOS:** the binaries aren't signed by Apple. The cask removes macOS's quarantine flag on install, so dk-email opens straight away. If macOS still says the binary "is damaged" or "can't be opened", clear the flag yourself:
-
-  ```sh
-  xattr -d com.apple.quarantine "$(which dk-email)"
-  ```
-
-- **Linux:** this needs a Homebrew that installs casks on Linux. Run `brew update` first; if Homebrew still refuses the cask, use the release archive below.
-
-### Release archive (Linux, macOS)
-
-Each [release](https://github.com/dkouvdis/dk-email/releases) has a `tar.gz` per system: `dk-email_<version>_<os>_<arch>.tar.gz`, with `os` `linux` or `darwin` and `arch` `amd64` (Intel/AMD) or `arm64`. For example, on 64-bit Intel/AMD Linux:
-
-```sh
-VERSION=0.1.0
-curl -fsSLO "https://github.com/dkouvdis/dk-email/releases/download/v${VERSION}/dk-email_${VERSION}_linux_amd64.tar.gz"
-curl -fsSLO "https://github.com/dkouvdis/dk-email/releases/download/v${VERSION}/checksums.txt"
-sha256sum --check --ignore-missing checksums.txt
-tar -xzf "dk-email_${VERSION}_linux_amd64.tar.gz" dk-email
-install -m 755 dk-email ~/.local/bin/
-```
-
-Use `linux_arm64` on ARM (for example a Raspberry Pi 4 or 5 with a 64-bit OS). Any directory on your `PATH` works instead of `~/.local/bin`. The binary is static, so there's nothing else to install. On macOS, use `shasum -a 256 --check --ignore-missing checksums.txt` and clear the quarantine flag as above.
-
-While the repository is private, `curl` can't download release files; use `gh release download v${VERSION} --repo dkouvdis/dk-email --pattern '*linux_amd64*' --pattern checksums.txt` instead.
-
-### Go
-
-Requires Go 1.27 or later.
-
-```sh
-go install github.com/dkouvdis/dk-email/cmd/dk-email@latest
-```
-
-While the repository is private, set `GOPRIVATE=github.com/dkouvdis/dk-email` and make sure `git` can authenticate to GitHub.
-
-### From source
-
-```sh
-go build -o bin/dk-email ./cmd/dk-email
-```
-
-## Usage
+## Quick start
 
 ```sh
 dk-email                       # uses $XDG_CONFIG_HOME/dk-email/config.toml (or ~/.config/dk-email/config.toml)
@@ -75,326 +32,26 @@ dk-email --config path/to.toml # use another config file
 dk-email --version
 ```
 
-On first run with no accounts, the **connect-account popup** opens. It asks for the following:
+On first run with no accounts, the connect popup opens and walks you through adding one; see [Accounts](docs/accounts.md). Press `?` to see the keys, and `A` to add another account. To write the file by hand instead, start from [config.example.toml](config.example.toml).
 
-- a name, email and username;
-- the IMAP host, port and TLS mode;
-- a login: a 1Password reference, "enter once → keychain", or an **OAuth 2.0** browser sign-in ([guide](docs/oauth.md));
-- optionally, the SMTP host, port and TLS mode, which turn on [sending](#sending-mail).
+## Documentation
 
-Gmail addresses pre-fill `imap.gmail.com:993` and `smtp.gmail.com:465` (implicit TLS); Outlook, Hotmail, Live and Microsoft 365 addresses pre-fill `outlook.office365.com:993` and `smtp.office365.com:587` (STARTTLS). dk-email tests the IMAP connection, and the SMTP login too when an SMTP host is filled in, then appends an `[[account]]` block to `config.toml`, keeping your comments and formatting intact. Press `A` at any time to connect another account, and `E` to edit or delete one. [Accounts](docs/accounts.md) covers adding, editing and deleting accounts, which login to choose, two-factor authentication and per-provider settings.
-
-The config folder lives at `$XDG_CONFIG_HOME/dk-email/` (default `~/.config/dk-email/`) on every OS, macOS included. The folder is `0700`, `config.toml` is `0600`, and a `.gitignore` is written so the folder can be kept in a dotfiles repo safely.
-
-## Configuration
-
-```toml
-[ui]
-default_layout   = "split"   # "split" | "list"
-refresh_interval = "120s"
-
-[notify]
-bell    = true   # ring the bell on new INBOX mail (default true)
-desktop = true   # send a desktop notification, OSC 9 (default true)
-title   = true   # show the INBOX unread count in the window title (default true)
-
-[[account]]
-name         = "Personal"
-email        = "me@gmail.com"
-username     = "me@gmail.com"                               # optional, defaults to email
-imap_host    = "imap.gmail.com"
-imap_port    = 993                                          # optional, 993 for implicit, 143 for starttls
-tls          = "implicit"                                   # "implicit" (default) | "starttls"
-password_cmd = "op read op://Personal/Gmail/app-password"   # omit to use the keychain
-# archive_folder = "[Gmail]/All Mail"                       # optional, overrides the detected archive folder
-# tls_cert       = "~/.config/dk-email/bridge.pem"          # optional, trust this cert instead of the system roots
-# smtp_host      = "smtp.gmail.com"                         # optional, enables sending; omit to disable sending
-# smtp_port      = 465                                      # optional, 465 for implicit, 587 for starttls
-# smtp_tls       = "implicit"                               # optional, "implicit" (default) | "starttls"
-# from_name      = "Your Name"                              # optional, display name on outgoing mail
-# aliases        = [{ email = "me@example.com", name = "Me" }]   # optional, other From addresses (needs smtp_host)
-# save_sent      = true                                     # optional, save a copy of sent mail to Sent (default: false on Gmail and Microsoft 365/Outlook, true elsewhere)
-# auth           = "oauth2"                                 # optional, sign in with OAuth 2.0 instead of a password (see docs/oauth.md)
-# oauth_provider = "microsoft"                              # with auth = "oauth2": "microsoft" or "google"
-# oauth_client_id = "…"                                     # with auth = "oauth2": your app's client ID
-```
-
-- Unknown keys are errors, so a typo like `pasword_cmd` can't silently fall back to the keychain. A `password` key is rejected: passwords never go in this file.
-- `archive_folder` defaults to the folder marked `\Archive`, or else `\All` (Gmail's All Mail). If neither exists, archive is disabled for that account.
-- `tls_cert` accepts `~/`. A relative path is resolved from the config file's folder. It applies to SMTP as well as IMAP.
-- The `smtp_*`, `from_name` and `save_sent` keys are described under [Sending mail](#sending-mail).
-- `auth` and the `oauth_*` keys are described in [Signing in with OAuth 2.0](docs/oauth.md#configuration-reference). An `oauth_client_secret` key is rejected like `password`.
-- `[notify]` keys are all optional and on by default; see [New-mail notifications](docs/notifications.md).
-
-### Colours
-
-By default dk-email uses your terminal's 16-colour palette, so it follows your terminal theme (Ghostty, iTerm2, etc.), light or dark. Change the terminal theme and dk-email changes with it. The one exception is the text on the selected row, which is a fixed black: many dark themes make palette black a grey that barely shows on the accent.
-
-To override a colour, add a `[colors]` table. Every key is optional:
-
-```toml
-[colors]
-accent    = 5          # focus, selected row background (default: magenta)
-on_accent = 16         # text on the accent colour (default: black, fixed)
-muted     = "#808080"  # secondary text (default: the terminal's faint style)
-border    = 8          # pane borders, separators (default: bright black)
-unread    = 4          # unread markers and counts (default: blue)
-star      = 3          # starred marker (default: yellow)
-error     = 1          # errors (default: red)
-hint      = 6          # the hint bar (default: cyan)
-key       = 5          # keys in the help popup (default: magenta)
-```
-
-A value is an ANSI colour number (`0`–`255`, quoted or not) or a hex colour (`"#rgb"` or `"#rrggbb"`). Numbers `0`–`15` follow your terminal theme; higher numbers and hex colours are fixed. Unknown keys and invalid values are errors.
-
-### Passwords
-
-> [!IMPORTANT]
-> **No password or secret is ever written to `config.toml`.** A `password`
-> or `oauth_client_secret` key is rejected. Secrets come from a command, the
-> OS keychain, or an OAuth sign-in kept in the keychain. See
-> [Accounts](docs/accounts.md#choosing-a-login) for the options.
-
-dk-email looks for a password in this order:
-
-1. **`password_cmd`**: run with `sh -c`, using the first line of its output. It times out after 60s. If `op` isn't on your `PATH` when dk-email starts, use its absolute path.
-2. **The OS keychain**: used when `password_cmd` is omitted.
-
-If neither yields a password, the account shows as needing a password, and `A` opens a prompt to store one in the keychain.
-
-Accounts with `auth = "oauth2"` don't use a password: they sign in with OAuth 2.0, and the sign-in is kept in the keychain. With `auth = "oauth2"`, `password_cmd` instead prints an access token, for external token tools such as `oama`. See [Signing in with OAuth 2.0](docs/oauth.md).
-
-#### 1Password
-
-```toml
-password_cmd = "op read op://Personal/Gmail/app-password"
-```
-
-#### GPG and pass
-
-```toml
-password_cmd = "gpg --quiet --decrypt ~/.config/dk-email/work.gpg"  # or "pass show mail/work"
-```
-
-gpg must ask for its passphrase in a graphical pinentry (such as `pinentry-mac`), or have it cached. See [Passwords from GPG](docs/gpg.md).
-
-#### Keychain
-
-Omit `password_cmd`. dk-email reads the keychain entry whose **service** is `dk-email` and whose **account** is the account's `name`. The name must match exactly, including case and spaces.
-
-```toml
-[[account]]
-name      = "Personal"
-email     = "me@gmail.com"
-imap_host = "imap.gmail.com"
-# imap_port defaults to 993 (implicit TLS) or 143 (starttls); username defaults to email
-```
-
-There are two ways to store the password:
-
-- **In the app:** press `A` and choose "enter once → keychain". For an existing account that has no password, `A` asks only for the password.
-- **By hand on macOS.** `-w` comes last with no value, so `security` prompts for the password and it never lands in your shell history. `-U` replaces an existing entry.
-
-  ```sh
-  security add-generic-password -s dk-email -a "Personal" -U -w
-  ```
-
-To check what's stored:
-
-```sh
-security find-generic-password -s dk-email -a "Personal" -w
-```
-
-A password stored by dk-email itself prints as `go-keyring-base64:…`. That is expected: the keychain library encodes it, and dk-email decodes it when reading.
-
-**Linux** uses the Secret Service (GNOME Keyring or KWallet), in the default "login" collection:
-
-```sh
-secret-tool store --label "dk-email" service dk-email username "Personal"
-```
-
-**Troubleshooting:**
-
-- `no password: set password_cmd or store one in the keychain` means no entry has service `dk-email` and account exactly equal to `name`.
-- On macOS, dk-email reads the keychain through `/usr/bin/security`. Entries created with `security` or by dk-email are readable without a prompt. An entry created in Keychain Access may make macOS ask whether `security` can read it. Choose "Always Allow".
-
-#### Gmail
-
-Gmail rejects your normal Google password over IMAP when 2-Step Verification is on. Create an **app password** at <https://myaccount.google.com/apppasswords>, then store it in 1Password or the keychain. The same app password works for sending (see [Sending mail](#sending-mail)). Google Workspace accounts that don't allow app passwords can sign in with OAuth 2.0 instead; see [Signing in with OAuth 2.0](docs/oauth.md#google-google-cloud).
-
-#### Proton Mail Bridge
-
-```toml
-[[account]]
-name      = "Proton"
-email     = "me@proton.me"
-username  = "me@proton.me"                     # the username shown in Bridge's mailbox details
-imap_host = "127.0.0.1"
-imap_port = 1143
-tls       = "starttls"
-tls_cert  = "~/.config/dk-email/bridge.pem"
-```
-
-Export the certificate from Bridge: **Settings → Advanced settings → Export TLS certificates**. Then copy `cert.pem` to the `tls_cert` path.
-
-Why this is needed: macOS rejects Bridge's 20-year self-signed certificate as "not standards compliant", even if you trust it in Keychain. `tls_cert` tells dk-email to trust that certificate instead of the system roots, for this account only. The host name and expiry are still checked.
-
-The Bridge password (from Bridge's mailbox details, not your Proton password) goes in `password_cmd` or the keychain like any other.
-
-## Sending mail
-
-Sending is opt-in per account: an account sends only when it has an `smtp_host`. Without one, `r`, `R`, `f` and `c` show `Sending isn't set up for <account>: add smtp_host to its config`, and everything else works as before.
-
-```toml
-[[account]]
-name         = "Personal"
-email        = "me@gmail.com"
-imap_host    = "imap.gmail.com"
-password_cmd = "op read op://Personal/Gmail/app-password"
-smtp_host    = "smtp.gmail.com"    # enables sending
-smtp_port    = 465                 # optional, 465 for implicit, 587 for starttls
-smtp_tls     = "implicit"          # optional, "implicit" (default) | "starttls"
-from_name    = "Your Name"         # optional, display name on outgoing mail; default: the address only
-save_sent    = false               # optional, save a copy to Sent; default: false on Gmail and Microsoft 365/Outlook, true elsewhere
-```
-
-- **Credentials:** SMTP logs in with the account's `username` and the same password as IMAP (`password_cmd` or the keychain), or, for OAuth accounts, the same token with `XOAUTH2`. There's no separate SMTP password. For Gmail, the same app password works for IMAP and SMTP.
-- **TLS:** the connection is always encrypted, and dk-email never falls back to plaintext. With `smtp_tls = "starttls"`, STARTTLS is mandatory. `tls_cert` applies to SMTP too, so Proton Mail Bridge works for both.
-- **`smtp_port`** defaults to 465 for `implicit` and 587 for `starttls`. `smtp_tls` defaults to `implicit`.
-- **`save_sent`:** dk-email saves a copy of each sent message to the account's Sent folder over IMAP. Gmail, Exchange Online and Outlook.com already file mail sent through their SMTP servers in Sent, so the default is `false` for `imap.gmail.com`, `outlook.office365.com` and `imap-mail.outlook.com` (or SMTP host `smtp.office365.com` / `smtp-mail.outlook.com`) to avoid duplicates, and `true` everywhere else. Set `save_sent = false` for any other provider that files SMTP-sent mail in Sent itself. If the account has no Sent folder, the message is still sent and the status warns.
-- **`aliases`:** other addresses this account can send as, such as a custom domain. Gmail needs each one verified under "Send mail as" first, or it silently rewrites From. An address with its own SMTP login is a separate account. See [Sending from aliases](docs/send-as.md).
-- `smtp_port`, `smtp_tls`, `from_name`, `aliases` and `save_sent` without `smtp_host` are config errors.
-- **Microsoft 365 and Outlook.com** don't accept passwords: they sign in with [OAuth 2.0](docs/oauth.md), for sending too.
-
-### Writing a message
-
-- `r` replies, `R` replies to everyone, `f` forwards and `c` starts a new message from the account under the sidebar cursor (the undimmed one).
-- **Target:** on a collapsed thread and in the reader, `r`, `R` and `f` use the thread's latest message. On an expanded row, they use the selected message.
-- The composer opens in a popup, with **To**, **Cc**, **Bcc**, **Subject** and the body as plain-text fields. Its title shows the action, the subject and the account's address. dk-email never hands the terminal to another program.
-- Replies start in the body, above the quote. New messages and forwards start in `To`. With `aliases`, a **From** row above `To` picks the sending address, and replies start from the address the message was sent to. See [Sending from aliases](docs/send-as.md).
-- Addresses are separated by commas, as in `Alice <alice@example.com>, bob@example.com`.
-- The body is sent exactly as typed. Long lines are only wrapped on screen, and tabs become 4 spaces.
-
-| Key | Action |
+| Guide | What it covers |
 |---|---|
-| `ctrl+s` | send |
-| `ctrl+o` | attach a file (or drag and drop files onto the terminal) |
-| `tab` / `shift+tab` | next / previous field |
-| `←` / `→`, `d` | on the Attach row, choose / remove an attachment |
-| `enter` | in a header field, move to the next field (in the body, a new line) |
-| `esc` | close at once if nothing changed, otherwise ask what to do |
-| `ctrl+c` | quit, even while composing |
+| [Usage](docs/usage.md) | Layouts, keys, the mouse, threads and the reader |
+| [Accounts](docs/accounts.md) | Adding, editing and deleting accounts, which login to choose, 2FA, provider settings |
+| [Passwords](docs/passwords.md) | `password_cmd`, 1Password, the OS keychain |
+| [Passwords from GPG](docs/gpg.md) | GPG and `pass`, with a graphical pinentry |
+| [Signing in with OAuth 2.0](docs/oauth.md) | Microsoft 365, Outlook.com and Google |
+| [Configuration](docs/configuration.md) | Every `config.toml` key, defaults, colours and validation |
+| [Sending mail](docs/sending.md) | SMTP, the composer, drafts, reply and forward |
+| [Sending from aliases](docs/send-as.md) | Other From addresses |
+| [Attachments](docs/attachments.md) | Attaching files and opening attachments |
+| [Searching](docs/search.md) | Operators, dates and provider differences |
+| [New-mail notifications](docs/notifications.md) | Bell, desktop alerts, window title and push |
+| [Installing dk-email](docs/install.md) | Homebrew, release archive, Go, updating and removing |
+| [Troubleshooting](docs/troubleshooting.md) | The debug log and where to look for each problem |
 
-- If you press `esc` after changing something, the popup's last row asks (`Save draft?`) and the hint bar lists the answers: `s` saves to Drafts, `d` discards, `e` keeps editing, and `esc` saves and closes. A draft is only discarded on purpose. If the account can't save drafts, only `d` and `e` are offered.
-- While a draft is saving, `esc` cancels the save and leaves the composer open. If the server already stored the draft, a retry can leave a duplicate.
-- Sending happens in the background (`Sending…`). A bad address or a failed send shows in the composer's footer, with your text intact, and `ctrl+s` retries. `q` types a `q` while you compose, so it never quits by accident.
-- If the message was delivered but saving the Sent copy, marking the original answered or removing the draft failed, the composer closes and the status bar says so. dk-email never retries then, so nothing is sent twice.
+## Contributing
 
-### Drafts
-
-- Choosing **save** in the `esc` prompt stores the message in the account's Drafts folder, flagged `\Draft` and `\Seen`. Saving needs no recipients. The saved copy keeps `Bcc`, the threading headers of a reply and every attachment.
-- Press `enter` on a message in the Drafts folder (or click to open it) to reopen it in the composer. Saving it again replaces the old copy, and sending it removes the draft.
-- Removing a single message needs the IMAP **UIDPLUS** extension, which Gmail, Fastmail and most other servers have. Without it, the old copy is kept and the status says so, so you may see two copies in Drafts. dk-email never uses a plain `EXPUNGE`, which could remove other messages you flagged for deletion.
-- A resumed reply still threads, but sending it doesn't mark the original answered.
-- Drafts work for accounts that have `smtp_host`, like the other compose keys.
-
-### Reply, reply all and forward
-
-- **Reply** goes to the message's `Reply-To`, else its sender. If the message is from you, it goes to its original recipients. The subject gets `Re: `, and `In-Reply-To` and `References` are set so the reply threads correctly. Only the target message is quoted. After sending, the original is marked answered.
-- **Reply all** also includes the original's To and Cc, minus your own address, with duplicates removed.
-- **Forward** starts with an empty `To` and the subject `Fwd: …`. The original's attachments are listed on the Attach row with their original names and types, and you can remove any of them.
-- Outgoing mail is plain text. Attach files with `ctrl+o` or by drag and drop; see [Attachments](docs/attachments.md#attaching-files).
-- `Bcc` recipients get the message, but the `Bcc` header is never written to a sent message. Only the saved draft keeps it.
-
-### Connect popup
-
-The connect-account popup has optional **SMTP host**, **SMTP port** and **SMTP TLS** fields. Gmail addresses pre-fill `smtp.gmail.com:465` with implicit TLS. When an SMTP host is filled in, the popup tests the SMTP login (connect and sign in, nothing is sent) before saving, and writes the `smtp_*` keys to the new `[[account]]` block. Leave the host empty if the account shouldn't send. Press `E` to edit or delete an existing account; see [Editing an account](docs/accounts.md#editing-an-account).
-
-## Searching
-
-Press `/` in the thread list to search the open folder on your mail server. Results replace the list, threaded as usual, and you can reply, forward, star, archive or move them like any other thread. `esc` clears the search, and `ctrl+r` runs it again. Queries use Gmail-style operators:
-
-```
-invoice
-from:jane since:2026-01-01
-is:unread -from:newsletter
-subject:"weekly report" before:2026-07-01
-```
-
-[Searching](docs/search.md) covers every operator, dates, provider differences and privacy.
-
-## Keys
-
-| Key | Action | Key | Action |
-|---|---|---|---|
-| `j`/`k`, `↓`/`↑` | move | `tab` / `shift+tab` | next / previous pane |
-| `h`/`l`, `←`/`→` | focus left / right pane | `enter` | open thread / folder |
-| `space` | expand / collapse thread | `g` / `G` | top / bottom |
-| `u` | toggle read / unread | `s` | toggle star |
-| `e` | archive | `d` | delete (moves to Trash) |
-| `m` | move to folder | `ctrl+r` | refresh, and reconnect accounts that failed |
-| `r` | reply | `R` | reply all |
-| `f` | forward | `c` | new message |
-| `a` | focus folders (narrow) / folder picker (list) | `A` | connect account |
-| `E` | edit or delete account | `o` | open attachment (reader) |
-| `/` | filter folders (sidebar) / search (thread list) | `v` | toggle split ↔ list + popup |
-| `?` | key help | `esc` | close popup / back |
-| `q` | close the open popup, otherwise quit | `ctrl+c` | quit, even with a popup open |
-
-- Actions on a collapsed thread apply to every message in it. On an expanded row, or in the reader, they apply to the selected message. Opening a message marks it read.
-- `r`, `R` and `f` work on the thread list and in the reader. `c` works anywhere a folder is open. In the Drafts folder, `enter` reopens a draft in the composer. See [Sending mail](#sending-mail).
-- `enter` opens the conversation in a popup, and `esc` closes it. In the reader, `pgup`/`pgdn` (or `ctrl+u`/`ctrl+d`) scroll by a page, and `space` expands or collapses every message. A scrollbar on the right shows the position in long conversations.
-- **Mouse:** clicking a folder opens it. Clicking a thread selects it, and clicking it again opens it. The scroll wheel moves the selection (or scrolls the open popup) but never opens anything. Links in a message are underlined; cmd+click (ctrl+click on Linux) opens them while the reader popup is open, in terminals that support hyperlinks. To select text in the terminal, hold shift (or option on macOS) while dragging.
-- Every popup lists its keys in the bottom hint bar (`Close: esc`, `Send: ctrl+s`, …), not inside the popup, and the panes behind an open popup are dimmed.
-- In the `?` help popup, `/` filters keys by key or description.
-- In the folders sidebar and the folder pickers (`a` in list mode, `m` to move), `/` filters folders by name. While typing, every key goes to the filter: `↑`/`↓` move between matches, `enter` opens the highlighted folder, and `esc` clears the filter.
-- In the connect popup, `tab`/`↓` and `shift+tab`/`↑` move between fields, and `←`/`→` or `space` change a choice. `enter` submits and `esc` cancels.
-
-Below 80 columns, list mode is forced.
-
-## Debugging
-
-```sh
-DK_EMAIL_DEBUG=1 dk-email
-```
-
-This appends to `$XDG_CACHE_HOME/dk-email/debug.log` (default `~/.cache/dk-email/debug.log`). The log records timings and metadata only, never passwords or message bodies. It also records IMAP drops and reconnects, and may contain folder names and email addresses from server errors (never passwords or tokens), so check it before sharing.
-
-## Development
-
-```sh
-go test -race ./...
-go vet ./...
-gofmt -l .          # must print nothing
-```
-
-Commit messages follow [Conventional Commits](https://www.conventionalcommits.org). The release changelog is grouped by `feat:` and `fix:`, and drops `docs:`, `test:` and `chore:`. The spec lives in [SPEC.md](SPEC.md), and the task plan in [tasks/](tasks/).
-
-## Releasing (maintainers)
-
-Versions come only from git tags ([SemVer](https://semver.org)). Nothing in the source holds a version number. GoReleaser injects it at build time.
-
-**One-time prerequisites:**
-
-- The public tap repo `dkouvdis/homebrew-tap` exists.
-- The `HOMEBREW_TAP_GITHUB_TOKEN` secret is set on `dkouvdis/dk-email`. It must be a fine-grained personal access token with **Contents: read and write** on the tap repo only.
-- Fine-grained tokens expire. When it does, stable releases fail at the cask upload step. Create a new token and update the secret, then re-run the release workflow.
-- Optional: `brew install goreleaser` for local dry runs.
-
-**Dry run** (builds into `dist/` and publishes nothing):
-
-```sh
-goreleaser check
-goreleaser release --snapshot --clean
-```
-
-**Release.** Pushing a `v*` tag runs `.github/workflows/release.yml`, which runs the tests, then builds darwin/linux × amd64/arm64 archives with checksums and creates the GitHub release.
-
-```sh
-git tag -a v0.1.0-beta.1 -m "v0.1.0-beta.1"
-git push origin v0.1.0-beta.1
-```
-
-- Tags with `-beta.N` or `-rc.N` become GitHub pre-releases and **never** update the Homebrew tap.
-- A stable tag such as `v0.1.0` also pushes the updated cask to `dkouvdis/homebrew-tap`.
-- Homebrew installs download the release assets, so `brew install` only works once this repository is public.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development and releases. The spec is in [SPEC.md](SPEC.md) and the task plan in [tasks/](tasks/).

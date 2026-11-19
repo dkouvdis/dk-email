@@ -29,15 +29,26 @@ The connect popup opens on first run, and whenever you press `A`. It asks for:
 | **Username** | The IMAP login. Leave it as the email unless your provider says otherwise (Proton Mail Bridge, some self-hosted servers). |
 | **IMAP host / Port / TLS** | Your provider's incoming server. Port 993 with implicit TLS is the usual choice; 143 with STARTTLS also works. |
 | **Login** | Where the password comes from, or OAuth 2.0. See [Choosing a login](#choosing-a-login). |
-| **SMTP host / port / TLS** | Optional. Fill it in to [send mail](../README.md#sending-mail); leave it empty for a read-only account. |
+| **SMTP host / port / TLS** | Optional. Fill it in to [send mail](sending.md); leave it empty for a read-only account. |
 | **Aliases** | Optional. Other addresses this account can send as. See [Sending from aliases](send-as.md). |
 
 `tab`/`↓` and `shift+tab`/`↑` move between fields, `←`/`→` or `space`
 change a choice, and `enter` on **Submit** connects.
 
+On first run, with no accounts, the popup opens by itself. Press `A` at any
+time to connect another account, and `E` to edit or delete one
+([Editing an account](#editing-an-account)).
+
+Hosts are pre-filled from your address: Gmail addresses get
+`imap.gmail.com:993` and `smtp.gmail.com:465` (implicit TLS); Outlook,
+Hotmail, Live and Microsoft 365 addresses get `outlook.office365.com:993`
+and `smtp.office365.com:587` (STARTTLS).
+
 dk-email then tests the IMAP login, and the SMTP login when an SMTP host is
-set. Only when that works is the account added to `config.toml`, with your
-comments and formatting left as they are. If the test fails, the error and
+set. Only when that works is the account added: dk-email appends an
+`[[account]]` block to `config.toml`, with your comments and formatting left
+as they are, and writes the `smtp_*` keys too when an SMTP host was filled in.
+The SMTP test connects and signs in; nothing is sent. If the test fails, the error and
 a hint show in the popup: fix the field and press `enter` again.
 
 ## Choosing a login
@@ -50,26 +61,10 @@ a hint show in the popup: fix the field and press `enter` again.
 
 Whichever you pick, the password stays out of `config.toml`. If you prefer
 another password manager, set `password_cmd` in the config by hand to any
-command that prints the password on its first line:
-
-| Source | `password_cmd` |
-|---|---|
-| 1Password | `op read op://Personal/Mail/password` |
-| pass / gopass ([setup](gpg.md)) | `pass show mail/work` |
-| GPG-encrypted file ([setup](gpg.md)) | `gpg --quiet --decrypt ~/.config/dk-email/work.gpg` |
-| macOS Keychain (your own entry) | `security find-generic-password -s mail-work -w` |
-| Linux Secret Service | `secret-tool lookup service mail account work` |
-| Bitwarden | `bw get password mail-work` |
-| Environment variable | `printenv WORK_MAIL_PASSWORD` |
-
-The command runs with `sh -c` in your environment, with no terminal to type
-into, so it must not wait for keyboard input. A desktop prompt such as
-1Password's Touch ID approval works; dk-email waits up to 60 seconds for it.
-Anything after the first line is ignored, which suits `pass` entries with
-notes below the password. See [Passwords](../README.md#passwords).
-
-GPG, `pass` and `gopass` need a graphical passphrase prompt (pinentry) or a
-cached passphrase; see [Passwords from GPG](gpg.md).
+command that prints the password on its first line. The
+[Passwords](passwords.md) guide has examples for 1Password, pass, GPG,
+Bitwarden and others, and explains how the command runs and how the
+keychain entry is named.
 
 **Which one for my provider?**
 
@@ -160,6 +155,10 @@ Filled in for you for `@gmail.com` and `@googlemail.com` addresses.
 - If that page says *the setting you are looking for is not available*,
   your account is in Advanced Protection or uses only passkeys, or 2-Step
   Verification is off. Use [OAuth 2.0](oauth.md#google-google-cloud).
+- Store the app password in 1Password or the keychain ([Passwords](passwords.md)).
+  The same app password works for sending: there's no separate SMTP password.
+- Google Workspace accounts that don't allow app passwords can sign in with
+  [OAuth 2.0](oauth.md#google-google-cloud) instead.
 - IMAP is always on for personal accounts.
 - Gmail files sent mail in Sent itself, so `save_sent` defaults to `false`.
 
@@ -254,9 +253,31 @@ Security → Generate app password**.
 ### Proton Mail
 
 Proton Mail works through **Proton Mail Bridge**, which runs a local IMAP
-and SMTP server. Use the password Bridge shows (not your Proton password)
-and trust its certificate with `tls_cert`. See
-[Proton Mail Bridge](../README.md#proton-mail-bridge).
+and SMTP server on your computer.
+
+```toml
+[[account]]
+name      = "Proton"
+email     = "me@proton.me"
+username  = "me@proton.me"                     # the username shown in Bridge's mailbox details
+imap_host = "127.0.0.1"
+imap_port = 1143
+tls       = "starttls"
+tls_cert  = "~/.config/dk-email/bridge.pem"
+```
+
+- **Password:** use the Bridge password from Bridge's mailbox details, not
+  your Proton password. It goes in `password_cmd` or the keychain like any
+  other ([Passwords](passwords.md)).
+- **Certificate:** export it from Bridge under **Settings → Advanced
+  settings → Export TLS certificates**. Then copy `cert.pem` to the
+  `tls_cert` path.
+- **Why `tls_cert` is needed:** macOS rejects Bridge's 20-year self-signed
+  certificate as "not standards compliant", even if you trust it in
+  Keychain. `tls_cert` tells dk-email to trust that certificate instead of
+  the system roots, for this account only. The host name and expiry are
+  still checked. It applies to SMTP as well as IMAP, so sending through
+  Bridge works too.
 
 ### Self-hosted and other providers
 

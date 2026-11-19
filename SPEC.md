@@ -1,6 +1,6 @@
 # Spec: dk-email (v1)
 
-Status: **Approved; v1 built, with `v0.1.0-beta.1` released on 2026-11-10.** Source of intent: [docs/intent/terminal-email-client.md](docs/intent/terminal-email-client.md).
+Status: **Approved; v1 built, with `v0.1.0-beta.1` released on 2026-11-10.** Source of intent: [tasks/terminal-email-client.md](tasks/terminal-email-client.md).
 
 ## Objective
 
@@ -137,7 +137,7 @@ internal/ui/sidebar/   → folders pane
 internal/ui/threadlist/→ thread list pane
 internal/ui/reader/    → conversation view (pane + popup reuse the same model)
 internal/ui/popup/     → picker, connect-account form, help, compose (the built-in message composer)
-docs/intent/           → confirmed intent docs
+tasks/                 → intent, specs, plans and task lists
 .goreleaser.yaml       → build, archive, changelog, Homebrew cask config
 .github/workflows/     → ci.yml (test/vet/gofmt on push & PR), release.yml (GoReleaser on v* tags)
 testdata/ (per pkg)    → synthetic fixtures only, never real mail
@@ -291,7 +291,7 @@ In the folders sidebar and the folder pickers (`a` in list mode, `m` for move), 
   - It uses `homebrew_casks` because the older `brews` section is deprecated as of GoReleaser v2.10.
   - `skip_upload: auto` means **pre-releases never reach the tap**; only stable tags update the cask.
   - The workflow pushes to the tap using the repo secret `HOMEBREW_TAP_GITHUB_TOKEN`: a fine-grained personal access token with contents write access to the tap repo only.
-  - The binaries are unsigned, so macOS may quarantine them. The cask clears the quarantine attribute using the declarative `postflight_steps` (configured as `hooks.post.install_steps` in `.goreleaser.yaml`), and the README documents the manual fallback (`xattr -d com.apple.quarantine`). Apple code signing and notarization are out of scope until 1.0.
+  - The binaries are unsigned, so macOS may quarantine them. The cask clears the quarantine attribute using the declarative `postflight_steps` (configured as `hooks.post.install_steps` in `.goreleaser.yaml`), and docs/install.md documents the manual fallback (`xattr -d com.apple.quarantine`). Apple code signing and notarization are out of scope until 1.0.
 - **CI** (`.github/workflows/ci.yml`): runs `go test -race ./...`, `go vet ./...` and `gofmt -l .` on every push and pull request, plus `goreleaser check` once `.goreleaser.yaml` exists.
 - **Prerequisites (one-time setup, done by you):**
   - Install GoReleaser locally (`brew install goreleaser`) for snapshot dry-runs. It's optional, since CI does the real releases.
