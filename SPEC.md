@@ -55,7 +55,7 @@ Messages in the conversation are stacked oldest to newest. The latest (or first 
 3. **Threading happens per folder** (Thunderbird's default; confirmed): client-side, from `Message-ID` / `In-Reply-To` / `References`, falling back to normalized subject only for replies (`Re:`/`Fwd:`) that carry no references, so unrelated mails with a generic subject never merge. There's no cross-folder threading, so replies sitting in Sent won't appear inside Inbox threads.
 4. **v1 caches nothing on disk.** Headers and bodies are kept in memory for the session. `~/.cache/dk-email/` is reserved for the future cache and holds only the debug log.
 5. **Each folder loads its newest 200 messages**, and more are fetched when scrolling reaches the end.
-6. **Refresh:** `ctrl+r` refreshes manually, and the selected folder plus all folders' unread counts are polled every `refresh_interval` (default 120s; confirmed). No IMAP IDLE in v1.
+6. **Refresh:** `ctrl+r` refreshes manually, and the selected folder plus all folders' unread counts are polled every `refresh_interval` (default 120s; confirmed). No IMAP IDLE in v1. New INBOX mail found by a refresh is announced (bell, OSC 9 desktop notification, window title); see [docs/notifications.md](docs/notifications.md).
 7. **Delete moves mail to the Trash folder** without asking for confirmation, the way Gmail does. It's never a permanent expunge.
 8. **Archive moves mail to the account's archive folder.** That's the folder with IMAP's special-use marker `\Archive`, or else `\All` (Gmail's All Mail), unless `archive_folder` overrides it in config. If none of these exist, archive is disabled for that account and a message explains why.
 9. **Keybindings and themes are fixed in v1.** `keys.toml` and `themes/` are reserved names (and whitelisted in the config `.gitignore`) but aren't read yet.
@@ -128,6 +128,7 @@ internal/mail/imap/    → go-imap v2 implementation of mail.Mailbox
 internal/mail/smtp/    → go-smtp transport (implicit TLS / STARTTLS, AUTH PLAIN or XOAUTH2)
 internal/compose/      → pure: reply / reply-all / forward / new drafts, composer fields, MIME build (send and draft mode), FromRaw to reopen a draft
 internal/send/         → implements mail.Sender and mail.Drafter: forward attachments, SMTP, Sent copy, \Answered, save / reopen / remove drafts
+internal/notify/       → pure: counts new INBOX mail per account from UIDNEXT, builds the count-only alert text and bell/OSC 9 sequences (no I/O)
 internal/search/       → Gmail-style query parser (stdlib + internal/mail)
 internal/thread/       → builds threads from message summaries (pure, no I/O)
 internal/render/       → MIME → displayable text (plain preferred, HTML→text, attachment list)
@@ -171,6 +172,11 @@ There's **one IMAP connection per account**, opened lazily and serialized behind
 default_layout   = "split"   # "split" | "list"
 refresh_interval = "120s"
 
+[notify]
+bell    = true   # optional: bell on new INBOX mail
+desktop = true   # optional: OSC 9 desktop notification
+title   = true   # optional: INBOX unread count in the window title
+
 [[account]]
 name         = "Personal"
 email        = "me@gmail.com"
@@ -198,6 +204,7 @@ password_cmd = "op read op://Personal/Gmail/app-password"   # omit to use the ke
   - `tls` defaults to `implicit`. `imap_port` defaults to 993 for `implicit` and 143 for `starttls`. `username` defaults to `email`.
   - Unknown keys are rejected, so a typo such as `pasword_cmd` can't silently fall back to the keychain. A `password` key is rejected with a hint to use `password_cmd`.
   - `[ui]` limits: `refresh_interval` positive.
+  - `[notify]` keys (`bell`, `desktop`, `title`) are optional booleans, all on by default. See [docs/notifications.md](docs/notifications.md).
   - All problems in a file are reported together.
   - The config dir and its `.gitignore` are only created for the default location, never next to a custom `--config` path.
   - `tls_cert` (optional) is a PEM file of certificates trusted for that account **instead of** the system roots. It's for local bridges with self-signed certificates, such as Proton Mail Bridge, whose 20-year certificate macOS rejects as "not standards compliant" even when trusted in Keychain. The host name and expiry are still verified. `~/` is expanded, and a relative path is resolved from the config file's folder. A missing file, or one with no PEM certificate, fails at load. Added 2026-11-09 with your approval.

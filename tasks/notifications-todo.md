@@ -115,9 +115,9 @@ Plan: [notifications-plan.md](notifications-plan.md) · Spec: [notifications-spe
 **Description:** Write `docs/notifications.md` as the user guide: what alerts and when (new INBOX mail, count only, skipped while focused, one per refresh round), the `[notify]` settings, and how the terminal decides what an alert looks like. Setup for Ghostty (`desktop-notifications`, `bell-features`), iTerm2 (Profiles → Terminal: notifications, bell), Terminal.app (bell and title only, no OSC 9), tmux (`allow-passthrough on`, `focus-events on`, `monitor-bell`), and SSH (OSC 9 and bell pass through). macOS: System Settings → Notifications → (terminal app) chooses Banners, Alerts or None. Troubleshooting: no banner, alerts while looking, empty title after quit. Link it from README (config sample gains `[notify]`) and update SPEC.md decision 6 and the config section. Add `internal/notify` to AGENTS.md.
 
 **Acceptance criteria:**
-- [ ] `docs/notifications.md` exists and follows the style of `docs/attachments.md` (task-first, short sections).
-- [ ] README's config sample shows `[notify]` and links the guide; SPEC.md and AGENTS.md describe the behaviour as built.
-- [ ] Every setting and terminal option named in the docs matches the code and the terminal's real option name.
+- [x] `docs/notifications.md` exists and follows the style of `docs/attachments.md` (task-first, short sections).
+- [x] README's config sample shows `[notify]` and links the guide; SPEC.md and AGENTS.md describe the behaviour as built.
+- [ ] Every setting and terminal option named in the docs matches the code and the terminal's real option name. (Code settings match. To verify by hand: Ghostty `desktop-notifications` / `bell-features`, iTerm2 "Filter Alerts…", tmux `allow-passthrough` / `focus-events` / `monitor-bell`.)
 
 **Verification:**
 - [ ] Manual check: follow the guide from scratch in Ghostty and in tmux, and get a banner.

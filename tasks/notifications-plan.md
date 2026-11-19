@@ -47,7 +47,7 @@ T2 detect (imap+notify) ┘                              │
 - [ ] `go test -race ./...`, `go vet ./...`, `gofmt -l .` clean
 - [ ] Manual check in Ghostty and iTerm2: send yourself mail, switch apps, see a banner and hear or see the bell
 
-- [ ] Task 5: User docs for step 1
+- [x] Task 5: User docs for step 1
 
 ### Phase 2: IDLE push
 - [ ] Task 6: `imap.Watcher` waits for new INBOX mail over its own connection

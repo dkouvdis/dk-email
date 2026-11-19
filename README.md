@@ -10,6 +10,7 @@ A keyboard-driven terminal email client for triaging several IMAP accounts (Gmai
 - Reads passwords from 1Password (`op read`), any other command, or the OS keychain. They are never stored in a plain-text file.
 - Signs in to Microsoft 365, Outlook.com and Google with **OAuth 2.0** (`XOAUTH2` over IMAP and SMTP), using your own app registration. Tokens live in the OS keychain and refresh on their own. See [Signing in with OAuth 2.0](docs/oauth.md).
 - Attaches files in the composer (`ctrl+o`, or drag and drop files onto the terminal) and opens attachments with `o` in the reader: saved to Downloads, then opened with the system's default app. See [Attachments](docs/attachments.md).
+- Announces new INBOX mail with a bell, a desktop notification and the unread count in the window title, as a count only and never while the window has focus. See [New-mail notifications](docs/notifications.md).
 
 v0.x is a personal tool: it reads, triages and sends mail. Nothing is cached on disk.
 
@@ -69,6 +70,11 @@ The config folder lives at `$XDG_CONFIG_HOME/dk-email/` (default `~/.config/dk-e
 default_layout   = "split"   # "split" | "list"
 refresh_interval = "120s"
 
+[notify]
+bell    = true   # ring the bell on new INBOX mail (default true)
+desktop = true   # send a desktop notification, OSC 9 (default true)
+title   = true   # show the INBOX unread count in the window title (default true)
+
 [[account]]
 name         = "Personal"
 email        = "me@gmail.com"
@@ -95,6 +101,7 @@ password_cmd = "op read op://Personal/Gmail/app-password"   # omit to use the ke
 - `tls_cert` accepts `~/`. A relative path is resolved from the config file's folder. It applies to SMTP as well as IMAP.
 - The `smtp_*`, `from_name` and `save_sent` keys are described under [Sending mail](#sending-mail).
 - `auth` and the `oauth_*` keys are described in [Signing in with OAuth 2.0](docs/oauth.md#configuration-reference). An `oauth_client_secret` key is rejected like `password`.
+- `[notify]` keys are all optional and on by default; see [New-mail notifications](docs/notifications.md).
 
 ### Colours
 
