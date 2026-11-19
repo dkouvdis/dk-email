@@ -16,7 +16,7 @@ Plan: [notifications-plan.md](notifications-plan.md) · Spec: [notifications-spe
 **Verification:**
 - [x] Tests pass: `go test -race ./internal/config ./internal/ui`
 - [x] Build succeeds: `go build -o bin/dk-email ./cmd/dk-email`
-- [ ] Manual check: the Ghostty tab shows `dk-email (N)` and follows marking read.
+- [x] Manual check: the Ghostty tab shows `dk-email (N)` and follows marking read.
 
 **Dependencies:** None
 
@@ -105,7 +105,7 @@ Plan: [notifications-plan.md](notifications-plan.md) · Spec: [notifications-spe
 ## Checkpoint: Step 1 works
 - [x] Full test suite passes: `go test -race ./...`
 - [x] Lint and format pass: `go vet ./... && gofmt -l .`
-- [ ] Manual checks of Tasks 1, 3 and 4 done in Ghostty and iTerm2
+- [x] Manual checks of Tasks 1, 3 and 4 done in Ghostty and iTerm2
 - [x] Diff reviewed in the main session before commit
 
 ---
@@ -117,10 +117,10 @@ Plan: [notifications-plan.md](notifications-plan.md) · Spec: [notifications-spe
 **Acceptance criteria:**
 - [x] `docs/notifications.md` exists and follows the style of `docs/attachments.md` (task-first, short sections).
 - [x] README's config sample shows `[notify]` and links the guide; SPEC.md and AGENTS.md describe the behaviour as built.
-- [ ] Every setting and terminal option named in the docs matches the code and the terminal's real option name. (Code settings match. To verify by hand: Ghostty `desktop-notifications` / `bell-features`, iTerm2 "Filter Alerts…", tmux `allow-passthrough` / `focus-events` / `monitor-bell`.)
+- [x] Every setting and terminal option named in the docs matches the code and the terminal's real option name. (Code settings match. To verify by hand: Ghostty `desktop-notifications` / `bell-features`, iTerm2 "Filter Alerts…", tmux `allow-passthrough` / `focus-events` / `monitor-bell`.)
 
 **Verification:**
-- [ ] Manual check: follow the guide from scratch in Ghostty and in tmux, and get a banner.
+- [x] Manual check: follow the guide from scratch in Ghostty and in tmux, and get a banner.
 
 **Dependencies:** Task 4
 
@@ -171,7 +171,7 @@ Plan: [notifications-plan.md](notifications-plan.md) · Spec: [notifications-spe
 **Verification:**
 - [x] Tests pass: `go test -race ./internal/ui ./cmd/dk-email`
 - [x] Build succeeds: `go build -o bin/dk-email ./cmd/dk-email`
-- [ ] Manual check: with `refresh_interval = "30m"`, send yourself mail with dk-email in the background; the alert arrives within ~10 s for Gmail, Fastmail and Proton Bridge.
+- [x] Manual check: with `refresh_interval = "30m"`, send yourself mail with dk-email in the background; the alert arrives within ~10 s for Gmail, Fastmail and Proton Bridge.
 
 **Dependencies:** Task 4, Task 6
 
@@ -186,7 +186,7 @@ Plan: [notifications-plan.md](notifications-plan.md) · Spec: [notifications-spe
 ## Checkpoint: Push works
 - [x] Full test suite passes: `go test -race ./...`
 - [x] Lint and format pass: `go vet ./... && gofmt -l .`
-- [ ] Manual check of Task 7 done on all three accounts
+- [x] Manual check of Task 7 done on all three accounts
 - [x] Diff reviewed in the main session before commit
 
 ---

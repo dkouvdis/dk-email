@@ -45,7 +45,7 @@ T2 detect (imap+notify) ┘                              │
 
 ### Checkpoint: Step 1 works
 - [x] `go test -race ./...`, `go vet ./...`, `gofmt -l .` clean
-- [ ] Manual check in Ghostty and iTerm2: send yourself mail, switch apps, see a banner and hear or see the bell
+- [x] Manual check in Ghostty and iTerm2: send yourself mail, switch apps, see a banner and hear or see the bell
 
 - [x] Task 5: User docs for step 1
 
