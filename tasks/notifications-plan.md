@@ -38,7 +38,7 @@ T2 detect (imap+notify) ┘                              │
 ## Task List
 
 ### Phase 1: Notify on poll
-- [ ] Task 1: `[notify]` config and unread count in the window title
+- [x] Task 1: `[notify]` config and unread count in the window title
 - [ ] Task 2: Detect new INBOX mail from refresh results
 - [ ] Task 3: Bell and desktop alerts after a refresh round
 - [ ] Task 4: No alerts while the window has focus

@@ -591,3 +591,14 @@ func TestClick_OpensTheFolderOnThatLineAndClearsAFilter(t *testing.T) {
 		t.Errorf("opened %q, filtering %v; want Spam and the filter cleared", sel.Folder, m.Filtering())
 	}
 }
+
+func TestInboxUnread(t *testing.T) {
+	m := New(theme.Default(), []string{"Personal", "Work", "Empty"})
+	m = m.SetFolders(0, gmailFolders(), nil) // INBOX 12; All Mail and Spam don't count
+	m = m.SetFolders(1, []mail.Folder{{Name: "INBOX", Delimiter: "/", Role: mail.RoleInbox, Unread: 5}}, nil)
+	m = m.SetFolders(2, nil, nil)
+
+	if got := m.InboxUnread(); got != 17 {
+		t.Errorf("InboxUnread() = %d, want 17", got)
+	}
+}

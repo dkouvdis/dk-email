@@ -402,6 +402,19 @@ func (m Model) AdjustUnread(account int, name string, delta int) Model {
 	return m
 }
 
+// InboxUnread is the unread count summed over every account's INBOX.
+func (m Model) InboxUnread() int {
+	n := 0
+	for _, a := range m.accounts {
+		for _, f := range a.folders {
+			if f.Role == mail.RoleInbox {
+				n += f.Unread
+			}
+		}
+	}
+	return n
+}
+
 // Role is a folder's role, or RoleNone if it isn't known.
 func (m Model) Role(account int, name string) mail.Role {
 	f, _ := m.Folder(account, name)

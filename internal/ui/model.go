@@ -54,6 +54,7 @@ func (p Pane) String() string {
 
 type Model struct {
 	ui      config.UI
+	notify  config.Notify
 	accts   []config.Account
 	connect Connector
 	// boxes holds each account's mailbox once connected, by account index.
@@ -140,6 +141,7 @@ func New(cfg config.Config, connect Connector, log *slog.Logger) Model {
 	th := theme.New(cfg.Colors)
 	m := Model{
 		ui:            cfg.UI,
+		notify:        cfg.Notify,
 		accts:         slices.Clone(cfg.Accounts),
 		connect:       connect,
 		boxes:         make([]mail.Mailbox, len(cfg.Accounts)),
@@ -498,9 +500,20 @@ func (m *Model) toggleMode() {
 	m.log.Debug("mode", "mode", m.mode, "kind", m.panes.Kind)
 }
 
+// windowTitle is the terminal title: the app name plus the INBOX unread total.
+func (m Model) windowTitle() string {
+	if n := m.side.InboxUnread(); n > 0 {
+		return fmt.Sprintf("dk-email (%d)", n)
+	}
+	return "dk-email"
+}
+
 func (m Model) View() tea.View {
 	v := tea.NewView(m.render())
 	v.AltScreen = true
+	if m.notify.Title {
+		v.WindowTitle = m.windowTitle()
+	}
 	// Popups ignore clicks, so release the mouse to the terminal while one is
 	// open: it can then open hyperlinks in the message (cmd/ctrl+click), and
 	// in the alt screen it turns the wheel into ↑/↓, which still scrolls.

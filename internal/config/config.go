@@ -31,6 +31,7 @@ const (
 
 type Config struct {
 	UI       UI        `toml:"ui"`
+	Notify   Notify    `toml:"notify"`
 	Colors   Colors    `toml:"colors"`
 	Accounts []Account `toml:"account"`
 
@@ -41,6 +42,14 @@ type Config struct {
 type UI struct {
 	DefaultLayout   string   `toml:"default_layout"`
 	RefreshInterval Duration `toml:"refresh_interval"`
+}
+
+// Notify chooses how new INBOX mail is announced. Every key is optional
+// and on by default.
+type Notify struct {
+	Bell    bool `toml:"bell"`
+	Desktop bool `toml:"desktop"`
+	Title   bool `toml:"title"`
 }
 
 // Alias is another address the account can send as, such as one on the user's own domain.
@@ -143,10 +152,13 @@ func (d Duration) MarshalText() ([]byte, error) {
 
 // Default returns the config used when no file exists.
 func Default() Config {
-	return Config{UI: UI{
-		DefaultLayout:   LayoutSplit,
-		RefreshInterval: Duration{120 * time.Second},
-	}}
+	return Config{
+		UI: UI{
+			DefaultLayout:   LayoutSplit,
+			RefreshInterval: Duration{120 * time.Second},
+		},
+		Notify: Notify{Bell: true, Desktop: true, Title: true},
+	}
 }
 
 // Load reads and validates the config at path. A missing file is not an

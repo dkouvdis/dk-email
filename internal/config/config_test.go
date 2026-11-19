@@ -614,3 +614,35 @@ func TestLoad_RejectsPlaintextOAuthClientSecretWithHint(t *testing.T) {
 		t.Errorf("error leaks the secret: %q", err)
 	}
 }
+
+func TestLoad_NotifyDefaultsOn(t *testing.T) {
+	want := Notify{Bell: true, Desktop: true, Title: true}
+	if got := Default().Notify; got != want {
+		t.Errorf("Default().Notify = %+v, want %+v", got, want)
+	}
+	cfg, err := Load(writeConfig(t, "[ui]\nrefresh_interval = \"30s\"\n"))
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.Notify != want {
+		t.Errorf("Notify = %+v, want %+v", cfg.Notify, want)
+	}
+}
+
+func TestLoad_NotifyPartialKeepsOthersOn(t *testing.T) {
+	cfg, err := Load(writeConfig(t, "[notify]\nbell = false\n"))
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	want := Notify{Bell: false, Desktop: true, Title: true}
+	if cfg.Notify != want {
+		t.Errorf("Notify = %+v, want %+v", cfg.Notify, want)
+	}
+}
+
+func TestLoad_NotifyRejectsUnknownKey(t *testing.T) {
+	_, err := Load(writeConfig(t, "[notify]\nsound = true\n"))
+	if err == nil || !strings.Contains(err.Error(), "notify.sound") {
+		t.Errorf("Load() error = %v, want unknown key notify.sound", err)
+	}
+}

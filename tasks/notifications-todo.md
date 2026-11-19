@@ -9,13 +9,13 @@ Plan: [notifications-plan.md](notifications-plan.md) · Spec: [notifications-spe
 **Description:** Add an optional `[notify]` section to `config.Config` with `bell`, `desktop` and `title` (bools, all `true` when absent). It stays strict: unknown keys under `[notify]` fail validation like everywhere else. In `ui.Model.View`, when `title` is on, set `v.WindowTitle` to `dk-email (N)`, where N is the sum of `Unread` over every connected account's INBOX (`mail.RoleInbox`) as the sidebar holds it, or `dk-email` when N is 0. When `title` is off, leave `WindowTitle` empty so the terminal's title is untouched.
 
 **Acceptance criteria:**
-- [ ] A config without `[notify]` loads with all three on; `[notify] bell = false` turns only the bell off; `[notify] sound = true` fails with an unknown-key error.
-- [ ] With two accounts whose INBOXes have 2 and 1 unread, `View().WindowTitle` is `dk-email (3)`; after marking one read it's `dk-email (2)`; with none unread it's `dk-email`.
-- [ ] With `title = false`, `View().WindowTitle` is empty.
+- [x] A config without `[notify]` loads with all three on; `[notify] bell = false` turns only the bell off; `[notify] sound = true` fails with an unknown-key error.
+- [x] With two accounts whose INBOXes have 2 and 1 unread, `View().WindowTitle` is `dk-email (3)`; after marking one read it's `dk-email (2)`; with none unread it's `dk-email`.
+- [x] With `title = false`, `View().WindowTitle` is empty.
 
 **Verification:**
-- [ ] Tests pass: `go test -race ./internal/config ./internal/ui`
-- [ ] Build succeeds: `go build -o bin/dk-email ./cmd/dk-email`
+- [x] Tests pass: `go test -race ./internal/config ./internal/ui`
+- [x] Build succeeds: `go build -o bin/dk-email ./cmd/dk-email`
 - [ ] Manual check: the Ghostty tab shows `dk-email (N)` and follows marking read.
 
 **Dependencies:** None
