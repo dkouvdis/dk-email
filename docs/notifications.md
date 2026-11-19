@@ -4,6 +4,7 @@ This guide covers how dk-email tells you about new mail while it runs in a
 terminal, and how to get desktop notifications working in yours.
 
 - [What triggers an alert](#what-triggers-an-alert)
+- [Push](#push)
 - [Settings](#settings)
 - [Your terminal decides what an alert looks like](#your-terminal-decides-what-an-alert-looks-like)
 - [Terminal setup](#terminal-setup)
@@ -11,8 +12,9 @@ terminal, and how to get desktop notifications working in yours.
 
 ## What triggers an alert
 
-dk-email checks for new mail on every refresh: each `refresh_interval`
-(default `120s`) and when you press `ctrl+r`.
+dk-email notices new mail right away through push (IMAP IDLE) when the
+server supports it, and otherwise on every refresh: each `refresh_interval`
+(default `120s`) and when you press `ctrl+r`. See [Push](#push).
 
 New mail means messages that arrived in an account's INBOX since the last
 refresh. Mail that dk-email itself moves into the INBOX doesn't count, the
@@ -43,6 +45,33 @@ always updates.
 dk-email learns about focus from the terminal (focus reporting). Any key
 press, click, scroll or paste also counts as being at the window, so
 terminals that don't report focus still go quiet once you use dk-email.
+
+## Push
+
+When an account connects, dk-email opens a second IMAP connection for it
+that only watches. It waits on INBOX with IDLE, opened read-only, so it never
+changes a flag. When the server reports new mail there, dk-email refreshes
+that account at once, so the alert comes within seconds instead of after
+`refresh_interval`.
+
+Push is automatic. There is no setting. If the server doesn't support IDLE,
+the account keeps polling as before.
+
+The extra connection counts against your server's limit on simultaneous
+connections (Gmail allows 15). It uses the same credentials as the main
+connection. For OAuth accounts a fresh token is fetched for each connection.
+
+dk-email ends and restarts IDLE every 25 minutes, because Gmail ends it after
+29. If the watch connection fails, dk-email retries after 30 seconds, then
+waits twice as long each time, up to 5 minutes. Polling carries on meanwhile.
+
+The watcher stops when you remove or edit the account, reconnect it with
+`ctrl+r` after a failure, or quit.
+
+With `DK_EMAIL_DEBUG=1` the debug log (`~/.cache/dk-email/debug.log`) shows
+what the watcher does. The lines are `watch start`, `watch connected`,
+`watch woke`, `watch idle restarted`, `watch dropped`, `watch failed` (with
+the backoff) and `watch unsupported`. They never contain credentials.
 
 ## Settings
 
@@ -116,3 +145,9 @@ dk-email you're at the window.
 
 **The title is empty after quitting.** dk-email clears the title on exit. Your
 shell prompt or terminal sets it again.
+
+**Alerts only come every couple of minutes.** Push isn't working for that
+account, so dk-email falls back to polling. Either the server doesn't support
+IDLE, or the watch connection is failing. Run with `DK_EMAIL_DEBUG=1` and look
+for `watch` lines in the debug log: `watch unsupported` means no IDLE, and
+`watch failed` shows the error and the retry delay.

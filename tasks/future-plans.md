@@ -110,8 +110,11 @@ See [docs/attachments.md](../docs/attachments.md) for how they work today.
   runs `password_cmd` again and can bring up another 1Password or pinentry
   prompt. Keep the password in memory for the session, optionally with a
   lifetime, and drop it when the server rejects it so the next try runs the
-  command again. The password never touches disk. Plan together with the
-  IDLE watcher in [notifications-plan.md](notifications-plan.md).
+  command again. The password never touches disk. The IDLE watcher is built
+  and reuses the credentials resolved at connect (for a password account, a
+  static password resolved once), so it adds no prompts; an oauth2 account
+  with `password_cmd` runs the command per connection, watcher included. The
+  open part is only `ctrl+r` reconnects of failed accounts.
 - **Settings in the app**: change UI settings without editing the config file
   by hand.
 

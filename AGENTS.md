@@ -33,8 +33,8 @@ goreleaser check
 
 Core boundaries:
 
-- `internal/mail` defines provider-agnostic domain types plus the `mail.Mailbox` interface. UI code depends on this interface only.
-- `internal/mail/imap` is the concrete IMAP adapter (`go-imap/v2`) implementing `mail.Mailbox`.
+- `internal/mail` defines provider-agnostic domain types plus the `mail.Mailbox` interface. UI code depends on this interface only. `mail.Watcher` is the separate interface for waiting on new mail (it holds its own connection).
+- `internal/mail/imap` is the concrete IMAP adapter (`go-imap/v2`) implementing `mail.Mailbox`, plus the `Watcher`: a second, watch-only connection per account that IDLEs on INBOX (renewed every 25 minutes, `ErrUnsupported` without IDLE), separate from the serialized `Client`.
 - `internal/mail/smtp` is the concrete SMTP transport (`go-smtp`): implicit TLS or STARTTLS, AUTH PLAIN, and `Verify` for the onboarding login test.
 - `internal/ui` is a single root Bubble Tea model coordinating sidebar, thread list, popups (including the `popup.Compose` composer), and reader. It never hands the terminal to another program (no editor hand-off).
 
@@ -43,8 +43,9 @@ Data/control flow:
 1. Startup loads config and creates one connector per account.
 2. UI `Init` schedules asynchronous `tea.Cmd` work (connect, fetch folders/summaries/messages, flag/move).
 3. Background work returns typed messages (e.g., `accountMsg`, `summariesMsg`, `messageMsg`) to `Model.Update`.
-4. UI never talks directly to IMAP internals; all network I/O is behind `mail.Mailbox`.
-5. Sending goes through `mail.Sender` (nil when the account has no `smtp_host`), also inside a `tea.Cmd`. The built-in `popup.Compose` composer edits the draft in place; `ctrl+s` sends it, and `esc` offers save/discard when it changed. Saving and reopening drafts goes through `mail.Drafter`, which `send.Sender` also implements.
+4. New mail pushed by the watcher arrives as a typed message and triggers that account's refresh; polling stays as the fallback.
+5. UI never talks directly to IMAP internals; all network I/O is behind `mail.Mailbox`.
+6. Sending goes through `mail.Sender` (nil when the account has no `smtp_host`), also inside a `tea.Cmd`. The built-in `popup.Compose` composer edits the draft in place; `ctrl+s` sends it, and `esc` offers save/discard when it changed. Saving and reopening drafts goes through `mail.Drafter`, which `send.Sender` also implements.
 
 Supporting modules:
 

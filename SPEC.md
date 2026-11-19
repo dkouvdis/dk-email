@@ -55,7 +55,7 @@ Messages in the conversation are stacked oldest to newest. The latest (or first 
 3. **Threading happens per folder** (Thunderbird's default; confirmed): client-side, from `Message-ID` / `In-Reply-To` / `References`, falling back to normalized subject only for replies (`Re:`/`Fwd:`) that carry no references, so unrelated mails with a generic subject never merge. There's no cross-folder threading, so replies sitting in Sent won't appear inside Inbox threads.
 4. **v1 caches nothing on disk.** Headers and bodies are kept in memory for the session. `~/.cache/dk-email/` is reserved for the future cache and holds only the debug log.
 5. **Each folder loads its newest 200 messages**, and more are fetched when scrolling reaches the end.
-6. **Refresh:** `ctrl+r` refreshes manually, and the selected folder plus all folders' unread counts are polled every `refresh_interval` (default 120s; confirmed). No IMAP IDLE in v1. New INBOX mail found by a refresh is announced (bell, OSC 9 desktop notification, window title); see [docs/notifications.md](docs/notifications.md).
+6. **Refresh:** `ctrl+r` refreshes manually, and the selected folder plus all folders' unread counts are polled every `refresh_interval` (default 120s; confirmed). INBOX is also watched with IMAP IDLE over a second connection per account when the server supports it, which triggers an immediate refresh; polling stays as the fallback. New INBOX mail found by a refresh is announced (bell, OSC 9 desktop notification, window title); see [docs/notifications.md](docs/notifications.md).
 7. **Delete moves mail to the Trash folder** without asking for confirmation, the way Gmail does. It's never a permanent expunge.
 8. **Archive moves mail to the account's archive folder.** That's the folder with IMAP's special-use marker `\Archive`, or else `\All` (Gmail's All Mail), unless `archive_folder` overrides it in config. If none of these exist, archive is disabled for that account and a message explains why.
 9. **Keybindings and themes are fixed in v1.** `keys.toml` and `themes/` are reserved names (and whitelisted in the config `.gitignore`) but aren't read yet.
@@ -161,7 +161,7 @@ type Mailbox interface {
 
 `Summary` carries UID, From, To, Subject, Date, Flags, Message-ID, In-Reply-To and References, which is all that threading needs. **Sending is implemented behind a separate `mail.Sender` interface** (SMTP), so `Mailbox` never had to change to add reply/compose. Drafts sit behind a second small interface, `mail.Drafter` (`SaveDraft`, `OpenDraft`), which `send.Sender` also implements; the UI uses it only for accounts that can send. Saving and removing drafts happen on the IMAP side through `DraftsFolder` and `Delete`, and `Delete` needs UIDPLUS so it never issues a plain `EXPUNGE`. See [tasks/smtp-spec.md](tasks/smtp-spec.md) for the sending design and [tasks/compose-plan.md](tasks/compose-plan.md) for the composer.
 
-There's **one IMAP connection per account**, opened lazily and serialized behind a mutex. All network calls run inside `tea.Cmd`s with a context timeout, so the UI never blocks.
+There's **one IMAP connection per account**, opened lazily and serialized behind a mutex. The IDLE watcher uses one more, watch-only connection per account. All network calls run inside `tea.Cmd`s with a context timeout, so the UI never blocks.
 
 ## Configuration
 
