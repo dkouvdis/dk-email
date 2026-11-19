@@ -13,10 +13,19 @@ type Count struct {
 }
 
 // Text is the announcement for counts, in order: "dk-email: 3 new in Work"
-// or "dk-email: 3 new in Work, 1 in Personal". It never names a sender or
+// or "dk-email: 3 new in Work, 1 in Personal", or "" when there is no new mail.
+func Text(counts []Count) string {
+	s := Summary(counts)
+	if s == "" {
+		return ""
+	}
+	return "dk-email: " + s
+}
+
+// Summary is Text without the "dk-email: " prefix. It never names a sender or
 // subject. Control characters in account names are dropped, since names come
 // from config and the text goes into an escape sequence.
-func Text(counts []Count) string {
+func Summary(counts []Count) string {
 	var parts []string
 	for _, c := range counts {
 		if c.New <= 0 {
@@ -37,7 +46,7 @@ func Text(counts []Count) string {
 	if len(parts) == 0 {
 		return ""
 	}
-	return "dk-email: " + strings.Join(parts, ", ")
+	return strings.Join(parts, ", ")
 }
 
 // Sequence is what to write to the terminal: an OSC 9 desktop notification

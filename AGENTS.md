@@ -72,6 +72,6 @@ Supporting modules:
 - `internal/mail` stays provider-agnostic and standard-library-only; IMAP-specific behavior belongs in `internal/mail/imap`.
 - IMAP client behavior is deliberate: one lazily opened connection per account, serialized calls, reconnect on a dropped connection or an expired session (a server `NO`/`BAD` on a reused connection is checked with a `LIST "" ""` probe), and context-driven cancellation. Drops and reconnects go to the debug log.
 - Threading behavior is deliberate: prefer header-based linkage, use subject fallback only for reply-like messages without references.
-- New-mail alerts are count only, never sender or subject. They are sent via `tea.Raw` from `finishRefresh` and skipped while the window has focus. User guide: `docs/notifications.md`.
+- New-mail alerts are count only, never sender or subject. They are sent via `tea.Raw` from `finishRefresh` and skipped while the window has focus only for the INBOX open on screen (mail for other accounts still alerts), and are also shown in the status line. User guide: `docs/notifications.md`.
 - Releases are tag-driven SemVer (`v*`) via GoReleaser; versions are injected via ldflags (no hardcoded version constants).
 - Commit messages follow Conventional Commits (`feat:`, `fix:`, etc.) because release notes are grouped/filtered from commit prefixes.

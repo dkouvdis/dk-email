@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -293,37 +294,50 @@ func TestAnnounce_WrapsForTmux(t *testing.T) {
 	}
 }
 
+// focus gives the window focus.
+func focus(m Model) Model {
+	next, _ := m.Update(tea.FocusMsg{})
+	return next.(Model)
+}
+
 func TestAnnounce_SilentWhileFocused(t *testing.T) {
 	f := newFixture()
-	m := started(t, f, 160, 30)
-	next, _ := m.Update(tea.FocusMsg{})
-	m = next.(Model)
-	addNewMail(f)
+	m := focus(started(t, f, 160, 30)) // Personal's INBOX is open
+	addNewMailTo(f, "personal")
 
 	m, raw := tickRaw(t, m)
 	if len(raw) != 0 {
 		t.Fatalf("focused: raw writes %q, want none", raw)
 	}
 
-	next, _ = m.Update(tea.BlurMsg{})
+	next, _ := m.Update(tea.BlurMsg{})
 	m = next.(Model)
-	addNewMail(f)
+	addNewMailTo(f, "personal")
 	if _, raw := tickRaw(t, m); len(raw) != 1 {
 		t.Errorf("blurred: got %d raw writes %q, want 1", len(raw), raw)
 	}
 }
 
+func addNewMailTo(f *fixture, which string) {
+	if which == "personal" {
+		f.personal.AddMessage("INBOX", msg("Zed", "One", fixedNow, false, "z1"))
+		f.personal.AddMessage("INBOX", msg("Zed", "Two", fixedNow, false, "z2"))
+		return
+	}
+	f.work.AddMessage("INBOX", msg("Boss", "Three", fixedNow, false, "w3"))
+}
+
 func TestAnnounce_KeyPressCountsAsFocus(t *testing.T) {
 	f := newFixture()
 	m := started(t, f, 160, 30)
-	addNewMail(f)
+	addNewMailTo(f, "personal")
 	m2, raw := tickRaw(t, m)
 	if len(raw) != 1 {
 		t.Fatalf("unfocused: got %d raw writes %q, want 1", len(raw), raw)
 	}
 
 	m2 = pressSettled(t, m2, "j")
-	addNewMail(f)
+	addNewMailTo(f, "personal")
 	if _, raw := tickRaw(t, m2); len(raw) != 0 {
 		t.Errorf("after key press: raw writes %q, want none", raw)
 	}
@@ -331,19 +345,145 @@ func TestAnnounce_KeyPressCountsAsFocus(t *testing.T) {
 
 func TestAnnounce_MailSeenWhileFocusedNeverAlertsLater(t *testing.T) {
 	f := newFixture()
-	m := started(t, f, 160, 30)
-	next, _ := m.Update(tea.FocusMsg{})
-	m = next.(Model)
-	addNewMail(f)
+	m := focus(started(t, f, 160, 30))
+	addNewMailTo(f, "personal")
 	m, raw := tickRaw(t, m)
 	if len(raw) != 0 {
 		t.Fatalf("focused: raw writes %q, want none", raw)
 	}
 
-	next, _ = m.Update(tea.BlurMsg{})
+	next, _ := m.Update(tea.BlurMsg{})
 	m = next.(Model)
 	if _, raw := tickRaw(t, m); len(raw) != 0 {
 		t.Errorf("after blur with no new mail: raw writes %q, want none", raw)
+	}
+}
+
+func TestAnnounce_FocusedOtherAccountStillAlerts(t *testing.T) {
+	f := newFixture()
+	m := focus(started(t, f, 160, 30))
+	addNewMailTo(f, "work")
+
+	m, raw := tickRaw(t, m)
+
+	if len(raw) != 1 || !strings.Contains(raw[0], "dk-email: 1 new in Work") || strings.Contains(raw[0], "Personal") {
+		t.Fatalf("raw writes %q, want one naming only Work", raw)
+	}
+	if m.status != "New mail: 1 new in Work" || m.notice != m.status {
+		t.Errorf("status = %q (notice %q), want the Work notice", m.status, m.notice)
+	}
+}
+
+func TestAnnounce_FocusedOpenInboxOnlyIsSilentWithoutNotice(t *testing.T) {
+	f := newFixture()
+	m := focus(started(t, f, 160, 30))
+	addNewMailTo(f, "personal")
+
+	m, raw := tickRaw(t, m)
+
+	if len(raw) != 0 || m.notice != "" || strings.Contains(m.status, "New mail") {
+		t.Errorf("raw = %q, status = %q (notice %q); want silence", raw, m.status, m.notice)
+	}
+}
+
+func TestAnnounce_FocusedNonInboxOpenStillAlerts(t *testing.T) {
+	f := newFixture()
+	m := started(t, f, 160, 30)
+	opened, cmd := m.openFolder(0, "Receipts")
+	m = focus(settle(t, opened, cmd))
+	addNewMailTo(f, "personal")
+
+	m, raw := tickRaw(t, m)
+
+	if len(raw) != 1 || !strings.Contains(raw[0], "2 new in Personal") {
+		t.Fatalf("raw writes %q, want one for Personal", raw)
+	}
+	if m.status != "New mail: 2 new in Personal" || m.notice != m.status {
+		t.Errorf("status = %q (notice %q), want the Personal notice", m.status, m.notice)
+	}
+}
+
+func TestAnnounce_BlurredOpenInboxAlertsAndNotes(t *testing.T) {
+	f := newFixture()
+	m := started(t, f, 160, 30)
+	next, _ := m.Update(tea.BlurMsg{})
+	m = next.(Model)
+	addNewMailTo(f, "personal")
+
+	m, raw := tickRaw(t, m)
+
+	if len(raw) != 1 || m.status != "New mail: 2 new in Personal" || m.notice != m.status {
+		t.Errorf("raw = %q, status = %q (notice %q); want alert and notice", raw, m.status, m.notice)
+	}
+}
+
+func TestAnnounce_NoticeShownWhenBellAndDesktopOff(t *testing.T) {
+	f := newFixture()
+	m := started(t, f, 160, 30)
+	m.notify.Bell = false
+	m.notify.Desktop = false
+	addNewMailTo(f, "personal")
+
+	m, raw := tickRaw(t, m)
+
+	if len(raw) != 0 || m.status != "New mail: 2 new in Personal" || m.notice != m.status {
+		t.Errorf("raw = %q, status = %q (notice %q); want a notice only", raw, m.status, m.notice)
+	}
+}
+
+func TestNotice_KeyPressClearsIt(t *testing.T) {
+	m := started(t, newFixture(), 160, 30)
+	m.setNotice("New mail: 1 new in Work")
+
+	m = pressSettled(t, m, "j")
+
+	if m.status != "" || m.notice != "" {
+		t.Errorf("status = %q (notice %q), want cleared", m.status, m.notice)
+	}
+}
+
+func TestNotice_NeverReplacesError(t *testing.T) {
+	m := started(t, newFixture(), 160, 30)
+	m.setError(errors.New("boom"))
+
+	m.setNotice("New mail: 1 new in Work")
+
+	if m.status != "boom" || !m.statusErr || m.notice != "" {
+		t.Errorf("status = %q (err %v, notice %q), want the error kept", m.status, m.statusErr, m.notice)
+	}
+}
+
+func TestNotice_SetStatusReplacesIt(t *testing.T) {
+	m := started(t, newFixture(), 160, 30)
+	m.setNotice("New mail: 1 new in Work")
+
+	m.setStatus("Saved.")
+
+	if m.status != "Saved." || m.status == m.notice {
+		t.Errorf("status = %q (notice %q), want plain Saved.", m.status, m.notice)
+	}
+}
+
+func TestNotice_DirectStatusAssignmentRendersPlain(t *testing.T) {
+	m := started(t, newFixture(), 160, 30)
+	m.setNotice("New mail: 1 new in Work")
+	m.status = "Sent."
+
+	got := m.renderStatus()
+	if want := m.styles.status.Render("Sent."); !strings.Contains(got, want) {
+		t.Errorf("status line %q lacks the normal style %q", got, want)
+	}
+}
+
+func TestNotice_RenderedInNoticeStyle(t *testing.T) {
+	m := started(t, newFixture(), 160, 30)
+	m.setNotice("New mail: 1 new in Work")
+	got := m.renderStatus()
+	if want := m.styles.statusNote.Render(m.status); !strings.Contains(got, want) {
+		t.Errorf("status line %q lacks the notice style %q", got, want)
+	}
+	if plain := m.styles.status.Render(m.status); strings.Contains(got, plain) {
+		t.Errorf("status line %q uses the dim style", got)
 	}
 }
 

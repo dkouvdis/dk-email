@@ -187,7 +187,9 @@ func (m Model) finishRefresh(cmd tea.Cmd, stale bool) (Model, tea.Cmd) {
 		if m.refresh.manual && m.status == "Refreshing…" {
 			m.setStatus("")
 		}
-		cmd = tea.Batch(cmd, m.announce())
+		var alert tea.Cmd
+		m, alert = m.announce()
+		cmd = tea.Batch(cmd, alert)
 		if m.refresh.rerun {
 			var more tea.Cmd
 			m.refresh.rerun = false
@@ -198,21 +200,29 @@ func (m Model) finishRefresh(cmd tea.Cmd, stale bool) (Model, tea.Cmd) {
 	return m, cmd
 }
 
-// announce rings the bell and sends a desktop notification for the new INBOX
-// mail this refresh found, or returns nil when there is none or both are off.
-func (m Model) announce() tea.Cmd {
+// announce reports the new INBOX mail this refresh found: it sets a status
+// notice and, when bell or desktop is on, returns the command that rings and
+// notifies. While the window has focus the account whose INBOX is open on
+// screen is left out, since its mail shows up in front of the user.
+func (m Model) announce() (Model, tea.Cmd) {
 	var counts []notify.Count
 	for i, a := range m.accts {
-		if n := m.refresh.newMail[m.ids[i]]; n > 0 {
-			counts = append(counts, notify.Count{Account: a.Name, New: n})
+		n := m.refresh.newMail[m.ids[i]]
+		if n <= 0 {
+			continue
 		}
+		if m.focused && i == m.open.account && !m.open.loading && m.side.Role(i, m.open.folder) == mail.RoleInbox {
+			continue
+		}
+		counts = append(counts, notify.Count{Account: a.Name, New: n})
 	}
 	if len(counts) == 0 {
-		return nil
+		return m, nil
 	}
 	m.log.Debug("new mail", "accounts", len(counts), "focused", m.focused)
-	if m.focused || (!m.notify.Bell && !m.notify.Desktop) {
-		return nil
+	m.setNotice("New mail: " + notify.Summary(counts))
+	if !m.notify.Bell && !m.notify.Desktop {
+		return m, nil
 	}
-	return tea.Raw(notify.Sequence(notify.Text(counts), m.notify.Bell, m.notify.Desktop, m.tmux))
+	return m, tea.Raw(notify.Sequence(notify.Text(counts), m.notify.Bell, m.notify.Desktop, m.tmux))
 }

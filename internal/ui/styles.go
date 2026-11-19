@@ -10,6 +10,7 @@ type styles struct {
 	pane, paneFocused lipgloss.Style
 	title, dim        lipgloss.Style
 	status, statusErr lipgloss.Style
+	statusNote        lipgloss.Style
 	hint              lipgloss.Style
 }
 
@@ -25,6 +26,7 @@ func newStyles(th theme.Theme) styles {
 		dim:         th.Muted,
 		status:      th.Muted,
 		statusErr:   th.Error,
+		statusNote:  th.Unread.Bold(true),
 		hint:        th.Hint,
 	}
 }

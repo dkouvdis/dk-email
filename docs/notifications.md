@@ -31,17 +31,19 @@ dk-email: 3 new in Work, 1 in Personal
 The alert is a count only. It never shows a sender or a subject, so nothing
 private appears on a locked screen or in a shared notification centre.
 
-There are three channels:
+There are four channels:
 
 | Channel | What it does |
 |---|---|
 | Bell | Sends a bell character (BEL) to the terminal. |
 | Desktop | Sends an OSC 9 escape sequence with the alert text. Terminals that support it turn it into a system notification. |
 | Title | Sets the window title to `dk-email (N)`, where N is the unread count across all INBOXes. At 0 it reads `dk-email`. |
+| Status line | Shows `New mail: 3 new in Work, 1 in Personal` in the unread colour until your next key press. |
 
-Bell and desktop alerts are skipped while the dk-email window has focus. Mail
-found while you were looking at the window isn't announced later. The title
-always updates.
+While the dk-email window has focus, mail arriving in the INBOX you're
+viewing doesn't alert, because you see it arrive. Mail for any other account
+or folder still does. Mail found while you were looking at it isn't announced
+later. The title always updates.
 
 dk-email learns about focus from the terminal (focus reporting). Any key
 press, click, scroll or paste also counts as being at the window, so

@@ -123,6 +123,7 @@ type Model struct {
 	files     fileOpener
 	status    string
 	statusErr bool
+	notice    string // the new-mail notice text; status is shown in the notice style only while it still equals it
 	// draft is the message being composed, nil when there is none; sending
 	// is set while it is being delivered and saving while it is being saved
 	// to Drafts. The composer popup edits draft.
@@ -208,9 +209,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.resize(msg.Width, msg.Height)
 	case tea.FocusMsg:
+		m.log.Debug("window focus")
 		m.focused = true
 		return m, nil
 	case tea.BlurMsg:
+		m.log.Debug("window blur")
 		m.focused = false
 		return m, nil
 	case tea.KeyPressMsg:
@@ -385,8 +388,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.log.Debug("quit")
 		return m, tea.Quit
 	}
-	if m.statusErr {
-		m.status, m.statusErr = "", false
+	if m.statusErr || (m.notice != "" && m.status == m.notice) {
+		m.status, m.statusErr, m.notice = "", false, ""
 	}
 	if m.showPicker {
 		return m.handlePickerKey(msg)
@@ -672,6 +675,8 @@ func (m Model) renderStatus() string {
 	style := m.styles.status
 	if m.statusErr {
 		style = m.styles.statusErr
+	} else if m.notice != "" && m.status == m.notice {
+		style = m.styles.statusNote
 	}
 	left := ansi.Truncate(style.Render(m.status), m.width-lipgloss.Width(right)-1, "…")
 	gap := max(m.width-lipgloss.Width(left)-lipgloss.Width(right), 0)
@@ -743,6 +748,14 @@ func (m Model) fitHints(hints, tail []key.Binding) string {
 func (m *Model) setStatus(s string) {
 	if !m.statusErr {
 		m.status = s
+	}
+}
+
+// setNotice shows a new-mail notice. Like setStatus it never replaces an
+// error; the next key press dismisses it.
+func (m *Model) setNotice(s string) {
+	if !m.statusErr {
+		m.status, m.notice = s, s
 	}
 }
 
