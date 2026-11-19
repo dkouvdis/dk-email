@@ -18,14 +18,14 @@ import (
 type Method string
 
 const (
-	MethodFolders   Method = "Folders"
-	MethodSummaries Method = "Summaries"
-	MethodSearch    Method = "Search"
-	MethodCountFrom Method = "CountFrom"
-	MethodMessage   Method = "Message"
-	MethodRaw       Method = "Raw"
-	MethodSetFlag   Method = "SetFlag"
-	MethodMove      Method = "Move"
+	MethodFolders    Method = "Folders"
+	MethodSummaries  Method = "Summaries"
+	MethodSearch     Method = "Search"
+	MethodUnreadFrom Method = "UnreadFrom"
+	MethodMessage    Method = "Message"
+	MethodRaw        Method = "Raw"
+	MethodSetFlag    Method = "SetFlag"
+	MethodMove       Method = "Move"
 )
 
 // Call records one Mailbox call for assertions.
@@ -244,9 +244,9 @@ func (f *Fake) Search(ctx context.Context, name string, q mail.SearchQuery, befo
 	return out, total, nil
 }
 
-// CountFrom counts the folder's messages with a UID of at least uid.
-func (f *Fake) CountFrom(ctx context.Context, name string, uid mail.UID) (int, error) {
-	if err := f.begin(ctx, Call{Method: MethodCountFrom, Folder: name, UIDs: []mail.UID{uid}}); err != nil {
+// UnreadFrom counts the folder's unread messages with a UID of at least uid.
+func (f *Fake) UnreadFrom(ctx context.Context, name string, uid mail.UID) (int, error) {
+	if err := f.begin(ctx, Call{Method: MethodUnreadFrom, Folder: name, UIDs: []mail.UID{uid}}); err != nil {
 		return 0, err
 	}
 	f.mu.Lock()
@@ -257,7 +257,7 @@ func (f *Fake) CountFrom(ctx context.Context, name string, uid mail.UID) (int, e
 	}
 	n := 0
 	for _, m := range fl.messages {
-		if m.UID >= uid {
+		if m.UID >= uid && !m.Seen {
 			n++
 		}
 	}

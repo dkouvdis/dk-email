@@ -45,9 +45,10 @@ banners without any OS-specific code, and it works over SSH.
 ## MVP Scope
 
 **Step 1: notify on poll**
-- New mail = INBOX messages at or above the last refresh's `UIDNEXT`
+- New mail = unread INBOX messages at or above the last refresh's `UIDNEXT`
   (counted with a UID search once `UIDNEXT` rises, since UIDs may have
-  gaps), minus messages dk-email itself moved into INBOX. The first refresh after
+  gaps), minus unread messages dk-email itself moved into INBOX. Read mail
+  moved into INBOX doesn't alert. The first refresh after
   connecting only sets the baseline. A `UIDVALIDITY` change resets it.
 - One alert per refresh round, covering all accounts:
   `dk-email: 3 new in Work, 1 in Personal`. Count only, never sender or

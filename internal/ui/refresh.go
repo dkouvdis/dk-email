@@ -71,7 +71,7 @@ func refreshAccount(mb mail.Mailbox, account, id int, folder string, inboxFrom m
 					continue
 				}
 				if f.UIDNext > inboxFrom {
-					if n, err := mb.CountFrom(ctx, f.Name, inboxFrom); err == nil {
+					if n, err := mb.UnreadFrom(ctx, f.Name, inboxFrom); err == nil {
 						msg.inboxCount = n
 					}
 				}

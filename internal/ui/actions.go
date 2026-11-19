@@ -245,7 +245,7 @@ func (m Model) startMove(targets []mail.Summary, to, label, verb string) (Model,
 	}
 	m.side = m.side.AdjustUnread(account, from, -msg.unread)
 	if msg.toInbox = m.side.Role(account, to) == mail.RoleInbox; msg.toInbox {
-		m.inbox.Moved(msg.id, len(msg.uids))
+		m.inbox.Moved(msg.id, msg.unread)
 	}
 	m.writes++
 	m.inflight++
@@ -265,7 +265,7 @@ func (m Model) handleMove(msg moveMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 	if msg.toInbox {
-		m.inbox.Moved(msg.id, -len(msg.uids))
+		m.inbox.Moved(msg.id, -msg.unread)
 	}
 	if m.open.account == msg.account && m.open.folder == msg.from {
 		m.list = m.list.Restore(msg.removed)

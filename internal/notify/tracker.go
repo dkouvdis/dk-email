@@ -29,8 +29,8 @@ func (t *Tracker) Since(id int) mail.UID {
 
 // Observe records an account's folders from the server and returns how many
 // messages arrived in its INBOX since the last observation, less the ones
-// dk-email moved there (see Moved). counted is how many INBOX messages have a
-// UID of at least from (see mail.Mailbox.CountFrom), or -1 when they weren't
+// dk-email moved there (see Moved). counted is how many unread INBOX messages
+// have a UID of at least from (see mail.Mailbox.UnreadFrom), or -1 when they weren't
 // counted. The first observation only sets the baseline.
 //
 // A UIDNEXT rise only triggers a count: servers may leave gaps in UIDs, so
@@ -67,8 +67,8 @@ func (t *Tracker) Observe(id int, folders []mail.Folder, from mail.UID, counted 
 	return n
 }
 
-// Moved records n messages dk-email moved into the account's INBOX, so the
-// UIDNEXT rise they cause isn't counted as new mail. A negative n undoes a
+// Moved records n unread messages dk-email moved into the account's INBOX, so
+// the UIDNEXT rise they cause isn't counted as new mail. A negative n undoes a
 // failed move; the total never goes below 0.
 func (t *Tracker) Moved(id, n int) {
 	t.moved[id] = max(t.moved[id]+n, 0)

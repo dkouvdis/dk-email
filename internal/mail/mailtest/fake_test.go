@@ -770,22 +770,22 @@ func TestDraftSender_KeepsAttachmentsWithoutAliasingData(t *testing.T) {
 	}
 }
 
-func TestCountFrom_CountsMessagesFromUID(t *testing.T) {
+func TestUnreadFrom_CountsMessagesFromUID(t *testing.T) {
 	f := inbox()
-	f.AddMessage("INBOX", msg("one", true))
-	f.AddMessage("INBOX", msg("two", true))
-	f.AddMessage("INBOX", msg("three", true))
+	f.AddMessage("INBOX", msg("one", false))
+	f.AddMessage("INBOX", msg("two", true)) // read: not counted
+	f.AddMessage("INBOX", msg("three", false))
 
-	for uid, want := range map[mail.UID]int{1: 3, 2: 2, 4: 0, 100: 0} {
-		got, err := f.CountFrom(ctx, "INBOX", uid)
+	for uid, want := range map[mail.UID]int{1: 2, 2: 1, 3: 1, 4: 0, 100: 0} {
+		got, err := f.UnreadFrom(ctx, "INBOX", uid)
 		if err != nil || got != want {
-			t.Errorf("CountFrom(%d) = %d, %v; want %d", uid, got, err, want)
+			t.Errorf("UnreadFrom(%d) = %d, %v; want %d", uid, got, err, want)
 		}
 	}
-	if c := f.Calls(); c[len(c)-1].Method != MethodCountFrom {
-		t.Errorf("last call = %v, want CountFrom", c[len(c)-1])
+	if c := f.Calls(); c[len(c)-1].Method != MethodUnreadFrom {
+		t.Errorf("last call = %v, want UnreadFrom", c[len(c)-1])
 	}
-	if _, err := f.CountFrom(ctx, "Nope", 1); !errors.Is(err, mail.ErrFolderNotFound) {
+	if _, err := f.UnreadFrom(ctx, "Nope", 1); !errors.Is(err, mail.ErrFolderNotFound) {
 		t.Errorf("unknown folder error = %v, want ErrFolderNotFound", err)
 	}
 }

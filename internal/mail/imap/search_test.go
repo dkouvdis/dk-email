@@ -277,7 +277,7 @@ func TestSearchCriteria_SkipsUnknownKinds(t *testing.T) {
 	}
 }
 
-func TestCountFrom_CountsOnlyUIDsFromTheGivenOne(t *testing.T) {
+func TestUnreadFrom_CountsOnlyUIDsFromTheGivenOne(t *testing.T) {
 	srv := startServer(t, modeImplicit, capsListStatus)
 	srv.seedBulk(t, "Count", 3) // UIDs 1..3, UIDNEXT 4
 	c := srv.newClient(t, modeImplicit)
@@ -285,34 +285,50 @@ func TestCountFrom_CountsOnlyUIDsFromTheGivenOne(t *testing.T) {
 
 	count := func(uid mail.UID) int {
 		t.Helper()
-		n, err := c.CountFrom(ctx, "Count", uid)
+		n, err := c.UnreadFrom(ctx, "Count", uid)
 		if err != nil {
-			t.Fatalf("CountFrom(%d) error = %v", uid, err)
+			t.Fatalf("UnreadFrom(%d) error = %v", uid, err)
 		}
 		return n
 	}
 
 	if got := count(4); got != 0 {
-		t.Errorf("CountFrom(UIDNEXT) = %d, want 0 (uid:* matches the last message, which is below it)", got)
+		t.Errorf("UnreadFrom(UIDNEXT) = %d, want 0 (uid:* matches the last message, which is below it)", got)
 	}
 	if got := count(100); got != 0 {
-		t.Errorf("CountFrom(100) = %d, want 0", got)
+		t.Errorf("UnreadFrom(100) = %d, want 0", got)
 	}
 	if got := count(2); got != 2 {
-		t.Errorf("CountFrom(2) = %d, want 2", got)
+		t.Errorf("UnreadFrom(2) = %d, want 2", got)
 	}
 	srv.appendRaw(t, "Count", "Message-ID: <c4@example.com>\nSubject: Four\n\nx\n", day(4))
 	srv.appendRaw(t, "Count", "Message-ID: <c5@example.com>\nSubject: Five\n\nx\n", day(5))
 	if got := count(4); got != 2 {
-		t.Errorf("CountFrom(4) after two appends = %d, want 2", got)
+		t.Errorf("UnreadFrom(4) after two appends = %d, want 2", got)
 	}
 }
 
-func TestCountFrom_UnknownFolder(t *testing.T) {
+func TestUnreadFrom_SkipsReadMessages(t *testing.T) {
+	srv := startServer(t, modeImplicit, capsListStatus)
+	srv.createMailbox(t, "Unread")
+	for i, flags := range [][]goimap.Flag{nil, {goimap.FlagSeen}, nil} {
+		raw := fmt.Sprintf("Message-ID: <u%d@example.com>\nSubject: m%d\n\nx\n", i, i)
+		srv.appendRaw(t, "Unread", raw, day(i+1), flags...)
+	}
+	c := srv.newClient(t, modeImplicit)
+
+	n, err := c.UnreadFrom(timeoutCtx(t, 10*time.Second), "Unread", 1)
+
+	if err != nil || n != 2 {
+		t.Errorf("UnreadFrom(1) = %d, %v; want 2 (one of three is \\Seen)", n, err)
+	}
+}
+
+func TestUnreadFrom_UnknownFolder(t *testing.T) {
 	srv := startServer(t, modeImplicit, capsListStatus)
 	c := srv.newClient(t, modeImplicit)
 
-	_, err := c.CountFrom(timeoutCtx(t, 10*time.Second), "Nope", 1)
+	_, err := c.UnreadFrom(timeoutCtx(t, 10*time.Second), "Nope", 1)
 
 	if !errors.Is(err, mail.ErrFolderNotFound) {
 		t.Errorf("error = %v, want ErrFolderNotFound", err)

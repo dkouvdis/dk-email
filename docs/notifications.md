@@ -16,10 +16,11 @@ dk-email notices new mail right away through push (IMAP IDLE) when the
 server supports it, and otherwise on every refresh: each `refresh_interval`
 (default `120s`) and when you press `ctrl+r`. See [Push](#push).
 
-New mail means messages that arrived in an account's INBOX since the last
-refresh. Mail that dk-email itself moves into the INBOX doesn't count, the
-first refresh after connecting never alerts, and other folders are never
-announced.
+New mail means unread messages that arrived in an account's INBOX since the
+last refresh. Read mail moved into the INBOX (for example restored from Bin,
+in dk-email or any other client) doesn't alert, nor does mail dk-email itself
+moves there. The first refresh after connecting never alerts, and other
+folders are never announced.
 
 There is one alert per refresh, covering all accounts:
 

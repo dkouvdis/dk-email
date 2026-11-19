@@ -49,7 +49,7 @@ Data/control flow:
 
 Supporting modules:
 
-- `internal/notify`: pure, no I/O. Counts new INBOX mail per account (a UIDNEXT rise triggers a `CountFrom` UID search, since UIDs may have gaps), builds the count-only alert text and the bell/OSC 9 sequences.
+- `internal/notify`: pure, no I/O. Counts new INBOX mail per account (a UIDNEXT rise triggers an `UnreadFrom` UID search for unread messages, since UIDs may have gaps), builds the count-only alert text and the bell/OSC 9 sequences.
 - `internal/search`: pure parsing of Gmail-style filter input into `mail.SearchQuery`; it never errors, and unknown input falls back to plain text.
 - `internal/thread`: pure threading logic (union-find over Message-ID / References with constrained subject fallback).
 - `internal/render`: MIME parsing + HTML-to-markdown rendering (email cruft stripped first; junk text/plain parts fall back to HTML) + Glamour styling of HTML-derived bodies (plain text is only wrapped) + attachment extraction (it also exposes attachment `Parts` with bytes for forwarding).
