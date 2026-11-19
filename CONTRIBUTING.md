@@ -52,5 +52,5 @@ git push origin v0.1.0-beta.1
   update the Homebrew tap.
 - A stable tag such as `v0.1.0` also pushes the updated cask to
   `dkouvdis/homebrew-tap`.
-- Homebrew installs download the release assets, so `brew install` only
-  works once this repository is public.
+- Homebrew installs download the release assets from this public
+  repository, so a release is installable as soon as the cask is pushed.

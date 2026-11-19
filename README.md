@@ -54,7 +54,7 @@ On first run with no accounts, the connect popup opens and walks you through add
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development and releases. The spec is in [SPEC.md](SPEC.md) and the task plan in [tasks/](tasks/).
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development and releases, and [SECURITY.md](SECURITY.md) to report a vulnerability privately. The spec is in [SPEC.md](SPEC.md) and the task plan in [tasks/](tasks/).
 
 ## Licence
 
