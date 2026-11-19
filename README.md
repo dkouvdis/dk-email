@@ -10,7 +10,7 @@ A keyboard-driven terminal email client for triaging several IMAP accounts (Gmai
 - Reads passwords from 1Password (`op read`), any other command, or the OS keychain. They are never stored in a plain-text file.
 - Signs in to Microsoft 365, Outlook.com and Google with **OAuth 2.0** (`XOAUTH2` over IMAP and SMTP), using your own app registration. Tokens live in the OS keychain and refresh on their own. See [Signing in with OAuth 2.0](docs/oauth.md).
 - Attaches files in the composer (`ctrl+o`, or drag and drop files onto the terminal) and opens attachments with `o` in the reader: saved to Downloads, then opened with the system's default app. See [Attachments](docs/attachments.md).
-- Announces new INBOX mail with a bell, a desktop notification and the unread count in the window title, as a count only and never while the window has focus. See [New-mail notifications](docs/notifications.md).
+- Announces new INBOX mail with a bell, a desktop notification and the unread count in the window title, as a count only, pushed within seconds over IMAP IDLE. While you're looking at an INBOX, mail arriving there doesn't alert. See [New-mail notifications](docs/notifications.md).
 
 v0.x is a personal tool: it reads, triages and sends mail. Nothing is cached on disk.
 
@@ -22,11 +22,34 @@ v0.x is a personal tool: it reads, triages and sends mail. Nothing is cached on 
 brew install dkouvdis/tap/dk-email
 ```
 
-The binaries aren't signed by Apple. The cask removes macOS's quarantine flag on install, but if macOS still says the binary "is damaged" or "can't be opened", clear the flag yourself:
+That one command is all you need. It taps `dkouvdis/homebrew-tap` on first use, and `brew upgrade dk-email` picks up new releases. Keep the tap: `brew untap` stops upgrades.
+
+dk-email is published as a cask with builds for macOS and Linux, on Intel/AMD and ARM.
+
+- **macOS:** the binaries aren't signed by Apple. The cask removes macOS's quarantine flag on install, so dk-email opens straight away. If macOS still says the binary "is damaged" or "can't be opened", clear the flag yourself:
+
+  ```sh
+  xattr -d com.apple.quarantine "$(which dk-email)"
+  ```
+
+- **Linux:** this needs a Homebrew that installs casks on Linux. Run `brew update` first; if Homebrew still refuses the cask, use the release archive below.
+
+### Release archive (Linux, macOS)
+
+Each [release](https://github.com/dkouvdis/dk-email/releases) has a `tar.gz` per system: `dk-email_<version>_<os>_<arch>.tar.gz`, with `os` `linux` or `darwin` and `arch` `amd64` (Intel/AMD) or `arm64`. For example, on 64-bit Intel/AMD Linux:
 
 ```sh
-xattr -d com.apple.quarantine "$(which dk-email)"
+VERSION=0.1.0
+curl -fsSLO "https://github.com/dkouvdis/dk-email/releases/download/v${VERSION}/dk-email_${VERSION}_linux_amd64.tar.gz"
+curl -fsSLO "https://github.com/dkouvdis/dk-email/releases/download/v${VERSION}/checksums.txt"
+sha256sum --check --ignore-missing checksums.txt
+tar -xzf "dk-email_${VERSION}_linux_amd64.tar.gz" dk-email
+install -m 755 dk-email ~/.local/bin/
 ```
+
+Use `linux_arm64` on ARM (for example a Raspberry Pi 4 or 5 with a 64-bit OS). Any directory on your `PATH` works instead of `~/.local/bin`. The binary is static, so there's nothing else to install. On macOS, use `shasum -a 256 --check --ignore-missing checksums.txt` and clear the quarantine flag as above.
+
+While the repository is private, `curl` can't download release files; use `gh release download v${VERSION} --repo dkouvdis/dk-email --pattern '*linux_amd64*' --pattern checksums.txt` instead.
 
 ### Go
 
