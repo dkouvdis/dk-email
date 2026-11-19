@@ -22,12 +22,6 @@ must keep possible.
 
 ## High Priority
 
-- **Tag `v0.1.0`**: `v0.1.0-rc.4` is out. After tagging,
-  `brew install dkouvdis/tap/dk-email && dk-email --version` should print
-  `dk-email 0.1.0 (…)`, which is the last open success criterion in
-  `SPEC.md`. The finished v0.1.0 plan and task list are in git history
-  (`tasks/plan.md`, `tasks/todo.md`, removed after `5ff77cd`).
-
 - **Undo for delete, archive and move**: `d` deletes without confirmation by
   design, so offer a short undo (e.g. `z` within a few seconds). The
   optimistic updates in `internal/ui/actions.go` already keep what's needed to
