@@ -60,13 +60,13 @@ Plan: [notifications-plan.md](notifications-plan.md) · Spec: [notifications-spe
 **Description:** In `internal/notify`, add `Text(counts)` that builds `dk-email: 3 new in Work, 1 in Personal` from per-account counts in account order (`dk-email: 1 new in Work` for one), and `Sequence(text string, bell, desktop bool, tmux bool) string`, which returns `\a` and/or OSC 9 (`ESC ] 9 ; text BEL`), wrapped for tmux passthrough (`ESC P tmux; …ESC\`, inner `ESC` doubled) when `tmux` is true. Strip control characters from the text, since account names come from config. In `finishRefresh`, when the round's total is above 0, send `tea.Raw(notify.Sequence(...))` using the `[notify]` settings and `os.Getenv("TMUX") != ""` (read once in `New`). Never put sender, subject or any message content in the text.
 
 **Acceptance criteria:**
-- [ ] `Text` and `Sequence` table tests cover one and several accounts, bell only, desktop only, both, tmux wrapping, and a name with control characters.
-- [ ] A UI test with 2 new in one account and 1 in another emits exactly one `tea.RawMsg` for the round, containing `dk-email: 2 new in Work, 1 in Personal`.
-- [ ] A round with 0 new, or with `bell` and `desktop` both off, emits nothing.
+- [x] `Text` and `Sequence` table tests cover one and several accounts, bell only, desktop only, both, tmux wrapping, and a name with control characters.
+- [x] A UI test with 2 new in one account and 1 in another emits exactly one `tea.RawMsg` for the round, containing `dk-email: 2 new in Personal, 1 in Work`.
+- [x] A round with 0 new, or with `bell` and `desktop` both off, emits nothing.
 
 **Verification:**
-- [ ] Tests pass: `go test -race ./internal/notify ./internal/ui`
-- [ ] Build succeeds: `go build -o bin/dk-email ./cmd/dk-email`
+- [x] Tests pass: `go test -race ./internal/notify ./internal/ui`
+- [x] Build succeeds: `go build -o bin/dk-email ./cmd/dk-email`
 - [ ] Manual check: in Ghostty, switch to another app, send yourself mail, press nothing; within `refresh_interval` a banner shows `dk-email: 1 new in <account>` and the bell fires. Repeat in iTerm2 and in tmux with `allow-passthrough on`.
 
 **Dependencies:** Task 1, Task 2

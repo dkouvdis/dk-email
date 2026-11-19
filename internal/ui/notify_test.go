@@ -1,8 +1,10 @@
 package ui
 
 import (
+	"strings"
 	"testing"
 
+	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/dkouvdis/dk-email/internal/mail/mailtest"
@@ -137,5 +139,91 @@ func TestNewMail_MailDeliveredDuringStaleRoundIsCountedNext(t *testing.T) {
 
 	if got := m.refresh.newMail[m.ids[0]]; got != 1 {
 		t.Errorf("Personal newMail = %d, want 1", got)
+	}
+}
+
+// tickRaw runs one refresh tick to completion like tickSettled and returns
+// the model with every tea.RawMsg the commands produced.
+func tickRaw(t *testing.T, m Model) (Model, []string) {
+	t.Helper()
+	next, cmd := m.Update(refreshTickMsg{})
+	m = next.(Model)
+	var raw []string
+	queue := []tea.Cmd{cmd}
+	for len(queue) > 0 {
+		c := queue[0]
+		queue = queue[1:]
+		if c == nil {
+			continue
+		}
+		switch msg := c().(type) {
+		case nil, spinner.TickMsg:
+		case tea.BatchMsg:
+			queue = append(queue, msg...)
+		case tea.RawMsg:
+			s, _ := msg.Msg.(string)
+			raw = append(raw, s)
+		default:
+			next, nc := m.Update(msg)
+			m = next.(Model)
+			queue = append(queue, nc)
+		}
+	}
+	return m, raw
+}
+
+func addNewMail(f *fixture) {
+	f.personal.AddMessage("INBOX", msg("Zed", "One", fixedNow, false, "z1"))
+	f.personal.AddMessage("INBOX", msg("Zed", "Two", fixedNow, false, "z2"))
+	f.work.AddMessage("INBOX", msg("Boss", "Three", fixedNow, false, "w3"))
+}
+
+func TestAnnounce_NewMailWritesOneBellAndDesktopNotification(t *testing.T) {
+	f := newFixture()
+	m := started(t, f, 160, 30)
+	addNewMail(f)
+
+	_, raw := tickRaw(t, m)
+
+	if len(raw) != 1 {
+		t.Fatalf("got %d raw writes %q, want 1", len(raw), raw)
+	}
+	for _, want := range []string{"dk-email: 2 new in Personal, 1 in Work", "\a", "\x1b]9;"} {
+		if !strings.Contains(raw[0], want) {
+			t.Errorf("raw write %q missing %q", raw[0], want)
+		}
+	}
+}
+
+func TestAnnounce_SilentWithoutNewMail(t *testing.T) {
+	m := started(t, newFixture(), 160, 30)
+
+	if _, raw := tickRaw(t, m); len(raw) != 0 {
+		t.Errorf("raw writes %q, want none", raw)
+	}
+}
+
+func TestAnnounce_SilentWhenBellAndDesktopOff(t *testing.T) {
+	f := newFixture()
+	m := started(t, f, 160, 30)
+	m.notify.Bell = false
+	m.notify.Desktop = false
+	addNewMail(f)
+
+	if _, raw := tickRaw(t, m); len(raw) != 0 {
+		t.Errorf("raw writes %q, want none", raw)
+	}
+}
+
+func TestAnnounce_WrapsForTmux(t *testing.T) {
+	f := newFixture()
+	m := started(t, f, 160, 30)
+	m.tmux = true
+	addNewMail(f)
+
+	_, raw := tickRaw(t, m)
+
+	if len(raw) != 1 || !strings.HasPrefix(raw[0], "\x1bPtmux;") {
+		t.Errorf("raw writes %q, want one starting with the tmux passthrough", raw)
 	}
 }

@@ -9,6 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/dkouvdis/dk-email/internal/mail"
+	"github.com/dkouvdis/dk-email/internal/notify"
 )
 
 const refreshTimeout = 60 * time.Second
@@ -165,6 +166,7 @@ func (m Model) finishRefresh(cmd tea.Cmd, stale bool) (Model, tea.Cmd) {
 		if m.refresh.manual && m.status == "Refreshing…" {
 			m.setStatus("")
 		}
+		cmd = tea.Batch(cmd, m.announce())
 		if m.refresh.rerun {
 			var more tea.Cmd
 			m.refresh.rerun = false
@@ -173,4 +175,23 @@ func (m Model) finishRefresh(cmd tea.Cmd, stale bool) (Model, tea.Cmd) {
 		}
 	}
 	return m, cmd
+}
+
+// announce rings the bell and sends a desktop notification for the new INBOX
+// mail this refresh found, or returns nil when there is none or both are off.
+func (m Model) announce() tea.Cmd {
+	var counts []notify.Count
+	for i, a := range m.accts {
+		if n := m.refresh.newMail[m.ids[i]]; n > 0 {
+			counts = append(counts, notify.Count{Account: a.Name, New: n})
+		}
+	}
+	if len(counts) == 0 {
+		return nil
+	}
+	m.log.Debug("new mail", "accounts", len(counts))
+	if !m.notify.Bell && !m.notify.Desktop {
+		return nil
+	}
+	return tea.Raw(notify.Sequence(notify.Text(counts), m.notify.Bell, m.notify.Desktop, m.tmux))
 }

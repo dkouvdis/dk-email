@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 	"runtime"
 	"slices"
 	"strings"
@@ -58,6 +59,7 @@ type Model struct {
 	notify config.Notify
 	// inbox counts new INBOX mail per account from server results.
 	inbox   *notify.Tracker
+	tmux    bool // inside tmux, so OSC 9 needs passthrough
 	accts   []config.Account
 	connect Connector
 	// boxes holds each account's mailbox once connected, by account index.
@@ -146,6 +148,7 @@ func New(cfg config.Config, connect Connector, log *slog.Logger) Model {
 		ui:            cfg.UI,
 		notify:        cfg.Notify,
 		inbox:         notify.NewTracker(),
+		tmux:          os.Getenv("TMUX") != "",
 		accts:         slices.Clone(cfg.Accounts),
 		connect:       connect,
 		boxes:         make([]mail.Mailbox, len(cfg.Accounts)),
