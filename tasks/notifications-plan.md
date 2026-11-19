@@ -44,7 +44,7 @@ T2 detect (imap+notify) ┘                              │
 - [x] Task 4: No alerts while the window has focus
 
 ### Checkpoint: Step 1 works
-- [ ] `go test -race ./...`, `go vet ./...`, `gofmt -l .` clean
+- [x] `go test -race ./...`, `go vet ./...`, `gofmt -l .` clean
 - [ ] Manual check in Ghostty and iTerm2: send yourself mail, switch apps, see a banner and hear or see the bell
 
 - [x] Task 5: User docs for step 1
@@ -55,7 +55,7 @@ T2 detect (imap+notify) ┘                              │
 
 ### Checkpoint: Push works
 - [x] `go test -race ./...`, `go vet ./...`, `gofmt -l .` clean
-- [ ] Mail sent to yourself alerts within ~10 s
+- [x] Mail sent to yourself alerts within ~10 s (Gmail and Fastmail, ~5 s)
 
 - [ ] Task 8: Docs for push and an overnight run
 

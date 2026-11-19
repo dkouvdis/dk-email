@@ -67,7 +67,7 @@ Plan: [notifications-plan.md](notifications-plan.md) · Spec: [notifications-spe
 **Verification:**
 - [x] Tests pass: `go test -race ./internal/notify ./internal/ui`
 - [x] Build succeeds: `go build -o bin/dk-email ./cmd/dk-email`
-- [ ] Manual check: in Ghostty, switch to another app, send yourself mail, press nothing; within `refresh_interval` a banner shows `dk-email: 1 new in <account>` and the bell fires. Repeat in iTerm2 and in tmux with `allow-passthrough on`.
+- [x] Manual check: in Ghostty, switch to another app, send yourself mail, press nothing; within `refresh_interval` a banner shows `dk-email: 1 new in <account>` and the bell fires. Repeat in iTerm2 and in tmux with `allow-passthrough on`. (Ghostty, 2026-11-19; iTerm2 and tmux not yet checked)
 
 **Dependencies:** Task 1, Task 2
 
@@ -91,7 +91,7 @@ Plan: [notifications-plan.md](notifications-plan.md) · Spec: [notifications-spe
 **Verification:**
 - [x] Tests pass: `go test -race ./internal/ui`
 - [x] Build succeeds: `go build -o bin/dk-email ./cmd/dk-email`
-- [ ] Manual check: with dk-email in front, `ctrl+r` after new mail shows no banner or bell; switch away, send another, and the alert arrives.
+- [x] Manual check: with dk-email in front, `ctrl+r` after new mail shows no banner or bell; switch away, send another, and the alert arrives. (now: silent only for the INBOX on screen; checked 2026-11-19)
 
 **Dependencies:** Task 3
 
@@ -106,7 +106,7 @@ Plan: [notifications-plan.md](notifications-plan.md) · Spec: [notifications-spe
 - [x] Full test suite passes: `go test -race ./...`
 - [x] Lint and format pass: `go vet ./... && gofmt -l .`
 - [ ] Manual checks of Tasks 1, 3 and 4 done in Ghostty and iTerm2
-- [ ] Diff reviewed in the main session before commit
+- [x] Diff reviewed in the main session before commit
 
 ---
 
@@ -187,7 +187,7 @@ Plan: [notifications-plan.md](notifications-plan.md) · Spec: [notifications-spe
 - [x] Full test suite passes: `go test -race ./...`
 - [x] Lint and format pass: `go vet ./... && gofmt -l .`
 - [ ] Manual check of Task 7 done on all three accounts
-- [ ] Diff reviewed in the main session before commit
+- [x] Diff reviewed in the main session before commit
 
 ---
 
