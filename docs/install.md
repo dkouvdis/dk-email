@@ -58,8 +58,7 @@ binary is static, so there's nothing else to install. On macOS, use
 `shasum -a 256 --check --ignore-missing checksums.txt` and clear the
 quarantine flag as [above](#homebrew-macos-linux).
 
-While the repository is private, `curl` can't download release files; use
-this instead:
+With the GitHub CLI, `gh release download` fetches the same files:
 
 ```sh
 gh release download v${VERSION} --repo dkouvdis/dk-email --pattern '*linux_amd64*' --pattern checksums.txt
@@ -72,9 +71,6 @@ Requires Go 1.27 or later.
 ```sh
 go install github.com/dkouvdis/dk-email/cmd/dk-email@latest
 ```
-
-While the repository is private, set `GOPRIVATE=github.com/dkouvdis/dk-email`
-and make sure `git` can authenticate to GitHub.
 
 ## From source
 
