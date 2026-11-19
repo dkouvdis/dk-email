@@ -76,10 +76,10 @@ func (m Model) startRefresh(manual bool) (Model, tea.Cmd) {
 	return m.refreshAccounts(manual, -1)
 }
 
-// refreshAfterDraft brings account up to date after a draft was saved or
-// sent, which changes its Drafts folder. A refresh already running may have
-// read the folder before that, so it is followed by another one.
-func (m Model) refreshAfterDraft(account int) (Model, tea.Cmd) {
+// refreshSoon brings account up to date because something changed on the
+// server (a draft saved or sent, new mail pushed). A refresh already running
+// may have read the account before that, so it is followed by another one.
+func (m Model) refreshSoon(account int) (Model, tea.Cmd) {
 	if m.refresh.pending > 0 {
 		m.refresh.rerun = true
 		return m, nil

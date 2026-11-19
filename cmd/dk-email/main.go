@@ -195,7 +195,7 @@ func dial(ctx context.Context, acct config.Account, creds mail.Credentials, log 
 	if err != nil {
 		return ui.Conn{}, err
 	}
-	conn := ui.Conn{Mailbox: c}
+	conn := ui.Conn{Mailbox: c, Watcher: imap.NewWatcher(acct, creds, log)}
 	if strings.TrimSpace(acct.SMTPHost) != "" {
 		conn.Sender = send.New(acct, smtp.NewWithCredentials(acct, creds), c, log)
 	}

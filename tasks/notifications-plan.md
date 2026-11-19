@@ -51,10 +51,10 @@ T2 detect (imap+notify) ┘                              │
 
 ### Phase 2: IDLE push
 - [x] Task 6: `imap.Watcher` waits for new INBOX mail over its own connection
-- [ ] Task 7: The UI refreshes an account when its watcher wakes
+- [x] Task 7: The UI refreshes an account when its watcher wakes
 
 ### Checkpoint: Push works
-- [ ] `go test -race ./...`, `go vet ./...`, `gofmt -l .` clean
+- [x] `go test -race ./...`, `go vet ./...`, `gofmt -l .` clean
 - [ ] Mail sent to yourself alerts within ~10 s
 
 - [ ] Task 8: Docs for push and an overnight run

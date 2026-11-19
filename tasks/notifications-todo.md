@@ -163,14 +163,14 @@ Plan: [notifications-plan.md](notifications-plan.md) · Spec: [notifications-spe
 **Description:** Add `Watcher mail.Watcher` to `ui.Conn`; `cmd/dk-email`'s `dial` builds an `imap.Watcher` with the same credentials and logger (nil in tests that don't need one). When an account connects, `Model` starts `waitInbox(watcher, account, id, ctx)`, a `tea.Cmd` that calls `Wait(ctx, "INBOX")` and returns `inboxMsg{account, id, err}`. On nil: refresh that account through the `refresh.rerun` path (so a running refresh is followed by another), then wait again. On `mail.ErrUnsupported`: debug-log and stop for that account. On any other error: debug-log and wait again after a backoff of 30s, doubling up to 5 minutes, reset after a success. Each account's wait has a cancel func, called when the account is removed, replaced or reconnected, and in `Model.Close`, which also closes the watchers.
 
 **Acceptance criteria:**
-- [ ] A fake watcher that returns nil leads to exactly one refresh of that account and a new wait; while a refresh is running it leads to a rerun, not a dropped refresh.
-- [ ] Errors back off 30s, 60s, … up to 5 min (via the injectable `every`/tick), and a success resets it; `ErrUnsupported` stops the waits.
-- [ ] Removing or replacing an account cancels its wait, and a late `inboxMsg` for it is ignored (matched by `id`).
-- [ ] `cmd/dk-email` connector tests show a `Watcher` on successful dials.
+- [x] A fake watcher that returns nil leads to exactly one refresh of that account and a new wait; while a refresh is running it leads to a rerun, not a dropped refresh.
+- [x] Errors back off 30s, 60s, … up to 5 min (via the injectable `after`), and a success resets it; `ErrUnsupported` stops the waits.
+- [x] Removing or replacing an account cancels its wait, and a late `inboxMsg` for it is ignored (matched by `id`).
+- [x] `cmd/dk-email` connector tests show a `Watcher` on successful dials.
 
 **Verification:**
-- [ ] Tests pass: `go test -race ./internal/ui ./cmd/dk-email`
-- [ ] Build succeeds: `go build -o bin/dk-email ./cmd/dk-email`
+- [x] Tests pass: `go test -race ./internal/ui ./cmd/dk-email`
+- [x] Build succeeds: `go build -o bin/dk-email ./cmd/dk-email`
 - [ ] Manual check: with `refresh_interval = "30m"`, send yourself mail with dk-email in the background; the alert arrives within ~10 s for Gmail, Fastmail and Proton Bridge.
 
 **Dependencies:** Task 4, Task 6
@@ -184,8 +184,8 @@ Plan: [notifications-plan.md](notifications-plan.md) · Spec: [notifications-spe
 ---
 
 ## Checkpoint: Push works
-- [ ] Full test suite passes: `go test -race ./...`
-- [ ] Lint and format pass: `go vet ./... && gofmt -l .`
+- [x] Full test suite passes: `go test -race ./...`
+- [x] Lint and format pass: `go vet ./... && gofmt -l .`
 - [ ] Manual check of Task 7 done on all three accounts
 - [ ] Diff reviewed in the main session before commit
 
@@ -196,7 +196,7 @@ Plan: [notifications-plan.md](notifications-plan.md) · Spec: [notifications-spe
 **Description:** Add a "Push" section to `docs/notifications.md`: IDLE is used automatically when the server supports it, it opens one extra connection per account, polling stays as the fallback, and the debug log shows watcher dials and drops. Update SPEC.md decision 6 ("No IMAP IDLE in v1" → push via IDLE on INBOX), AGENTS.md (the watcher connection beside the serialized `Client`, and `mail.Watcher`), and the `password_cmd` cache entry in `tasks/future-plans.md`. Then leave dk-email open overnight with `DK_EMAIL_DEBUG=1` and read the watcher lines in `debug.log`.
 
 **Acceptance criteria:**
-- [ ] Docs, SPEC.md and AGENTS.md describe push as built.
+- [x] Docs, SPEC.md and AGENTS.md describe push as built.
 - [ ] After an overnight run, mail sent in the morning alerts within seconds for each account, or the log shows why not and a follow-up is recorded in `tasks/future-plans.md`.
 
 **Verification:**

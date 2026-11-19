@@ -174,10 +174,8 @@ func editTest(parent context.Context, o Onboarding, gen, index int, old config.A
 	acct := editedAccount(old, req)
 	res := editedMsg{gen: gen, index: index, oldName: old.Name, acct: acct}
 	fail := func(err error) tea.Msg {
-		if res.conn.Mailbox != nil {
-			_ = res.conn.Mailbox.Close()
-			res.conn = Conn{}
-		}
+		closeConn(res.conn)
+		res.conn = Conn{}
 		res.err, res.took = err, time.Since(start)
 		return res
 	}
@@ -271,9 +269,7 @@ func (m Model) handleEdited(msg editedMsg) (Model, tea.Cmd) {
 	}
 	live := msg.gen == m.connectGen && m.showConnect && m.editFor == msg.index
 	if msg.err != nil {
-		if msg.conn.Mailbox != nil {
-			_ = msg.conn.Mailbox.Close()
-		}
+		closeConn(msg.conn)
 		m.log.Debug("edit", "account", msg.oldName, "ok", false, "anyway", msg.anyway, "took", msg.took.Round(time.Millisecond))
 		if live {
 			m.connectPop.SetBusy(false)
@@ -289,9 +285,7 @@ func (m Model) handleEdited(msg editedMsg) (Model, tea.Cmd) {
 	// config has changed, and the next edit would otherwise find a stale name.
 	i := msg.index
 	if i < 0 || i >= len(m.accts) || m.accts[i].Name != msg.oldName {
-		if msg.conn.Mailbox != nil {
-			_ = msg.conn.Mailbox.Close()
-		}
+		closeConn(msg.conn)
 		return m, nil
 	}
 	m.log.Debug("edit", "account", msg.oldName, "ok", true, "anyway", msg.anyway, "took", msg.took.Round(time.Millisecond))
@@ -303,6 +297,7 @@ func (m Model) handleEdited(msg editedMsg) (Model, tea.Cmd) {
 	m.accts = slices.Clone(m.accts)
 	m.accts[i] = msg.acct
 	m.inbox.Forget(m.ids[i])
+	m.stopWatch(m.ids[i])
 	m.ids = slices.Clone(m.ids)
 	m.ids[i] = m.newID() // results for the old connection are dropped
 	if old := m.boxes[i]; old != nil {
@@ -323,7 +318,7 @@ func (m Model) handleEdited(msg editedMsg) (Model, tea.Cmd) {
 		} else {
 			// The tested connection saves tokens under the old name, so
 			// drop it and connect again under the new one.
-			_ = msg.conn.Mailbox.Close()
+			closeConn(msg.conn)
 			m.setStatus(fmt.Sprintf("Saved %s.", msg.acct.Name))
 		}
 		if m.connect == nil {
@@ -394,6 +389,7 @@ func (m Model) removeAccountAt(i int) (Model, tea.Cmd) {
 		_ = mb.Close()
 	}
 	m.inbox.Forget(m.ids[i])
+	m.stopWatch(m.ids[i])
 	m.accts = slices.Delete(slices.Clone(m.accts), i, i+1)
 	m.boxes = slices.Delete(slices.Clone(m.boxes), i, i+1)
 	m.senders = slices.Delete(slices.Clone(m.senders), i, i+1)

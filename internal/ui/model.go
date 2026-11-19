@@ -72,6 +72,10 @@ type Model struct {
 	// every schedules the next refresh tick; tests replace it.
 	every   func(time.Duration) tea.Cmd
 	refresh refreshState
+	// watches holds each account's IDLE watch, by account id.
+	watches map[int]*watchState
+	// after delays a message; tests replace it.
+	after func(time.Duration, tea.Msg) tea.Cmd
 	// writes counts flag changes and moves started; inflight counts those
 	// still waiting for the server. A refresh uses them to spot results
 	// that could undo an optimistic change.
@@ -157,6 +161,8 @@ func New(cfg config.Config, connect Connector, log *slog.Logger) Model {
 		side:          sidebar.New(th, names),
 		open:          openFolder{account: -1},
 		every:         tick,
+		watches:       map[int]*watchState{},
+		after:         func(d time.Duration, msg tea.Msg) tea.Cmd { return tea.Tick(d, func(time.Time) tea.Msg { return msg }) },
 		needsPassword: map[int]bool{},
 		connectFor:    -1,
 		editFor:       -1,
@@ -263,6 +269,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleTick()
 	case refreshMsg:
 		return m.handleRefresh(msg)
+	case inboxMsg:
+		return m.handleInbox(msg)
+	case watchRetryMsg:
+		return m.handleWatchRetry(msg)
 	case connectedMsg:
 		return m.handleConnected(msg)
 	case signInProgressMsg:

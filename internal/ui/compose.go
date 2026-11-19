@@ -337,7 +337,7 @@ func (m Model) handleDraftSaved(msg draftSavedMsg) (tea.Model, tea.Cmd) {
 		m.status, m.statusErr = "", false
 		return m, nil
 	}
-	return m.refreshAfterDraft(msg.account)
+	return m.refreshSoon(msg.account)
 }
 
 // sendDraft runs in a tea.Cmd. It gives up after sendTimeout; past delivery
@@ -376,7 +376,7 @@ func (m Model) handleSent(msg sentMsg) (tea.Model, tea.Cmd) {
 	}
 	if msg.draft.DraftOf != nil {
 		// The saved copy this replaced is gone from Drafts.
-		return m.refreshAfterDraft(msg.account)
+		return m.refreshSoon(msg.account)
 	}
 	return m, nil
 }

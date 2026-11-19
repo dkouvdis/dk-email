@@ -728,3 +728,14 @@ func TestCredentials_OAuthProviderWithoutSignInFailsOnUse(t *testing.T) {
 		t.Errorf("creds() error = %v, want secret.ErrNoToken", err)
 	}
 }
+
+func TestNewConnector_SuccessfulDialHasAWatcher(t *testing.T) {
+	stubDial(t)
+
+	conn, err := newConnector(&countingResolver{password: "pw"}, slog.New(slog.DiscardHandler))(context.Background(), config.Account{Name: "Work"})
+
+	if err != nil || conn.Watcher == nil {
+		t.Fatalf("connect = %#v, %v; want a Watcher", conn, err)
+	}
+	_ = conn.Watcher.Close()
+}

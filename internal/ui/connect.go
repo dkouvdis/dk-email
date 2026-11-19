@@ -229,10 +229,8 @@ func connectTest(parent context.Context, o Onboarding, gen, index int, req popup
 	start := time.Now()
 	res := connectedMsg{gen: gen, index: index, acct: req.Account}
 	fail := func(err error) tea.Msg {
-		if res.conn.Mailbox != nil {
-			_ = res.conn.Mailbox.Close()
-			res.conn = Conn{}
-		}
+		closeConn(res.conn)
+		res.conn = Conn{}
 		res.err, res.took = err, time.Since(start)
 		return res
 	}
@@ -293,9 +291,7 @@ func connectTest(parent context.Context, o Onboarding, gen, index int, req popup
 
 func (m Model) handleConnected(msg connectedMsg) (Model, tea.Cmd) {
 	if msg.gen != m.connectGen || !m.showConnect {
-		if msg.conn.Mailbox != nil {
-			_ = msg.conn.Mailbox.Close()
-		}
+		closeConn(msg.conn)
 		return m, nil
 	}
 	m.endTest()
@@ -317,6 +313,7 @@ func (m Model) handleConnected(msg connectedMsg) (Model, tea.Cmd) {
 		m.side, index = m.side.AddAccount(msg.acct.Name, nil)
 	} else {
 		delete(m.needsPassword, index)
+		m.stopWatch(m.ids[index])
 		if old := m.boxes[index]; old != nil {
 			_ = old.Close()
 		}

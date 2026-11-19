@@ -31,6 +31,7 @@ const (
 type Conn struct {
 	Mailbox mail.Mailbox
 	Sender  mail.Sender
+	Watcher mail.Watcher // nil when the account isn't watched for new mail
 }
 
 // Connector opens an account's mailbox and, if sending is set up, its
@@ -105,6 +106,7 @@ func (m Model) retryFailed() (Model, tea.Cmd) {
 			cloned = true
 		}
 		// A failed folder listing leaves a logged-in mailbox behind.
+		m.stopWatch(m.ids[i])
 		if old := m.boxes[i]; old != nil {
 			_ = old.Close()
 		}
@@ -143,15 +145,16 @@ func (m Model) handleAccount(msg accountMsg) (Model, tea.Cmd) {
 	var ok bool
 	if msg.index, ok = m.accountIndex(msg.index, msg.id); !ok {
 		// The account was deleted or replaced while this was connecting.
-		if msg.conn.Mailbox != nil {
-			_ = msg.conn.Mailbox.Close()
-		}
+		closeConn(msg.conn)
 		return m, nil
 	}
 	name := m.accts[msg.index].Name
 	if msg.conn.Mailbox != nil {
 		m.boxes[msg.index] = msg.conn.Mailbox
 		m.senders[msg.index] = msg.conn.Sender
+	}
+	if msg.err != nil && msg.conn.Watcher != nil {
+		_ = msg.conn.Watcher.Close() // nothing to watch without a working account
 	}
 	m.side = m.side.SetFolders(msg.index, msg.folders, msg.err)
 	m.log.Debug("account connected", "account", name, "ok", msg.err == nil, "folders", len(msg.folders), "took", msg.took.Round(time.Millisecond))
@@ -180,14 +183,16 @@ func (m Model) handleAccount(msg accountMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.inbox.Observe(m.ids[msg.index], msg.folders) // the baseline
+	watch := m.startWatch(m.ids[msg.index], msg.conn.Watcher)
 	if m.open.account < 0 {
 		for _, f := range msg.folders {
 			if f.Role == mail.RoleInbox {
-				return m.openFolder(msg.index, f.Name)
+				m, cmd := m.openFolder(msg.index, f.Name)
+				return m, tea.Batch(cmd, watch)
 			}
 		}
 	}
-	return m, nil
+	return m, watch
 }
 
 func (m Model) openFolder(account int, folder string) (Model, tea.Cmd) {
@@ -267,9 +272,13 @@ func (m Model) handleSummaries(msg summariesMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-// Close closes every connected mailbox. Call it after the program exits.
+// Close stops every watch and closes every connected mailbox. Call it after
+// the program exits.
 func (m Model) Close() error {
 	var errs []error
+	for id := range m.watches {
+		m.stopWatch(id)
+	}
 	for _, mb := range m.boxes {
 		if mb != nil {
 			errs = append(errs, mb.Close())
