@@ -128,7 +128,7 @@ internal/mail/imap/    → go-imap v2 implementation of mail.Mailbox
 internal/mail/smtp/    → go-smtp transport (implicit TLS / STARTTLS, AUTH PLAIN or XOAUTH2)
 internal/compose/      → pure: reply / reply-all / forward / new drafts, composer fields, MIME build (send and draft mode), FromRaw to reopen a draft
 internal/send/         → implements mail.Sender and mail.Drafter: forward attachments, SMTP, Sent copy, \Answered, save / reopen / remove drafts
-internal/notify/       → pure: counts new INBOX mail per account from UIDNEXT, builds the count-only alert text and bell/OSC 9 sequences (no I/O)
+internal/notify/       → pure: counts new INBOX mail per account (UIDNEXT rise, then a UID search), builds the count-only alert text and bell/OSC 9 sequences (no I/O)
 internal/search/       → Gmail-style query parser (stdlib + internal/mail)
 internal/thread/       → builds threads from message summaries (pure, no I/O)
 internal/render/       → MIME → displayable text (plain preferred, HTML→text, attachment list)

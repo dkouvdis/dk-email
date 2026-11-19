@@ -253,6 +253,8 @@ type Mailbox interface {
 	// Search returns up to limit messages in folder matching every term of q with UID below before
 	// (0 = newest), newest first, plus how many messages match below before (all matches when before is 0).
 	Search(ctx context.Context, folder string, q SearchQuery, before UID, limit int) ([]Summary, int, error)
+	// CountFrom counts the messages in folder whose UID is uid or higher.
+	CountFrom(ctx context.Context, folder string, uid UID) (int, error)
 	// Message fetches and parses a full message without marking it seen.
 	Message(ctx context.Context, folder string, uid UID) (Message, error)
 	// Raw returns a message's exact stored bytes (RFC 5322) without marking it read.

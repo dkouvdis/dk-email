@@ -41,6 +41,40 @@ func (c *Client) Search(ctx context.Context, folder string, q mail.SearchQuery, 
 	return out, total, nil
 }
 
+// CountFrom counts the messages in folder with a UID of uid or higher. It
+// opens the folder read-only like Search and fails with mail.ErrFolderChanged
+// after a UIDVALIDITY change. Messages flagged \Deleted are not counted.
+func (c *Client) CountFrom(ctx context.Context, folder string, uid mail.UID) (int, error) {
+	var n int
+	err := c.do(ctx, "CountFrom", func(conn *imapclient.Client) error {
+		if err := c.openLocked(conn, folder, readOnly, true); err != nil {
+			return err
+		}
+		var set goimap.UIDSet
+		set.AddRange(goimap.UID(uid), 0) // uid:*
+		criteria := &goimap.SearchCriteria{
+			UID:     []goimap.UIDSet{set},
+			NotFlag: []goimap.Flag{goimap.FlagDeleted},
+		}
+		data, err := conn.UIDSearch(criteria, nil).Wait()
+		if err != nil {
+			return fmt.Errorf("count %q: %w", folder, err)
+		}
+		// uid:* always matches the last message, even below uid.
+		n = 0
+		for _, u := range data.AllUIDs() {
+			if mail.UID(u) >= uid {
+				n++
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return 0, err
+	}
+	return n, nil
+}
+
 // searchCriteria compiles q into IMAP SEARCH keys, ANDing every term.
 // Terms of unknown kind are skipped.
 func searchCriteria(q mail.SearchQuery) *goimap.SearchCriteria {

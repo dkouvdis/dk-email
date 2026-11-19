@@ -1,6 +1,7 @@
 package imap
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"testing"
@@ -273,5 +274,47 @@ func TestSearchCriteria_SkipsUnknownKinds(t *testing.T) {
 
 	if fmt.Sprintf("%+v", *got) != fmt.Sprintf("%+v", goimap.SearchCriteria{}) {
 		t.Errorf("searchCriteria = %+v, want empty", *got)
+	}
+}
+
+func TestCountFrom_CountsOnlyUIDsFromTheGivenOne(t *testing.T) {
+	srv := startServer(t, modeImplicit, capsListStatus)
+	srv.seedBulk(t, "Count", 3) // UIDs 1..3, UIDNEXT 4
+	c := srv.newClient(t, modeImplicit)
+	ctx := timeoutCtx(t, 10*time.Second)
+
+	count := func(uid mail.UID) int {
+		t.Helper()
+		n, err := c.CountFrom(ctx, "Count", uid)
+		if err != nil {
+			t.Fatalf("CountFrom(%d) error = %v", uid, err)
+		}
+		return n
+	}
+
+	if got := count(4); got != 0 {
+		t.Errorf("CountFrom(UIDNEXT) = %d, want 0 (uid:* matches the last message, which is below it)", got)
+	}
+	if got := count(100); got != 0 {
+		t.Errorf("CountFrom(100) = %d, want 0", got)
+	}
+	if got := count(2); got != 2 {
+		t.Errorf("CountFrom(2) = %d, want 2", got)
+	}
+	srv.appendRaw(t, "Count", "Message-ID: <c4@example.com>\nSubject: Four\n\nx\n", day(4))
+	srv.appendRaw(t, "Count", "Message-ID: <c5@example.com>\nSubject: Five\n\nx\n", day(5))
+	if got := count(4); got != 2 {
+		t.Errorf("CountFrom(4) after two appends = %d, want 2", got)
+	}
+}
+
+func TestCountFrom_UnknownFolder(t *testing.T) {
+	srv := startServer(t, modeImplicit, capsListStatus)
+	c := srv.newClient(t, modeImplicit)
+
+	_, err := c.CountFrom(timeoutCtx(t, 10*time.Second), "Nope", 1)
+
+	if !errors.Is(err, mail.ErrFolderNotFound) {
+		t.Errorf("error = %v, want ErrFolderNotFound", err)
 	}
 }

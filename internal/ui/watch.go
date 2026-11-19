@@ -93,7 +93,7 @@ func (m Model) handleInbox(msg inboxMsg) (Model, tea.Cmd) {
 	switch {
 	case msg.err == nil:
 		ws.backoff = 0
-		m.log.Debug("watch woke", "account", name)
+		m.log.Debug("push refresh", "account", name)
 		m, cmd := m.refreshSoon(i)
 		return m, tea.Batch(cmd, waitInbox(ws, ws.ctx, msg.id))
 	case errors.Is(msg.err, mail.ErrUnsupported):

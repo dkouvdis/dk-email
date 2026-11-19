@@ -94,6 +94,26 @@ func TestNewMail_MovingIntoInboxIsNotNewMail(t *testing.T) {
 	}
 }
 
+func TestNewMail_UIDGapFromMoveIsNotNewMail(t *testing.T) {
+	f := newFixture()
+	m := started(t, f, 160, 30)
+	f.personal.AddMessage("[Gmail]/Trash", msg("Old", "Binned", fixedNow, true, "b1"))
+	f.personal.SkipUIDs("INBOX", 4) // the server leaves a gap in INBOX's UIDs
+	opened, cmd := m.openFolder(0, "[Gmail]/Trash")
+	m = settle(t, opened, cmd)
+
+	m = pressSettled(t, m, "m")
+	m = pressSettled(t, m, "enter") // the first folder: Inbox
+	if c := lastCall(t, f.personal, mailtest.MethodMove); c.To != "INBOX" {
+		t.Fatalf("Move to %q, want INBOX", c.To)
+	}
+	m = tickSettled(t, m)
+
+	if len(m.refresh.newMail) != 0 {
+		t.Errorf("newMail = %v, want empty after a move into INBOX that left a UID gap", m.refresh.newMail)
+	}
+}
+
 // moveHeld starts a move of a Receipts message into INBOX but doesn't run it
 // yet: it returns the model and the command that performs it on the server.
 func moveHeld(t *testing.T, f *fixture) (Model, tea.Cmd) {

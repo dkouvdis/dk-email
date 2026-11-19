@@ -769,3 +769,32 @@ func TestDraftSender_KeepsAttachmentsWithoutAliasingData(t *testing.T) {
 		t.Errorf("saved = %+v, aliases the caller's data", got)
 	}
 }
+
+func TestCountFrom_CountsMessagesFromUID(t *testing.T) {
+	f := inbox()
+	f.AddMessage("INBOX", msg("one", true))
+	f.AddMessage("INBOX", msg("two", true))
+	f.AddMessage("INBOX", msg("three", true))
+
+	for uid, want := range map[mail.UID]int{1: 3, 2: 2, 4: 0, 100: 0} {
+		got, err := f.CountFrom(ctx, "INBOX", uid)
+		if err != nil || got != want {
+			t.Errorf("CountFrom(%d) = %d, %v; want %d", uid, got, err, want)
+		}
+	}
+	if c := f.Calls(); c[len(c)-1].Method != MethodCountFrom {
+		t.Errorf("last call = %v, want CountFrom", c[len(c)-1])
+	}
+	if _, err := f.CountFrom(ctx, "Nope", 1); !errors.Is(err, mail.ErrFolderNotFound) {
+		t.Errorf("unknown folder error = %v, want ErrFolderNotFound", err)
+	}
+}
+
+func TestSkipUIDs_LeavesAGap(t *testing.T) {
+	f := inbox()
+	f.SkipUIDs("INBOX", 3)
+
+	if uid := f.AddMessage("INBOX", msg("one", true)); uid != 4 {
+		t.Errorf("UID after SkipUIDs(3) = %d, want 4", uid)
+	}
+}

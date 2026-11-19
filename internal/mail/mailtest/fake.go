@@ -21,6 +21,7 @@ const (
 	MethodFolders   Method = "Folders"
 	MethodSummaries Method = "Summaries"
 	MethodSearch    Method = "Search"
+	MethodCountFrom Method = "CountFrom"
 	MethodMessage   Method = "Message"
 	MethodRaw       Method = "Raw"
 	MethodSetFlag   Method = "SetFlag"
@@ -105,6 +106,19 @@ func (f *Fake) AddRaw(name string, raw []byte) mail.UID {
 	}
 	fl.raw[uid] = slices.Clone(raw)
 	return uid
+}
+
+// SkipUIDs raises the folder's next UID by n without adding messages, like a
+// server that leaves gaps in its UIDs. It is a test aid and panics if the
+// folder doesn't exist.
+func (f *Fake) SkipUIDs(name string, n int) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	fl, ok := f.folders[name]
+	if !ok {
+		panic(fmt.Sprintf("mailtest: SkipUIDs on unknown folder %q", name))
+	}
+	fl.nextUID += mail.UID(n)
 }
 
 // Messages returns a copy of the folder's current messages in UID order.
@@ -228,6 +242,26 @@ func (f *Fake) Search(ctx context.Context, name string, q mail.SearchQuery, befo
 		}
 	}
 	return out, total, nil
+}
+
+// CountFrom counts the folder's messages with a UID of at least uid.
+func (f *Fake) CountFrom(ctx context.Context, name string, uid mail.UID) (int, error) {
+	if err := f.begin(ctx, Call{Method: MethodCountFrom, Folder: name, UIDs: []mail.UID{uid}}); err != nil {
+		return 0, err
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	fl, err := f.folder(name)
+	if err != nil {
+		return 0, err
+	}
+	n := 0
+	for _, m := range fl.messages {
+		if m.UID >= uid {
+			n++
+		}
+	}
+	return n, nil
 }
 
 func matchesAll(m mail.Message, terms []mail.SearchTerm) bool {

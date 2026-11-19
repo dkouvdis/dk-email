@@ -31,6 +31,10 @@ type refreshMsg struct {
 	folder     string // "" when this account's folders aren't open
 	summaries  []mail.Summary
 	sumsErr    error
+	// inboxFrom is the UID inboxCount counts from; inboxCount is -1 when
+	// INBOX wasn't counted.
+	inboxFrom  mail.UID
+	inboxCount int
 }
 
 // refreshState tracks the refresh in flight. writes is Model.writes when
@@ -52,12 +56,28 @@ func tick(d time.Duration) tea.Cmd {
 	return tea.Tick(d, func(time.Time) tea.Msg { return refreshTickMsg{} })
 }
 
-func refreshAccount(mb mail.Mailbox, account, id int, folder string) tea.Cmd {
+// refreshAccount reads an account's folders and, when its INBOX UIDNEXT rose
+// past inboxFrom, counts the INBOX messages from there (best-effort: a failed
+// count is left at -1 and a later round retries).
+func refreshAccount(mb mail.Mailbox, account, id int, folder string, inboxFrom mail.UID) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), refreshTimeout)
 		defer cancel()
-		msg := refreshMsg{account: account, id: id, folder: folder}
+		msg := refreshMsg{account: account, id: id, folder: folder, inboxFrom: inboxFrom, inboxCount: -1}
 		msg.folders, msg.foldersErr = mb.Folders(ctx)
+		if msg.foldersErr == nil && inboxFrom != 0 {
+			for _, f := range msg.folders {
+				if f.Role != mail.RoleInbox {
+					continue
+				}
+				if f.UIDNext > inboxFrom {
+					if n, err := mb.CountFrom(ctx, f.Name, inboxFrom); err == nil {
+						msg.inboxCount = n
+					}
+				}
+				break
+			}
+		}
 		if folder != "" {
 			msg.summaries, msg.sumsErr = mb.Summaries(ctx, folder, refreshBefore, pageSize)
 		}
@@ -102,7 +122,7 @@ func (m Model) refreshAccounts(manual bool, only int) (Model, tea.Cmd) {
 		if i == m.open.account && !m.open.loading && !m.searching() {
 			folder = m.open.folder
 		}
-		cmds = append(cmds, refreshAccount(mb, i, m.ids[i], folder))
+		cmds = append(cmds, refreshAccount(mb, i, m.ids[i], folder, m.inbox.Since(m.ids[i])))
 	}
 	if len(cmds) == 0 {
 		return m, nil
@@ -133,7 +153,8 @@ func (m Model) handleRefresh(msg refreshMsg) (Model, tea.Cmd) {
 		// Only a non-stale round has every recorded move done on the server;
 		// a skipped round keeps the baseline, so the next one counts the gap.
 		id := m.ids[msg.account]
-		if n := m.inbox.Observe(id, msg.folders); n > 0 {
+		if n := m.inbox.Observe(id, msg.folders, msg.inboxFrom, msg.inboxCount); n > 0 {
+			m.log.Debug("inbox arrivals", "account", name, "new", n)
 			m.refresh.newMail[id] += n
 		}
 	}

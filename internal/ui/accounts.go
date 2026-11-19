@@ -182,7 +182,7 @@ func (m Model) handleAccount(msg accountMsg) (Model, tea.Cmd) {
 		m.setError(errors.New(text))
 		return m, nil
 	}
-	m.inbox.Observe(m.ids[msg.index], msg.folders) // the baseline
+	m.inbox.Observe(m.ids[msg.index], msg.folders, 0, -1) // the baseline
 	watch := m.startWatch(m.ids[msg.index], msg.conn.Watcher)
 	if m.open.account < 0 {
 		for _, f := range msg.folders {
