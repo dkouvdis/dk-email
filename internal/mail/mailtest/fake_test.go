@@ -52,8 +52,8 @@ func TestFolders_ListsInInsertionOrderWithCounts(t *testing.T) {
 		t.Fatalf("Folders() error = %v", err)
 	}
 	want := []mail.Folder{
-		{Name: "INBOX", Delimiter: "/", Role: mail.RoleInbox, Unread: 2, Total: 3},
-		{Name: "[Gmail]/Trash", Delimiter: "/", Role: mail.RoleTrash, Unread: 0, Total: 0},
+		{Name: "INBOX", Delimiter: "/", Role: mail.RoleInbox, Unread: 2, Total: 3, UIDNext: 4, UIDValidity: 1},
+		{Name: "[Gmail]/Trash", Delimiter: "/", Role: mail.RoleTrash, Unread: 0, Total: 0, UIDNext: 1, UIDValidity: 1},
 	}
 	if len(got) != len(want) {
 		t.Fatalf("Folders() = %+v, want %+v", got, want)

@@ -21,6 +21,7 @@ import (
 	"github.com/dkouvdis/dk-email/internal/config"
 	"github.com/dkouvdis/dk-email/internal/download"
 	"github.com/dkouvdis/dk-email/internal/mail"
+	"github.com/dkouvdis/dk-email/internal/notify"
 	"github.com/dkouvdis/dk-email/internal/ui/popup"
 	"github.com/dkouvdis/dk-email/internal/ui/reader"
 	"github.com/dkouvdis/dk-email/internal/ui/sidebar"
@@ -53,8 +54,10 @@ func (p Pane) String() string {
 }
 
 type Model struct {
-	ui      config.UI
-	notify  config.Notify
+	ui     config.UI
+	notify config.Notify
+	// inbox counts new INBOX mail per account from server results.
+	inbox   *notify.Tracker
 	accts   []config.Account
 	connect Connector
 	// boxes holds each account's mailbox once connected, by account index.
@@ -142,6 +145,7 @@ func New(cfg config.Config, connect Connector, log *slog.Logger) Model {
 	m := Model{
 		ui:            cfg.UI,
 		notify:        cfg.Notify,
+		inbox:         notify.NewTracker(),
 		accts:         slices.Clone(cfg.Accounts),
 		connect:       connect,
 		boxes:         make([]mail.Mailbox, len(cfg.Accounts)),

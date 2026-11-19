@@ -9,7 +9,7 @@ Tell the user when new mail reaches an INBOX: a bell, an OSC 9 desktop notificat
 ## Investigation Summary
 
 - `internal/ui/refresh.go` already fetches every account's folders (STATUS `MESSAGES`/`UNSEEN` via `countOptions` in `internal/mail/imap/folders.go`) on each tick and on `ctrl+r`. Adding `UIDNEXT`/`UIDVALIDITY` to `countOptions` costs no extra round trip.
-- `handleRefresh` drops *stale* results (a write was in flight), but stale only concerns the UI's optimistic state; server counts in them are still true, so the new-mail check can use every result.
+- `handleRefresh` drops *stale* results (a write was in flight). The new-mail check skips them too: a move into INBOX is recorded when it starts, so only a non-stale round is sure to see every recorded move on the server. A skipped round keeps the baseline, so the next one counts the whole gap.
 - `refreshAccounts` returns nothing while a refresh is running; `refreshAfterDraft` shows the fix (`refresh.rerun`). An IDLE wake-up must use the same path, or a burst of mail would be lost.
 - Bubble Tea v2.1.1 has everything for step 1: `tea.View.ReportFocus` with `tea.FocusMsg`/`tea.BlurMsg`, `tea.View.WindowTitle`, and `tea.Raw` for the bell and OSC 9.
 - go-imap v2.0.0-beta.8 has `Client.Idle()` and `Options.UnilateralDataHandler.Mailbox` (reports `NumMessages`), and `imapmemserver` supports IDLE, so the watcher can be tested in-process with `server_test.go`.
@@ -39,7 +39,7 @@ T2 detect (imap+notify) ┘                              │
 
 ### Phase 1: Notify on poll
 - [x] Task 1: `[notify]` config and unread count in the window title
-- [ ] Task 2: Detect new INBOX mail from refresh results
+- [x] Task 2: Detect new INBOX mail from refresh results
 - [ ] Task 3: Bell and desktop alerts after a refresh round
 - [ ] Task 4: No alerts while the window has focus
 

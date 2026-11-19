@@ -43,7 +43,8 @@ type refreshState struct {
 	manual  bool
 	// rerun asks for another refresh once this one finishes, because
 	// something changed on the server after it started.
-	rerun bool
+	rerun   bool
+	newMail map[int]int // new INBOX mail this round, by account id
 }
 
 func tick(d time.Duration) tea.Cmd {
@@ -105,7 +106,7 @@ func (m Model) refreshAccounts(manual bool, only int) (Model, tea.Cmd) {
 	if len(cmds) == 0 {
 		return m, nil
 	}
-	m.refresh = refreshState{pending: len(cmds), writes: m.writes, dirty: m.inflight > 0, manual: manual}
+	m.refresh = refreshState{pending: len(cmds), writes: m.writes, dirty: m.inflight > 0, manual: manual, newMail: map[int]int{}}
 	if manual {
 		m.setStatus("Refreshing…")
 	}
@@ -126,6 +127,15 @@ func (m Model) handleRefresh(msg refreshMsg) (Model, tea.Cmd) {
 	}
 	stale := m.refresh.dirty || m.writes != m.refresh.writes
 	name := m.accts[msg.account].Name
+
+	if msg.foldersErr == nil && !stale {
+		// Only a non-stale round has every recorded move done on the server;
+		// a skipped round keeps the baseline, so the next one counts the gap.
+		id := m.ids[msg.account]
+		if n := m.inbox.Observe(id, msg.folders); n > 0 {
+			m.refresh.newMail[id] += n
+		}
+	}
 
 	switch {
 	case msg.foldersErr != nil:

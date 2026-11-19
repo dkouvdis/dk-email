@@ -53,7 +53,7 @@ func TestFolders_ListsSeededFoldersWithRolesAndCounts(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Folders() error = %v", err)
 			}
-			if !slices.Equal(got, wantSeededFolders) {
+			if !slices.Equal(plainFolders(got), wantSeededFolders) {
 				t.Errorf("Folders() = %+v, want %+v", got, wantSeededFolders)
 			}
 		})
@@ -91,7 +91,7 @@ func TestFolders_ReconnectsAfterServerDropsConnection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Folders() after drop error = %v", err)
 	}
-	if !slices.Equal(got, wantSeededFolders) {
+	if !slices.Equal(plainFolders(got), wantSeededFolders) {
 		t.Errorf("Folders() after drop = %+v, want %+v", got, wantSeededFolders)
 	}
 	if n := srv.ln.accepted(); n != 2 {
@@ -112,7 +112,7 @@ func TestFolders_ReconnectsAfterSessionExpires(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Folders() after expiry error = %v", err)
 	}
-	if !slices.Equal(got, wantSeededFolders) {
+	if !slices.Equal(plainFolders(got), wantSeededFolders) {
 		t.Errorf("Folders() after expiry = %+v, want %+v", got, wantSeededFolders)
 	}
 	if n := srv.ln.accepted(); n != 2 {
@@ -222,7 +222,7 @@ func TestFolders_ReconnectsAfterCallTimesOut(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Folders() after timeout error = %v", err)
 	}
-	if !slices.Equal(got, wantSeededFolders) {
+	if !slices.Equal(plainFolders(got), wantSeededFolders) {
 		t.Errorf("Folders() after timeout = %+v, want %+v", got, wantSeededFolders)
 	}
 }
@@ -685,7 +685,7 @@ func TestFolders_OAuthLoginWithValidToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Folders() error = %v", err)
 	}
-	if !slices.Equal(got, wantSeededFolders) {
+	if !slices.Equal(plainFolders(got), wantSeededFolders) {
 		t.Errorf("Folders() = %+v, want %+v", got, wantSeededFolders)
 	}
 	if toks := srv.acceptedTokens(); !slices.Equal(toks, []string{"tok-good"}) {
@@ -754,5 +754,62 @@ func TestFolders_ReconnectFetchesFreshCredentials(t *testing.T) {
 	}
 	if toks := srv.acceptedTokens(); !slices.Equal(toks, []string{"tok-1", "tok-2"}) {
 		t.Errorf("server accepted tokens %v, want [tok-1 tok-2]", toks)
+	}
+}
+
+// plainFolders returns folders without their UIDNEXT and UIDVALIDITY, which
+// depend on how the server was seeded.
+func plainFolders(folders []mail.Folder) []mail.Folder {
+	out := slices.Clone(folders)
+	for i := range out {
+		out[i].UIDNext, out[i].UIDValidity = 0, 0
+	}
+	return out
+}
+
+func TestFolders_ReportsUIDNextAndUIDValidity(t *testing.T) {
+	tests := []struct {
+		name string
+		caps goimap.CapSet
+	}{
+		{"LIST-STATUS", capsListStatus},
+		{"per-folder STATUS", capsListOnly},
+		{"plain LIST", capsPlainList},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srv := startServer(t, modeImplicit, tt.caps)
+			c := srv.newClient(t, modeImplicit)
+			inbox := func() mail.Folder {
+				t.Helper()
+				folders, err := c.Folders(timeoutCtx(t, 10*time.Second))
+				if err != nil {
+					t.Fatalf("Folders() error = %v", err)
+				}
+				for _, f := range folders {
+					if f.Role == mail.RoleInbox {
+						return f
+					}
+				}
+				t.Fatal("no INBOX")
+				return mail.Folder{}
+			}
+			before := inbox()
+			if before.UIDNext == 0 || before.UIDValidity == 0 {
+				t.Fatalf("INBOX UIDNext/UIDValidity = %d/%d, want both non-zero", before.UIDNext, before.UIDValidity)
+			}
+
+			if _, err := srv.user.Append("INBOX", newLiteral("Subject: new\r\n\r\nbody\r\n"), &goimap.AppendOptions{}); err != nil {
+				t.Fatalf("append: %v", err)
+			}
+
+			after := inbox()
+			if after.UIDNext != before.UIDNext+1 {
+				t.Errorf("UIDNext after append = %d, want %d", after.UIDNext, before.UIDNext+1)
+			}
+			if after.UIDValidity != before.UIDValidity {
+				t.Errorf("UIDValidity changed: %d -> %d", before.UIDValidity, after.UIDValidity)
+			}
+		})
 	}
 }

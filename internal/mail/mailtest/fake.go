@@ -163,6 +163,7 @@ func (f *Fake) Folders(ctx context.Context) ([]mail.Folder, error) {
 		fl := f.folders[name]
 		info := fl.info
 		info.Total = len(fl.messages)
+		info.UIDNext, info.UIDValidity = fl.nextUID, 1
 		info.Unread = 0
 		for _, m := range fl.messages {
 			if !m.Seen {

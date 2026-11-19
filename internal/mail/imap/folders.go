@@ -58,7 +58,7 @@ func (c *Client) folderByRole(ctx context.Context, op string, role mail.Role) (n
 	return name, ok, nil
 }
 
-var countOptions = goimap.StatusOptions{NumMessages: true, NumUnseen: true}
+var countOptions = goimap.StatusOptions{NumMessages: true, NumUnseen: true, UIDNext: true, UIDValidity: true}
 
 func listFolders(conn *imapclient.Client) ([]mail.Folder, error) {
 	list, err := conn.List("", "*", listOptions(conn.Caps())).Collect()
@@ -118,6 +118,8 @@ func newFolder(data *goimap.ListData) mail.Folder {
 		f.Delimiter = string(data.Delim)
 	}
 	if s := data.Status; s != nil {
+		f.UIDNext = mail.UID(s.UIDNext)
+		f.UIDValidity = s.UIDValidity
 		if s.NumMessages != nil {
 			f.Total = int(*s.NumMessages)
 		}

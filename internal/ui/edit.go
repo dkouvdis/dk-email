@@ -302,6 +302,7 @@ func (m Model) handleEdited(msg editedMsg) (Model, tea.Cmd) {
 
 	m.accts = slices.Clone(m.accts)
 	m.accts[i] = msg.acct
+	m.inbox.Forget(m.ids[i])
 	m.ids = slices.Clone(m.ids)
 	m.ids[i] = m.newID() // results for the old connection are dropped
 	if old := m.boxes[i]; old != nil {
@@ -392,6 +393,7 @@ func (m Model) removeAccountAt(i int) (Model, tea.Cmd) {
 	if mb := m.boxes[i]; mb != nil {
 		_ = mb.Close()
 	}
+	m.inbox.Forget(m.ids[i])
 	m.accts = slices.Delete(slices.Clone(m.accts), i, i+1)
 	m.boxes = slices.Delete(slices.Clone(m.boxes), i, i+1)
 	m.senders = slices.Delete(slices.Clone(m.senders), i, i+1)

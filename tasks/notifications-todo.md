@@ -30,17 +30,18 @@ Plan: [notifications-plan.md](notifications-plan.md) · Spec: [notifications-spe
 
 ## Task 2: Detect new INBOX mail from refresh results
 
-**Description:** Add `UIDNext` and `UIDValidity` to `mail.Folder` and to `countOptions` in `internal/mail/imap/folders.go` (filled by `newFolder`, both on the LIST-STATUS and plain STATUS paths). Create `internal/notify` (standard library plus `internal/mail` only) with a `Tracker`: `Observe(account int, folders []mail.Folder) int` returns how many messages INBOX gained since the last observation for that account, and `Moved(account, n int)` records messages dk-email moved into INBOX. Rules: the first observation is a baseline (0); a `UIDVALIDITY` change, a lower `UIDNEXT` or a missing value resets the baseline (0); otherwise new = `UIDNext` rise minus moved, never below 0, and moved is cleared. `Forget(account)` drops an account. Feed it from `handleAccount` (baseline) and `handleRefresh` (including stale results), record moves to INBOX in the move path in `internal/ui/actions.go`, and forget accounts that are removed or replaced. No alert yet; keep the per-round sum in `refreshState`.
+**Description:** Add `UIDNext` and `UIDValidity` to `mail.Folder` and to `countOptions` in `internal/mail/imap/folders.go` (filled by `newFolder`, both on the LIST-STATUS and plain STATUS paths). Create `internal/notify` (standard library plus `internal/mail` only) with a `Tracker`: `Observe(account int, folders []mail.Folder) int` returns how many messages INBOX gained since the last observation for that account, and `Moved(account, n int)` records messages dk-email moved into INBOX. Rules: the first observation is a baseline (0); a `UIDVALIDITY` change, a lower `UIDNEXT` or a missing value resets the baseline (0); otherwise new = `UIDNext` rise minus moved, never below 0, and moved is cleared. `Forget(account)` drops an account. Feed it from `handleAccount` (baseline) and `handleRefresh` (non-stale rounds only; see the plan), record moves to INBOX in the move path in `internal/ui/actions.go`, and forget accounts that are removed or replaced. No alert yet; keep the per-round sum in `refreshState`.
 
 **Acceptance criteria:**
-- [ ] `imap` folder tests show INBOX `UIDNext`/`UIDValidity` set, both with and without LIST-STATUS.
-- [ ] Tracker table tests cover: baseline, +3 delivered, a delivery after a move into INBOX (moves subtracted), a `UIDVALIDITY` change, a lower `UIDNEXT`, a missing INBOX, and two accounts that don't affect each other.
-- [ ] A UI test that runs a refresh after the server gained 2 INBOX messages leaves `refreshState` with 2 new for that account; a refresh that only reflects a dk-email move into INBOX leaves 0.
+- [x] `imap` folder tests show INBOX `UIDNext`/`UIDValidity` set, both with and without LIST-STATUS.
+- [x] Tracker table tests cover: baseline, +3 delivered, a delivery after a move into INBOX (moves subtracted), a `UIDVALIDITY` change, a lower `UIDNEXT`, a missing INBOX, and two accounts that don't affect each other.
+- [x] A UI test that runs a refresh after the server gained 2 INBOX messages leaves `refreshState` with 2 new for that account; a refresh that only reflects a dk-email move into INBOX leaves 0.
+- [x] A refresh that runs while a move into INBOX is in flight doesn't later count that move as new mail; mail delivered during such a round is counted in the next one.
 
 **Verification:**
-- [ ] Tests pass: `go test -race ./internal/mail/imap ./internal/notify ./internal/ui`
-- [ ] Build succeeds: `go build -o bin/dk-email ./cmd/dk-email`
-- [ ] Manual check: none (no visible change yet).
+- [x] Tests pass: `go test -race ./internal/mail/imap ./internal/notify ./internal/ui`
+- [x] Build succeeds: `go build -o bin/dk-email ./cmd/dk-email`
+- [x] Manual check: none (no visible change yet).
 
 **Dependencies:** None
 

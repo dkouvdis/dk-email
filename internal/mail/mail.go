@@ -134,6 +134,10 @@ type Folder struct {
 	Role      Role
 	Unread    int
 	Total     int
+	// UIDNext and UIDValidity are the folder's IMAP UIDNEXT and UIDVALIDITY,
+	// 0 when the server didn't report them. A rise in UIDNext means new mail.
+	UIDNext     UID
+	UIDValidity uint32
 }
 
 type Address struct {

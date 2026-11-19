@@ -179,6 +179,7 @@ func (m Model) handleAccount(msg accountMsg) (Model, tea.Cmd) {
 		m.setError(errors.New(text))
 		return m, nil
 	}
+	m.inbox.Observe(m.ids[msg.index], msg.folders) // the baseline
 	if m.open.account < 0 {
 		for _, f := range msg.folders {
 			if f.Role == mail.RoleInbox {

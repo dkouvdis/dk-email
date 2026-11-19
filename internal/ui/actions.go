@@ -30,6 +30,8 @@ type flagMsg struct {
 // removed and unread are what's needed to undo that if the move failed.
 type moveMsg struct {
 	account  int
+	id       int // the account's Model.ids entry, for the INBOX tracker
+	toInbox  bool
 	from, to string
 	uids     []mail.UID
 	removed  []mail.Summary
@@ -229,7 +231,7 @@ func (m Model) startMove(targets []mail.Summary, to, label, verb string) (Model,
 	if m.boxes[account] == nil || to == from {
 		return m, nil
 	}
-	msg := moveMsg{account: account, from: from, to: to, verb: verb, label: label, removed: targets}
+	msg := moveMsg{account: account, id: m.ids[account], from: from, to: to, verb: verb, label: label, removed: targets}
 	for _, s := range targets {
 		msg.uids = append(msg.uids, s.UID)
 		if !s.Seen {
@@ -242,6 +244,9 @@ func (m Model) startMove(targets []mail.Summary, to, label, verb string) (Model,
 		m.readerPopup = false
 	}
 	m.side = m.side.AdjustUnread(account, from, -msg.unread)
+	if msg.toInbox = m.side.Role(account, to) == mail.RoleInbox; msg.toInbox {
+		m.inbox.Moved(msg.id, len(msg.uids))
+	}
 	m.writes++
 	m.inflight++
 	m.setStatus(progressive(verb) + "…")
@@ -258,6 +263,9 @@ func (m Model) handleMove(msg moveMsg) (Model, tea.Cmd) {
 		}
 		m.setStatus(done + ".")
 		return m, nil
+	}
+	if msg.toInbox {
+		m.inbox.Moved(msg.id, -len(msg.uids))
 	}
 	if m.open.account == msg.account && m.open.folder == msg.from {
 		m.list = m.list.Restore(msg.removed)
