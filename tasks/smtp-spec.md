@@ -157,7 +157,7 @@ password_cmd = "op read op://Personal/Gmail/app-password"
 smtp_host = "smtp.gmail.com"     # enables sending; omit to keep the account read-only
 smtp_port = 465                  # default: 465 for implicit, 587 for starttls
 smtp_tls  = "implicit"           # "implicit" | "starttls"; default "implicit"
-from_name = "Dimitri Kouvdis"    # display name on outgoing mail; default: none (address only)
+from_name = "Your Name"          # display name on outgoing mail; default: none (address only)
 save_sent = false                # APPEND a copy to Sent; default false for imap.gmail.com, true otherwise
 ```
 
