@@ -1,0 +1,75 @@
+# dk-email example config.
+#
+# A starter you can copy and edit:
+#
+#   mkdir -p ~/.config/dk-email
+#   cp config.example.toml ~/.config/dk-email/config.toml
+#   chmod 600 ~/.config/dk-email/config.toml
+#
+# You don't have to write this file by hand: press A in the app (or just start
+# it with no accounts) and the connect popup adds accounts for you.
+#
+# Passwords never go in this file. Use password_cmd or the OS keychain; see
+# docs/passwords.md.
+#
+# Every key is explained in docs/configuration.md.
+
+[ui]
+default_layout   = "split"   # "split" (folders | threads) or "list" (threads only)
+refresh_interval = "120s"    # how often every account is refreshed; must be positive
+
+[notify]
+bell    = true   # ring the bell on new INBOX mail
+desktop = true   # send a desktop notification (OSC 9)
+title   = true   # show the INBOX unread count in the window title
+
+# By default dk-email follows your terminal's colour theme. Uncomment a key to
+# override it. A value is an ANSI colour number (0-255) or a hex colour.
+# [colors]
+# accent    = 5          # focus, selected row background (default: magenta)
+# on_accent = 16         # text on the accent colour (default: black, fixed)
+# muted     = "#808080"  # secondary text (default: the terminal's faint style)
+# border    = 8          # pane borders, separators (default: bright black)
+# unread    = 4          # unread markers and counts (default: blue)
+# star      = 3          # starred marker (default: yellow)
+# error     = 1          # errors (default: red)
+# hint      = 6          # the hint bar (default: cyan)
+# key       = 5          # keys in the help popup (default: magenta)
+
+[[account]]
+name         = "Personal"                                   # sidebar label and keychain entry; unique
+email        = "me@gmail.com"                               # your address; also the default username
+imap_host    = "imap.gmail.com"                             # incoming mail server
+password_cmd = "op read op://Personal/Gmail/app-password"   # prints the password; omit to use the keychain
+smtp_host    = "smtp.gmail.com"                             # turns sending on; remove it for a read-only account
+
+# username       = "me@gmail.com"                      # the IMAP and SMTP login (default: email)
+# imap_port      = 993                                 # 993 for implicit TLS, 143 for starttls
+# tls            = "implicit"                          # "implicit" (default) or "starttls"
+# archive_folder = "[Gmail]/All Mail"                  # where e archives to (default: the \Archive or \All folder)
+# tls_cert       = "~/.config/dk-email/bridge.pem"     # PEM certificate to trust instead of the system roots
+# smtp_port      = 465                                 # 465 for implicit TLS, 587 for starttls (needs smtp_host)
+# smtp_tls       = "implicit"                          # "implicit" (default) or "starttls" (needs smtp_host)
+# from_name      = "Your Name"                         # display name on outgoing mail (needs smtp_host)
+# aliases        = [{ email = "me@example.com", name = "Me" }]   # other From addresses (needs smtp_host)
+# save_sent      = true                                # copy sent mail to Sent (default: false on Gmail and Microsoft 365/Outlook, else true)
+
+# OAuth 2.0 sign-in. These keys replace password_cmd: remove password_cmd
+# above and uncomment these instead (see docs/oauth.md).
+# auth                    = "oauth2"                   # "password" (default) or "oauth2"
+# oauth_provider          = "google"                   # "microsoft" or "google"
+# oauth_client_id         = "your-client-id"           # your own app registration's client ID
+# oauth_tenant            = "common"                   # Microsoft only: tenant ID or domain (default: "common")
+# oauth_client_secret_cmd = "op read op://Personal/Google/client-secret"   # Google only; omit to use the keychain
+
+# Proton Mail through Proton Mail Bridge (see docs/accounts.md#proton-mail).
+# The password is the Bridge password, not your Proton password.
+# [[account]]
+# name         = "Proton"
+# email        = "me@proton.me"
+# username     = "me@proton.me"                        # the username shown in Bridge's mailbox details
+# imap_host    = "127.0.0.1"
+# imap_port    = 1143
+# tls          = "starttls"
+# tls_cert     = "~/.config/dk-email/bridge.pem"       # exported from Bridge: Settings > Advanced settings
+# password_cmd = "op read op://Personal/Bridge/password"
