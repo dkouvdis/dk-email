@@ -1,0 +1,114 @@
+From: "Example Shop" <orders@shop.example.com>
+To: Test <test@example.com>
+Subject: Your Example Shop Shipping Confirmation - Order #A0000000000
+Date: Thu, 05 Nov 2026 09:16:53 -0600
+Message-ID: <shop-shipping@example.com>
+MIME-Version: 1.0
+Content-Type: multipart/alternative;
+    boundary="shipBoundary=_?:"
+
+This is a multi-part message in MIME format.
+--shipBoundary=_?:
+Content-Type: text/plain;
+    charset="utf-8"
+Content-Transfer-Encoding: 8bit
+
+%%=redirectTo(concat(
+https://click.shop.example.com/REDACTED
+https://click.shop.example.com/REDACTED
+Trail Shoe
+Shipping Method:
+Tracking Number:
+Exampleton,
+AB1 2CD
+TRACK YOUR PACKAGE
+--shipBoundary=_?:
+Content-Type: text/html;
+    charset="utf-8"
+Content-Transfer-Encoding: 8bit
+
+<!---------------------------------------------------------------------
+ sets default
+--------------------------------------------------------------------->
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title></title>
+<style type="text/css">
+ body{ width:100% !important; margin:0; padding:0;}
+ .hide { display: none; }
+</style>
+</head>
+<body>
+<div style="display: none; max-height: 0px; overflow: hidden;"> &nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj; </div>
+<table role="presentation" width="600"> <tr> <td>
+<a href="https://shop.example.com/home/?tmemail=REDACTED"><img src="https://img.example.com/logo.png" alt="Example Shop Home" width="1" height="1"></a>
+</td> </tr> </table>
+<table style="background-color: #fff;"> <tr>
+<td style="font-size:17px; line-height:23px;"> Thank you for shopping with us. Your order #A0000000000 has been shipped. </td> </tr> </table>
+<!-- Shipping Confirmation Order Details -->
+<table style="min-width: 100%;"> <tr> <td style="padding:5px 0px;">
+<a href="https://click.shop.example.com/REDACTED" style="font-size: 17px;"> ORDER #A0000000000</a> </td> </tr> </table>
+<!-- SPACER TABLE -->
+<table> <tr> <td style="font-size:1px; line-height:1;">&nbsp;</td> </tr> </table>
+<!-- ITEM -->
+<table> <tr>
+<td style="font-size: 15px;">
+<a href="https://click.shop.example.com/REDACTED"><img src="https://img.example.com/trail-shoe.jpg" alt="Trail Shoe" style="display: block; max-width: 242px;" ></a> </td>
+<td style="text-align: left; font-size: 15px;"> <b><a href="https://click.shop.example.com/REDACTED">Trail Shoe</a></b><br> Product Number: TS-1000<br> Color: Green | White<br> Size: 9 M<br> Quantity: 1<br> </td>
+<td style="display: none;">&nbsp;</td>
+<td style="font-size: 15px;"><b>&nbsp;</b></td> </tr> </table>
+<!-- / ITEM -->
+<table> <tr> <td style="font-size:1px; line-height:1;">&nbsp;</td> </tr> </table>
+<table> <tr> <td style="font-size: 15px;">
+<table> <tr> <td style="font-size: 1px;"><img src="https://img.example.com/spacer.gif" alt="" width="1" height="1" style="display: block;" ></td> </tr> </table></td> </tr> </table>
+<table style="background-color: #fff;"> <tr>
+<td style="font-size:17px; line-height:23px;"> Your order was shipped via ParcelCo to: </td> </tr> </table>
+<!--Shipping Details -->
+<table style="min-width: 100%;"> <tr> <td style="padding-left:30px;">
+<table> <tr> <td style="font-size:1px;"><img src="https://img.example.com/spacer.gif" alt="" width="1" height="1" ></td> </tr> </table>
+SHIPPING DETAILS
+<table> <tr> <td style="font-size:1px;"><img src="https://img.example.com/spacer.gif" alt="" width="1" height="1" ></td> </tr> </table> </td> </tr> </table>
+<table> <tr> <td style="font-size:1px; line-height:1;">&nbsp;</td> </tr> </table>
+<table> <tr> <td>
+<table> <tr>
+<th style="font-size: 15px; font-weight: normal;"> <b>Shipping Method:</b><br> ParcelCo<br><br> <b>Tracking Number:</b><br> PC00TEST0000000000<br> </th>
+<th style="font-size: 15px; font-weight: normal;"> <b>Ship To:</b><br> Test Customer<br> 1 Example Lane<br> Example Court<br> Exampleton, AB1 2CD </th> </tr> </table> </td> </tr> </table>
+<table> <tr> <td style="font-size:1px; line-height:1;">&nbsp;</td> </tr> </table>
+<table> <tr> <td style="font-size: 15px;">
+<table role="presentation"> <tr> <td>
+<!--[if !mso]-->
+<a href="https://click.shop.example.com/REDACTED" style="text-decoration:none;color: #000000;" target="_blank">
+<div> <!--[endif]-->
+<table role="presentation" style="background-color:#000000; border-radius: 33px;"> <tr> <td style="padding: 2px;">
+<table role="presentation" style="background-color:#ffffff; border-radius: 30px;"> <tr> <td style="font-family: Arial, sans-serif;">
+<a href="https://click.shop.example.com/REDACTED" style="text-decoration:none;color: #000000;" target="_blank"><b>TRACK YOUR PACKAGE</b></a></td></tr></table></td></tr></table>
+<!--[if !mso]-->
+</div> </a> <!--[endif]-->
+</td></tr></table> </td> </tr> </table>
+<table style="background-color: #fff;"> <tr>
+<td style="font-size:17px; line-height:23px;"> If you have any questions about this order please make reference to order number A0000000000 in your enquiry. </td> </tr> </table>
+<table style="background-color: #fff;"> <tr>
+<td style="font-size:17px; line-height:23px;"> Sincerely,<br>Example Shop Customer Service </td> </tr> </table>
+<table style="background-color:#c0c0c0; min-width: 100%;"> <tr> <td style="padding: 20px 40px 0px 0px;">
+<table style="min-width: 100%;"> <tr>
+<td style="padding: 0px 0px 0px 30px;"> <strong>Questions?</strong> </td>
+<td style="padding: 0px 30px 0px 0px;">For more information regarding your recent order, please visit our customer service hub <a href="https://click.shop.example.com/REDACTED" style="color: #ffffff;" target="_blank"><strong><u>here</u></strong></a>. </td> </tr>
+<tr> <td style="padding: 0px 0px 0px 30px;"> </td>
+<td style="padding: 20px 0px 0px 0px;">Additional information can be found in our <a href="https://click.shop.example.com/REDACTED" style="color: #ffffff;" target="_blank"><strong><u>Terms of Sale</u></strong></a>, <a href="https://click.shop.example.com/REDACTED" style="color: #ffffff;" target="_blank"><strong><u>Terms of Use</u></strong></a> and <a href="https://click.shop.example.com/REDACTED" style="color: #ffffff;" target="_blank"><strong><u>Return Policy</u></strong> </a>. </td> </tr> </table> </td> </tr> </table>
+<table role="presentation"> <tr> <td align="center">
+<a href="https://click.shop.example.com/REDACTED"><img src="https://img.example.com/fb.png" alt="Facebook" style="margin-right:12px;" /></a> <!--[if mso]>&nbsp;&nbsp;&nbsp;&nbsp;<![endif]-->
+<a href="https://click.shop.example.com/REDACTED"><img src="https://img.example.com/ig.png" alt="Instagram" style="margin-right:12px;" /></a> </td> </tr> </table>
+<table> <tr> <td style="font-size:14px; color:#000000;">
+<a alias="Footer_Returns" href="https://shop.example.com/content?tmemail=REDACTED&caid=returns" style="color:#000000;" conversion="true">RETURNS</a> |
+<a href="mailto:support@shop.example.com" style="color:#000000;" conversion="true">SUPPORT@SHOP.EXAMPLE.COM</a> |
+<a alias="Footer_Stores" href="https://shop.example.com/stores?tmemail=REDACTED" style="color:#000000;" conversion="true">FIND A STORE</a> </td> </tr>
+<tr> <td style="font-size:13px; color:#000000;">
+<a alias="Footer_Privacy" href="https://shop.example.com/content?tmemail=REDACTED&caid=privacy" style="color:#000000;" conversion="true"><span style="text-decoration:underline !important;">Privacy policy</span></a>&nbsp;|&nbsp;
+<a alias="Footer_Contact" href="https://shop.example.com/content?tmemail=REDACTED&caid=contact" style="color:#000000;" conversion="true"><span style="text-decoration:underline !important;">Contact us</span></a></td></tr></table>
+<table role="presentation"> <tr> <td style="font-size:8px;">
+<span style="font-size:8px;">©2026, Example Shop, 1 Example Street, Exampleton</span> </td> </tr> </table>
+</body>
+</html>
+--shipBoundary=_?:--

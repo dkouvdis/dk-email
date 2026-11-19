@@ -1,0 +1,98 @@
+From: "Example News" <noreply@news.example.org>
+To: Test <test@example.com>
+Subject: =?utf-8?B?Q2Fmw6kgcHJpY2VzIGhlYXQgdXA=?=
+Date: Wed, 11 Nov 2026 06:57:34 +0000
+Message-ID: <news-digest@example.com>
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="BOUNDARY"
+
+--BOUNDARY
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: 8bit
+
+Cafe Prices Reportedly Set to Rise
+Example Morning Digest ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ 
+‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ 
+Read in browser
+<https://news.example.org/REDACTED>
+Good morning. Coffee prices rise, markets rally, and the city plans a new tram line.
+Market Snapshot
+Index futures
+--BOUNDARY
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: 8bit
+
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><meta name="viewport" content="initial-scale=1"><title>Cafe Prices Reportedly Set to Rise</title><style>body{margin:0} .x{display:none}</style></head><body>
+<div style="color:transparent;visibility:hidden;opacity:0;font-size:0px;border:0;max-height:1px;width:1px;margin:0px;padding:0px;display:none !important;line-height:0px;">Cafe prices reportedly set to rise<img border="0" width="1" height="1" alt="" src="https://pixel.example.org/REDACTED"></div>
+<span style="color:transparent;visibility:hidden;display:none;opacity:0;height:0;width:0;font-size:0;"></span><img src="https://news.example.org/open/REDACTED" style="border:0;width:1px;height:1px;border-width:0px;" />
+<table style="max-width:580px;width:100%"><tbody>
+<tr><td><div style="display:none;max-height:0;overflow:hidden">Example Morning Digest ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ </div></td></tr>
+<tr><td style="padding-top:20px"><a href="https://news.example.org/REDACTED" style="font-family:Arial,sans-serif">Read in browser</a></td></tr>
+<tr><td style="font-size:16px;line-height:1.4">
+<figure style="margin:20px 0;max-width:580px"><a href="https://news.example.org/REDACTED" target="_blank"><!--[if mso]>
+<table><tr><td><img src="https://img.example.org/banner.png" alt="" /></td></tr></table>
+<div style="display:none"><![endif]-->
+<img src="https://img.example.org/banner.png" alt style="width:100%;display:block;margin-bottom:4px;"><!--[if mso]></div><![endif]--></a></figure>
+<a href="https://news.example.org/REDACTED" rel="noopener noreferrer" title="Example News Europe" target="_blank"><figure style="margin:20px 0;max-width:580px"><img src="https://img.example.org/masthead.png" alt style="width:100%;display:block;"></figure></a>
+<table data-version="3.0.0">
+<tr><td style="line-height:1px"><img src="https://pixel.example.org/a/REDACTED" style="display:block;max-height:12px !important"></td></tr>
+<tr><td style="line-height:1px"><a href="https://news.example.org/REDACTED" rel="nofollow" target="_blank"><img src="https://pixel.example.org/b/REDACTED" style="display:block;width:100% !important"></a></td></tr><!--[if !mso]>-->
+<tr><td style="line-height:1px"><a href="https://news.example.org/REDACTED" rel="nofollow" target="_blank"><img src="https://pixel.example.org/c/REDACTED" style="display:block !important;width:100% !important"></a></td></tr><!--<![endif]--></table>
+<p style="margin-top:24px;font-size:16px"><strong>Good morning</strong>. Coffee prices rise, markets rally, and the city plans a new tram line. <a href="https://news.example.org/REDACTED" rel="noopener noreferrer" title="Morning Audio" target="_blank">Listen to the day&rsquo;s top stories</a>.</p>
+<p style="margin-top:24px;font-size:16px"><em>&mdash; Alex Morgan</em></p>
+<div style="margin:24px 0 0">
+<table style="width:100%;border-collapse:collapse">
+<tr><td colspan="3" style="padding-bottom:14px;font-size:20px">Market Snapshot</td></tr><colgroup><col><col data-precision="2"><col data-precision="2"></colgroup>
+<tr><td style="padding:14px 0"><a href="https://news.example.org/REDACTED" rel="noopener noreferrer" title="Index Futures" target="_blank">Index futures</a></td><td style="padding:14px 0">12,345.00</td><td data-sentiment="positive" style="padding:14px 0">+1.5%</td></tr>
+<tr><td style="padding:14px 0"><a href="https://news.example.org/REDACTED" rel="noopener noreferrer" title="Crude Oil Futures" target="_blank">Crude oil futures</a></td><td style="padding:14px 0">$80.10</td><td data-sentiment="positive" style="padding:14px 0">+0.7%</td></tr>
+<tr><td style="padding:14px 0"><a href="https://news.example.org/REDACTED" rel="noopener noreferrer" title="Spot Gold" target="_blank">Spot gold</a></td><td style="padding:14px 0">$2,050.25</td><td data-sentiment="positive" style="padding:14px 0">+0.6%</td></tr>
+<tr><td style="padding:14px 0;padding-bottom:0">Market data as of 01:54 AM ET. Data is subject to provider delays.</td><td colspan="2" style="padding:14px 0"><div style="width:fit-content;background-color:#000"><a href="https://news.example.org/REDACTED" target="_blank">Your watchlist</a></div></td></tr></table></div>
+<p style="margin-top:24px;font-size:16px"><strong>Cafe owners</strong> are considering <a href="https://news.example.org/REDACTED" rel="noopener noreferrer" title="Cafes Weigh Price Increase" target="_blank">raising menu prices</a> next quarter, a trade group said, as bean costs climb. A regional roaster <a href="https://news.example.org/REDACTED" rel="noopener noreferrer" title="Roaster Reports Record Sales" target="_blank">reported record sales</a> despite the pressure.<br><br><strong>Transit update:</strong> Planners say the new tram line <a href="https://news.example.org/REDACTED" rel="noopener noreferrer" title="Tram Line Approved" target="_blank">cleared its final vote</a>.</p>
+<figure style="margin:20px 0;max-width:580px"><a href="https://news.example.org/REDACTED" target="_blank"><!--[if mso]>
+<table><tr><td><img src="https://img.example.org/tram.jpg" alt="WATCH: A first look at the planned tram route through the old town." /></td></tr></table>
+<div style="display:none"><![endif]-->
+<img src="https://img.example.org/tram.jpg" alt="WATCH: A first look at the planned tram route through the old town." style="width:100%;display:block;"><!--[if mso]></div><![endif]--><!--[if mso]>
+<table><tr><td><img src="https://img.example.org/play.png" alt="Watch now" /></td></tr></table>
+<div style="display:none"><![endif]-->
+<img src="https://img.example.org/play.png" alt="Watch now" style="width:100%;display:block;"><!--[if mso]></div><![endif]--></a><figcaption><div style="font-size:14px">WATCH: A first look at the planned tram route through the old town.</div></figcaption></figure>
+<div style="max-width:580px;margin-top:24px"><a href="https://news.example.org/REDACTED" target="_blank"><div><!--[if mso]>
+<table><tr><td><img src="https://img.example.org/grid.jpg" alt="" /></td></tr></table>
+<div style="display:none"><![endif]-->
+<img src="https://img.example.org/grid.jpg" alt style="width:100%;max-width:580px;display:block"><!--[if mso]></div><![endif]--></div>
+<h2 style="line-height:normal;font-weight:700;margin:12px 0 0">City Grid Upgrades Aim to Cut Outages</h2>
+<p style="line-height:1.4;margin:12px 0 0 0">Utilities are looking for ways to speed up connections to the local grid, aiming to reduce outages during peak demand.</p>
+<div style="display:block;width:100%;height:40px;text-align:center">Keep reading</div></a></div>
+<p style="margin-top:24px;font-size:16px"><strong>More Top Stories</strong></p>
+<div style="max-width:580px;margin-top:24px;margin-bottom:16px"><div style="padding:16px 0;border-bottom:1px solid #ccc"><a href="https://news.example.org/REDACTED" target="_blank"><div style="overflow:hidden"><div style="float:right;margin-left:12px"><!--[if mso]>
+<table><tr><td><img src="https://img.example.org/s1.jpg" alt="Image associated with story &quot;Harbor Festival Draws Record Crowd&quot;" /></td></tr></table>
+<div style="display:none"><![endif]-->
+<img src="https://img.example.org/s1.jpg" alt="Image associated with story &quot;Harbor Festival Draws Record Crowd&quot;" style="width:131px;height:88px;"><!--[if mso]></div><![endif]--></div>
+<div>Harbor Festival Draws Record Crowd</div></div></a></div>
+<div style="padding:16px 0;border-bottom:1px solid #ccc"><a href="https://news.example.org/REDACTED" target="_blank"><div style="overflow:hidden"><div style="float:right;margin-left:12px"><img src="https://img.example.org/s2.jpg" alt="Image associated with story &quot;Library Extends Opening Hours&quot;" style="width:131px;height:88px;"></div>
+<div>Library Extends Opening Hours</div></div></a></div></div>
+<div style="max-width:580px;margin:24px 0"><h3 style="font-size:24px;line-height:30px;font-weight:700">Deep Dive: Why the Bean Market Is Tight</h3>
+<p>In one valley, a family farm that has grown coffee for generations is <a href="https://news.example.org/REDACTED" rel="noopener noreferrer" title="Farm Faces Hard Choices" target="_blank">weighing its future after a poor harvest</a>.</p>
+<ul style="margin-top:24px;padding-inline-start:24px">
+<li style="font-weight:400"><strong>In the north</strong>, growers are calling on officials to act over rising costs.</li>
+<li style="font-weight:400"><strong>Across the region</strong>, buyers are paying more for beans after two weak seasons.</li>
+<li style="font-weight:400"><strong>Shipping rates</strong> have climbed sharply; <a href="https://news.example.org/REDACTED" rel="noopener noreferrer" title="Freight Costs Climb" target="_blank">freight costs hit a record</a> last week.</li>
+<li style="font-weight:400"><strong>With an election</strong> coming, the issue is moving up the agenda.</li></ul></div>
+<h3 style="font-size:24px;line-height:30px;font-weight:700">Test Your Knowledge</h3>
+<p>Today's clue is:</p><p>A hot drink in a small cup?</p>
+<div><a href="https://news.example.org/REDACTED" target="_blank">Play</a></div>
+<h3 style="font-size:24px;line-height:30px;font-weight:700">More From Example News</h3>
+<p>Enjoying the Morning Digest? Check out these newsletters:</p>
+<ul><li><a href="https://news.example.org/REDACTED" title="Money" target="_blank">Money</a> for tips on getting more from your money</li>
+<li><a href="https://news.example.org/REDACTED" title="Markets Daily" target="_blank">Markets Daily</a> for what is moving in stocks and bonds</li></ul>
+<p>Explore all newsletters at <a href="https://news.example.org/REDACTED" title="Newsletters" target="_blank">news.example.org</a>.</p>
+<p><em><strong>We are improving your newsletter experience and would love your feedback.</strong></em></p>
+<p>Follow Us</p>
+<table><tr><td><a href="https://news.example.org/REDACTED" rel="noopener noreferrer" target="_blank"><img width="36" height="36" src="https://img.example.org/icons/one.png" alt="https://img.example.org/icons/one.png icon" style="display:block;width:36px !important;height:36px !important"></a></td>
+<td><a href="https://news.example.org/REDACTED" rel="noopener noreferrer" target="_blank"><img width="36" height="36" src="https://img.example.org/icons/two.png" alt="https://img.example.org/icons/two.png icon" style="display:block;width:36px !important;height:36px !important"></a></td></tr></table>
+<p style="font-size:12px">You received this message because you are subscribed to the Example News Morning Digest newsletter. If a friend forwarded you this message, <a href="https://news.example.org/REDACTED" target="_blank">sign up here</a>.</p>
+<div style="font-size:14px"><a href="https://news.example.org/REDACTED" target="_blank">Unsubscribe</a><br><a href="https://news.example.org/REDACTED" target="_blank">news.example.org</a><br><a href="https://news.example.org/REDACTED" target="_blank">Contact Us</a></div>
+<p style="font-size:12px">Example News Ltd.<br>1 Example Street<br>Exampleton 00000</p>
+<div style="font-size:12px"><a href="https://news.example.org/REDACTED" target="_blank">Ads Powered By Example Ads</a><span style="padding:0 8px">|</span><a href="https://news.example.org/REDACTED" target="_blank">Ad Choices</a></div>
+</td></tr></tbody></table>
+</body></html>
+--BOUNDARY--

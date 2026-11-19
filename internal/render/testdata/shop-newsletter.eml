@@ -1,0 +1,115 @@
+From: "Example Shop" <news@shop.example.com>
+To: Test <test@example.com>
+Subject: Meet the maker
+Date: Wed, 11 Nov 2026 04:16:38 -0600
+Message-ID: <shop-newsletter@example.com>
+MIME-Version: 1.0
+Content-Type: multipart/alternative;
+    boundary="shopBoundary=_?:"
+
+This is a multi-part message in MIME format.
+--shopBoundary=_?:
+Content-Type: text/plain;
+    charset="utf-8"
+Content-Transfer-Encoding: 8bit
+
+https://click.shop.example.com/REDACTED
+https://click.shop.example.com/REDACTED
+MEET THE MAKER. <br><br> Introducing Sam Rivera, a ceramics artist balancing craft with patience.
+<br> For Sam, making is about showing up and finding more in the process.
+https://click.shop.example.com/REDACTED
+Watch the story&#10132;
+Sam's journey began in a small garage workshop.
+<br> From a first lopsided mug to a full studio collection, Sam learned that progress is slow.
+https://click.shop.example.com/REDACTED
+Watch the story&#10132;
+https://click.shop.example.com/REDACTED
+Stoneware Mug
+https://click.shop.example.com/REDACTED
+Shop Now
+--shopBoundary=_?:
+Content-Type: text/html;
+    charset="utf-8"
+Content-Transfer-Encoding: 8bit
+
+<!---------------------------------------------------------------------
+ sets default
+--------------------------------------------------------------------->
+<table cellpadding="0" cellspacing="0" width="100%" role="presentation" style="min-width: 100%; "><tr><td class="wrapper"></td></tr></table>
+
+<!-- addl tracking set-->
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" lang="en" xml:lang="en">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<head>
+<title></title>
+<style type="text/css">
+ span.MsoHyperlink {mso-style-priority:99; color:inherit;}
+ body{ width:100% !important; margin:0; padding:0;}
+ table{border-collapse:collapse !important;}
+</style>
+<style type="text/css">
+@media only screen and (max-width:480px) {
+ .mobile-hide {display:none !important;}
+}
+</style>
+</head>
+<body>
+<div style="font-size: 1px; display: none !important;">Meet Sam Rivera</div>
+<div style="display: none; max-height: 0px; overflow: hidden;"> &nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj; </div>
+<table role="presentation" width="100%"> <tr> <td>
+<table role="presentation" width="600"> <tbody> <tr> <td>
+<!-- HERO IMG START -->
+<table style="background-color: #000001; color: #FFFFFE;"> <tr> <td style="font-size: 0px; line-height: 0px;">
+<a href="https://click.shop.example.com/REDACTED" target="_blank"><img alt="Meet the maker: Sam Rivera" src="https://img.example.com/hero.png" style="display: block; border: 0px;" ></a> </td> </tr> </table>
+<!-- HERO IMG END -->
+<table role="presentation" style="min-width: 100%;"> <tr> <td style="font-size:14px;">
+<span>MEET THE MAKER.<br><br>Introducing Sam Rivera, a ceramics artist balancing craft with patience.<br><br>For Sam, making is about showing up and finding more in the process.</span> </td> </tr> </table>
+<table role="presentation"> <tr> <td style="background-color:#000001;">
+<!--[if mso]> <v:roundrect href="https://example.com/REDACTED" style="height:65px;width: 230px;" arcsize="50%" fill="t"> <w:anchorlock/> <center>Watch the story</center> </v:roundrect> <![endif]-->
+<!--[if !mso]><!-->
+<a data-linkto="other" href="https://click.shop.example.com/REDACTED" rel="noopener" style="background-color: #edfe52;" target="_blank"> Watch the story <span style="float: right;">&#10132;</span> </a>
+<!--<![endif]--> </td> </tr> </table>
+<table role="presentation"> <tr> <td>
+<img alt="Sam" src="https://img.example.com/portrait.png" style="display: block;" > </td> </tr> </table>
+<table role="presentation"> <tr> <td>
+<span>Sam's journey began in a small garage workshop. What started as a weekend hobby quickly became something much bigger: a passion for clay, patience and community.<br> <br> From a first lopsided mug to a full studio collection, Sam learned that progress is slow and worth it.</span> </td> </tr> </table>
+<table role="presentation"> <tr> <td style="background-color:#000001;">
+<!--[if !mso]><!--> <a href="https://click.shop.example.com/REDACTED" target="_blank"> Watch the story <span>&#10132;</span> </a> <!--<![endif]--> </td> </tr> </table>
+<table role="presentation"> <tr>
+<td> <table role="presentation"> <tr> <td>
+<a href="https://click.shop.example.com/REDACTED" target="_blank"> <img alt="" src="https://img.example.com/mug.jpg" style="display: block; max-width:234px;" > </a> </td> </tr>
+<tr> <td> <a href="https://click.shop.example.com/REDACTED" target="_blank">Stoneware Mug </a> </td> </tr>
+<tr> <td> <a href="https://click.shop.example.com/REDACTED" target="_blank"> <u> Shop Now </u> </a> </td> </tr> </table> </td>
+<td> <table role="presentation"> <tr> <td>
+<a href="https://click.shop.example.com/REDACTED" target="_blank"> <img alt="" src="https://img.example.com/bowl.jpg" style="display: block; max-width:234px;" > </a> </td> </tr>
+<tr> <td> <a href="https://click.shop.example.com/REDACTED" target="_blank">Speckled Bowl </a> </td> </tr>
+<tr> <td> <a href="https://click.shop.example.com/REDACTED" target="_blank"> <u> Shop Now </u> </a> </td> </tr> </table> </td>
+</tr> </table>
+<table role="presentation"> <tr> <td>
+<a href="https://click.shop.example.com/REDACTED" target="_blank"><img alt="Meet the maker - Sam Rivera" src="https://img.example.com/footer.png" style="display: block;" ></a> </td> </tr> </table>
+<table role="presentation"> <tr> <td>
+<a href="https://click.shop.example.com/REDACTED" target="_blank"><img alt="Example Shop Logo" src="https://img.example.com/logo.png" ></a> </td> </tr> </table>
+<table role="presentation"> <tr> <td style="font-size:14px; color:#fff;">
+<a alias="Footer_Returns" href="https://shop.example.com/content?tmemail=REDACTED&caid=returns" style="color:#fff;" conversion="true"> RETURNS </a>
+<a alias="Footer_Home" href="https://shop.example.com/home/?tmemail=REDACTED" style="margin-left: 5px; color:#fff;" conversion="true"> SHOP.EXAMPLE.COM </a>
+<a alias="Footer_Stores" href="https://shop.example.com/stores/?tmemail=REDACTED" style="margin-left: 5px; color:#fff;" conversion="true"> FIND A STORE </a> </td> </tr> </table>
+<table role="presentation"> <tr> <td align="center">
+<a href="https://click.shop.example.com/REDACTED"><img src="https://img.example.com/fb.png" alt="Facebook" style="margin-right:17px;" /></a> <!--[if mso]>&nbsp;&nbsp;&nbsp;&nbsp;<![endif]-->
+<a href="https://click.shop.example.com/REDACTED"><img src="https://img.example.com/ig.png" alt="Instagram" style="margin-right:17px;" /></a> <!--[if mso]>&nbsp;&nbsp;&nbsp;&nbsp;<![endif]-->
+<a href="https://click.shop.example.com/REDACTED"><img src="https://img.example.com/yt.png" alt="YouTube" style="margin-right:17px;" /></a> </td> </tr> </table>
+<table role="presentation"> <tr> <td style="font-size:11px; color:#fff;">
+This email was sent to you because you asked to receive promotions from us. Your address on record is: test@example.com.<br><br>
+<a alias="Footer_Privacy" href="https://shop.example.com/content?tmemail=REDACTED&caid=privacy" style="color:#fff;" conversion="true">Privacy policy</a>
+<a alias="Footer_Contact" href="https://shop.example.com/content?tmemail=REDACTED&caid=contact" style="color:#fff;" conversion="true">Contact us</a>
+<a alias="Footer_Unsub" href="https://shop.example.com/emailpreferences?tmemail=REDACTED&unsubscribe=true" style="color:#fff;" conversion="true">Unsubscribe</a> </td> </tr> </table>
+<table role="presentation"> <tr> <td>
+<span style="padding-top:10px; font-size:8px;">©2026, Example Shop, <br style="display:none;"> 1 Example Street, Exampleton</span>
+<span style="color:#fff;font-size: 0px;">Example Shop Holdings, 100 Example Road, Exampleton, 00000, US</span> </td> </tr> </table>
+</td> </tr> </tbody> </table> </td> </tr> </table>
+<img src="https://click.shop.example.com/REDACTED" alt="">
+<img src="https://click.shop.example.com/REDACTED" alt="" width="1" height="1">
+</body> </html>
+--shopBoundary=_?:--

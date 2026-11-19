@@ -87,7 +87,7 @@ func TestParse_AlternativePrefersPlain(t *testing.T) {
 	}
 }
 
-// Real-world emails (anonymised) whose text/plain parts are junk or that
+// Synthetic emails modelled on real-world mail, whose text/plain parts are junk or that
 // are HTML-only. Update with go test ./internal/render -run Golden -update
 func TestParse_Golden(t *testing.T) {
 	for _, name := range []string{"account-password-reset", "shop-newsletter", "shop-shipping", "news-digest", "community-discussion", "marketplace-newsletter"} {
