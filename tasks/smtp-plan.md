@@ -1,7 +1,6 @@
 # Implementation Plan: SMTP sending (v0.2.0)
 
-Spec: [smtp-spec.md](smtp-spec.md). Task details, acceptance criteria and verification: [smtp-todo.md](smtp-todo.md). The v0.1.0 plan stays in [plan.md](plan.md) / [todo.md](todo.md).
-
+Spec: [smtp-spec.md](smtp-spec.md). Task details, acceptance criteria and verification: [smtp-todo.md](smtp-todo.md).
 ## Overview
 
 Add reply, reply-all, forward and new message to dk-email. Mail is written in `$EDITOR`, confirmed in a popup, delivered over SMTP, copied to Sent via IMAP `APPEND` (except on Gmail), and the replied-to message is marked `\Answered`. The work is ordered so that:

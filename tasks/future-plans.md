@@ -22,6 +22,12 @@ must keep possible.
 
 ## High Priority
 
+- **Tag `v0.1.0`**: `v0.1.0-rc.4` is out. After tagging,
+  `brew install dkouvdis/tap/dk-email && dk-email --version` should print
+  `dk-email 0.1.0 (…)`, which is the last open success criterion in
+  `SPEC.md`. The finished v0.1.0 plan and task list are in git history
+  (`tasks/plan.md`, `tasks/todo.md`, removed after `5ff77cd`).
+
 - **Undo for delete, archive and move**: `d` deletes without confirmation by
   design, so offer a short undo (e.g. `z` within a few seconds). The
   optimistic updates in `internal/ui/actions.go` already keep what's needed to
@@ -31,10 +37,6 @@ must keep possible.
 
 ### Incoming
 
-- **New mail push and notifications**: use IMAP `IDLE` instead of polling on
-  `refresh_interval`, and announce new mail with a terminal bell or desktop
-  notification. Builds on the reconnect and expired-session handling from
-  the overnight bug fix.
 - **Multi-select and bulk actions**: mark several threads, then archive,
   delete, move or mark them read at once. Includes "mark folder as read".
 
@@ -108,7 +110,8 @@ See [docs/attachments.md](../docs/attachments.md) for how they work today.
   runs `password_cmd` again and can bring up another 1Password or pinentry
   prompt. Keep the password in memory for the session, optionally with a
   lifetime, and drop it when the server rejects it so the next try runs the
-  command again. The password never touches disk. Plan together with IDLE.
+  command again. The password never touches disk. Plan together with the
+  IDLE watcher in [notifications-plan.md](notifications-plan.md).
 - **Settings in the app**: change UI settings without editing the config file
   by hand.
 
