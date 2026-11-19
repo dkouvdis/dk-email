@@ -41,7 +41,7 @@ T2 detect (imap+notify) ┘                              │
 - [x] Task 1: `[notify]` config and unread count in the window title
 - [x] Task 2: Detect new INBOX mail from refresh results
 - [x] Task 3: Bell and desktop alerts after a refresh round
-- [ ] Task 4: No alerts while the window has focus
+- [x] Task 4: No alerts while the window has focus
 
 ### Checkpoint: Step 1 works
 - [ ] `go test -race ./...`, `go vet ./...`, `gofmt -l .` clean

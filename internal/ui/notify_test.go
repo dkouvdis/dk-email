@@ -227,3 +227,69 @@ func TestAnnounce_WrapsForTmux(t *testing.T) {
 		t.Errorf("raw writes %q, want one starting with the tmux passthrough", raw)
 	}
 }
+
+func TestAnnounce_SilentWhileFocused(t *testing.T) {
+	f := newFixture()
+	m := started(t, f, 160, 30)
+	next, _ := m.Update(tea.FocusMsg{})
+	m = next.(Model)
+	addNewMail(f)
+
+	m, raw := tickRaw(t, m)
+	if len(raw) != 0 {
+		t.Fatalf("focused: raw writes %q, want none", raw)
+	}
+
+	next, _ = m.Update(tea.BlurMsg{})
+	m = next.(Model)
+	addNewMail(f)
+	if _, raw := tickRaw(t, m); len(raw) != 1 {
+		t.Errorf("blurred: got %d raw writes %q, want 1", len(raw), raw)
+	}
+}
+
+func TestAnnounce_KeyPressCountsAsFocus(t *testing.T) {
+	f := newFixture()
+	m := started(t, f, 160, 30)
+	addNewMail(f)
+	m2, raw := tickRaw(t, m)
+	if len(raw) != 1 {
+		t.Fatalf("unfocused: got %d raw writes %q, want 1", len(raw), raw)
+	}
+
+	m2 = pressSettled(t, m2, "j")
+	addNewMail(f)
+	if _, raw := tickRaw(t, m2); len(raw) != 0 {
+		t.Errorf("after key press: raw writes %q, want none", raw)
+	}
+}
+
+func TestAnnounce_MailSeenWhileFocusedNeverAlertsLater(t *testing.T) {
+	f := newFixture()
+	m := started(t, f, 160, 30)
+	next, _ := m.Update(tea.FocusMsg{})
+	m = next.(Model)
+	addNewMail(f)
+	m, raw := tickRaw(t, m)
+	if len(raw) != 0 {
+		t.Fatalf("focused: raw writes %q, want none", raw)
+	}
+
+	next, _ = m.Update(tea.BlurMsg{})
+	m = next.(Model)
+	if _, raw := tickRaw(t, m); len(raw) != 0 {
+		t.Errorf("after blur with no new mail: raw writes %q, want none", raw)
+	}
+}
+
+func TestView_ReportsFocusOnlyWhenAlerting(t *testing.T) {
+	m := started(t, newFixture(), 160, 30)
+	if !m.View().ReportFocus {
+		t.Error("ReportFocus false by default, want true")
+	}
+	m.notify.Bell = false
+	m.notify.Desktop = false
+	if m.View().ReportFocus {
+		t.Error("ReportFocus true with bell and desktop off, want false")
+	}
+}

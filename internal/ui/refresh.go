@@ -189,8 +189,8 @@ func (m Model) announce() tea.Cmd {
 	if len(counts) == 0 {
 		return nil
 	}
-	m.log.Debug("new mail", "accounts", len(counts))
-	if !m.notify.Bell && !m.notify.Desktop {
+	m.log.Debug("new mail", "accounts", len(counts), "focused", m.focused)
+	if m.focused || (!m.notify.Bell && !m.notify.Desktop) {
 		return nil
 	}
 	return tea.Raw(notify.Sequence(notify.Text(counts), m.notify.Bell, m.notify.Desktop, m.tmux))

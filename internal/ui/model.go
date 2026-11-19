@@ -60,6 +60,7 @@ type Model struct {
 	// inbox counts new INBOX mail per account from server results.
 	inbox   *notify.Tracker
 	tmux    bool // inside tmux, so OSC 9 needs passthrough
+	focused bool // the terminal window has focus, so new mail isn't announced
 	accts   []config.Account
 	connect Connector
 	// boxes holds each account's mailbox once connected, by account index.
@@ -200,13 +201,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.resize(msg.Width, msg.Height)
+	case tea.FocusMsg:
+		m.focused = true
+		return m, nil
+	case tea.BlurMsg:
+		m.focused = false
+		return m, nil
 	case tea.KeyPressMsg:
+		m.focused = true // input means the user is at the window
 		return m.handleKey(msg)
 	case tea.MouseClickMsg:
+		m.focused = true
 		return m.handleClick(tea.Mouse(msg))
 	case tea.MouseWheelMsg:
+		m.focused = true
 		return m.handleWheel(tea.Mouse(msg))
 	case tea.PasteMsg:
+		m.focused = true
 		switch {
 		case m.composing():
 			if m.draft.pop.TakesPaste() {
@@ -518,6 +529,7 @@ func (m Model) windowTitle() string {
 func (m Model) View() tea.View {
 	v := tea.NewView(m.render())
 	v.AltScreen = true
+	v.ReportFocus = m.notify.Bell || m.notify.Desktop
 	if m.notify.Title {
 		v.WindowTitle = m.windowTitle()
 	}

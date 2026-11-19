@@ -84,13 +84,13 @@ Plan: [notifications-plan.md](notifications-plan.md) · Spec: [notifications-spe
 **Description:** Set `v.ReportFocus` in `View` whenever `bell` or `desktop` is on. Keep `focused bool` on `Model`: false at start, true on `tea.FocusMsg` and on any key press, click or wheel, false on `tea.BlurMsg`. `finishRefresh` sends the alert only when not focused. The new-mail counts are still consumed, so they don't pile up into a later alert. The title (Task 1) updates regardless of focus.
 
 **Acceptance criteria:**
-- [ ] After a `tea.FocusMsg`, a round with new mail emits no `tea.RawMsg`; after a `tea.BlurMsg` it does.
-- [ ] Without any focus message, a round alerts until the first key press, then doesn't.
-- [ ] New mail that arrives while focused doesn't alert later, after blur.
+- [x] After a `tea.FocusMsg`, a round with new mail emits no `tea.RawMsg`; after a `tea.BlurMsg` it does.
+- [x] Without any focus message, a round alerts until the first key press, then doesn't.
+- [x] New mail that arrives while focused doesn't alert later, after blur.
 
 **Verification:**
-- [ ] Tests pass: `go test -race ./internal/ui`
-- [ ] Build succeeds: `go build -o bin/dk-email ./cmd/dk-email`
+- [x] Tests pass: `go test -race ./internal/ui`
+- [x] Build succeeds: `go build -o bin/dk-email ./cmd/dk-email`
 - [ ] Manual check: with dk-email in front, `ctrl+r` after new mail shows no banner or bell; switch away, send another, and the alert arrives.
 
 **Dependencies:** Task 3
@@ -103,8 +103,8 @@ Plan: [notifications-plan.md](notifications-plan.md) · Spec: [notifications-spe
 ---
 
 ## Checkpoint: Step 1 works
-- [ ] Full test suite passes: `go test -race ./...`
-- [ ] Lint and format pass: `go vet ./... && gofmt -l .`
+- [x] Full test suite passes: `go test -race ./...`
+- [x] Lint and format pass: `go vet ./... && gofmt -l .`
 - [ ] Manual checks of Tasks 1, 3 and 4 done in Ghostty and iTerm2
 - [ ] Diff reviewed in the main session before commit
 
