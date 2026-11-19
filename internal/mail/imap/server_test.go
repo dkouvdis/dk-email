@@ -101,6 +101,8 @@ type testServer struct {
 	// creates itself with addDrafts, with its \Drafts attribute.
 	withDrafts atomic.Bool
 	release    chan struct{}
+	// idles counts the IDLE commands the server has started.
+	idles atomic.Int64
 
 	// tokens are the access tokens XOAUTH2 accepts; loggedTokens records the
 	// accepted ones in order.
@@ -282,6 +284,11 @@ func (s *testSession) Status(name string, options *goimap.StatusOptions) (*goima
 		return nil, errSessionExpired
 	}
 	return s.UserSession.Status(name, options)
+}
+
+func (s *testSession) Idle(w *imapserver.UpdateWriter, stop <-chan struct{}) error {
+	s.srv.idles.Add(1)
+	return s.UserSession.Idle(w, stop)
 }
 
 func (s *testSession) AuthenticateMechanisms() []string { return []string{sasl.Plain, "XOAUTH2"} }

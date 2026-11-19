@@ -18,6 +18,8 @@ var (
 	ErrFolderNotFound  = errors.New("folder not found")
 	ErrMessageNotFound = errors.New("message not found")
 	ErrClosed          = errors.New("mailbox closed")
+	// ErrUnsupported means the server lacks a capability the call needs.
+	ErrUnsupported = errors.New("not supported by the server")
 	// ErrFolderChanged means the folder's UIDs were reset on the server
 	// (IMAP UIDVALIDITY changed), so UIDs from earlier calls are invalid and
 	// the caller must reload from the newest message.
@@ -275,4 +277,15 @@ type Credentials func(ctx context.Context) (Login, error)
 // StaticPassword returns Credentials that always yield password.
 func StaticPassword(password string) Credentials {
 	return func(context.Context) (Login, error) { return Login{Password: password}, nil }
+}
+
+// Watcher waits for new mail so it can be fetched without polling. It is
+// separate from Mailbox because it holds a connection of its own.
+type Watcher interface {
+	// Wait blocks until folder gains messages after the previous Wait (or,
+	// for the first, after it starts watching), ctx ends, or the watch
+	// fails. It returns ErrUnsupported if the server can't push. Only one
+	// Wait may run at a time.
+	Wait(ctx context.Context, folder string) error
+	Close() error
 }

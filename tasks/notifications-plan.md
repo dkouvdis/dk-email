@@ -50,7 +50,7 @@ T2 detect (imap+notify) ┘                              │
 - [x] Task 5: User docs for step 1
 
 ### Phase 2: IDLE push
-- [ ] Task 6: `imap.Watcher` waits for new INBOX mail over its own connection
+- [x] Task 6: `imap.Watcher` waits for new INBOX mail over its own connection
 - [ ] Task 7: The UI refreshes an account when its watcher wakes
 
 ### Checkpoint: Push works

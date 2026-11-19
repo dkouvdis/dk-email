@@ -222,7 +222,7 @@ func (c *Client) connectLocked(ctx context.Context) (conn *imapclient.Client, re
 	}
 
 	start := time.Now()
-	conn, raw, err := c.open(ctx)
+	conn, raw, err := c.open(ctx, nil)
 	if err != nil {
 		c.log.Debug("imap connect failed", "account", c.acct.Name, "err", err)
 		if ctxErr := ctx.Err(); ctxErr != nil {
@@ -236,7 +236,8 @@ func (c *Client) connectLocked(ctx context.Context) (conn *imapclient.Client, re
 	return conn, false, nil
 }
 
-func (c *Client) open(ctx context.Context) (*imapclient.Client, net.Conn, error) {
+// open dials and logs in. A non-nil handler receives unilateral server data.
+func (c *Client) open(ctx context.Context, handler *imapclient.UnilateralDataHandler) (*imapclient.Client, net.Conn, error) {
 	// Fetch the login first, so a failed token refresh costs no connection.
 	login, err := c.creds(ctx)
 	if err != nil {
@@ -250,7 +251,7 @@ func (c *Client) open(ctx context.Context) (*imapclient.Client, net.Conn, error)
 	}
 
 	stop := context.AfterFunc(ctx, func() { raw.Close() })
-	conn, err := c.handshake(ctx, raw, login)
+	conn, err := c.handshake(ctx, raw, login, handler)
 	if !stop() && err == nil {
 		err = ctx.Err()
 		_ = conn.Close()
@@ -265,12 +266,12 @@ func (c *Client) open(ctx context.Context) (*imapclient.Client, net.Conn, error)
 // handshake upgrades raw to TLS, waits for the greeting and logs in with
 // XOAUTH2 when login has a token, LOGIN otherwise. It leaves raw open on
 // failure; the caller closes it.
-func (c *Client) handshake(ctx context.Context, raw net.Conn, login mail.Login) (*imapclient.Client, error) {
+func (c *Client) handshake(ctx context.Context, raw net.Conn, login mail.Login, handler *imapclient.UnilateralDataHandler) (*imapclient.Client, error) {
 	tlsConfig, err := c.newTLSConfig()
 	if err != nil {
 		return nil, err
 	}
-	opts := &imapclient.Options{TLSConfig: tlsConfig}
+	opts := &imapclient.Options{TLSConfig: tlsConfig, UnilateralDataHandler: handler}
 
 	var conn *imapclient.Client
 	switch c.acct.TLS {

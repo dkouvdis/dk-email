@@ -136,16 +136,16 @@ Plan: [notifications-plan.md](notifications-plan.md) · Spec: [notifications-spe
 **Description:** Add `mail.Watcher` (`Wait(ctx, folder string) error`) and `mail.ErrUnsupported` to `internal/mail`. In `internal/mail/imap`, add `Watcher`, built like `Client` from the account, credentials and logger with no network I/O until the first `Wait`. It holds its own lazily dialed connection with an `UnilateralDataHandler` that records `EXISTS`, selects `folder`, and remembers the message count. `Wait` returns nil at once if the count grew since the last `Wait`, otherwise `IDLE`s until it grows, ending and re-issuing `IDLE` every 25 minutes. It returns `mail.ErrUnsupported` when the server lacks `IDLE`, drops the connection on any error (the next `Wait` dials again), and honours `ctx` by stopping `IDLE` and closing the connection. Debug-log dials, drops and wake-ups like `Client` does, never credentials. `Close` logs out.
 
 **Acceptance criteria:**
-- [ ] With `imapmemserver`, appending to INBOX from a second session makes a pending `Wait` return nil within 1s; an expunge doesn't.
-- [ ] A message appended between two `Wait` calls makes the second return at once.
-- [ ] A server without `IDLE` returns `mail.ErrUnsupported`; a cancelled `ctx` returns its error promptly; after the server drops the connection, the next `Wait` reconnects and works.
-- [ ] The re-IDLE interval is a field tests can shorten, and a test sees `IDLE` restarted.
-- [ ] No log record contains the password or token.
+- [x] With `imapmemserver`, appending to INBOX from a second session makes a pending `Wait` return nil within 1s; an expunge doesn't.
+- [x] A message appended between two `Wait` calls makes the second return at once.
+- [x] A server without `IDLE` returns `mail.ErrUnsupported`; a cancelled `ctx` returns its error promptly; after the server drops the connection, the next `Wait` reconnects and works.
+- [x] The re-IDLE interval is a field tests can shorten, and a test sees `IDLE` restarted.
+- [x] No log record contains the password or token.
 
 **Verification:**
-- [ ] Tests pass: `go test -race ./internal/mail/imap`
-- [ ] Build succeeds: `go build -o bin/dk-email ./cmd/dk-email`
-- [ ] Manual check: none (covered by the in-process server).
+- [x] Tests pass: `go test -race ./internal/mail/imap`
+- [x] Build succeeds: `go build -o bin/dk-email ./cmd/dk-email`
+- [x] Manual check: none (covered by the in-process server).
 
 **Dependencies:** None (can start any time after the Step 1 checkpoint)
 
