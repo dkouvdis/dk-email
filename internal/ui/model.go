@@ -120,10 +120,11 @@ type Model struct {
 	// pickingAttachment is set while the picker chooses an attachment to open.
 	pickingAttachment bool
 	// files saves and opens attachments.
-	files     fileOpener
-	status    string
-	statusErr bool
-	notice    string // the new-mail notice text; status is shown in the notice style only while it still equals it
+	files        fileOpener
+	status       string
+	statusErr    bool
+	refreshErrID int    // account id when statusErr came from a refresh, 0 otherwise
+	notice       string // the new-mail notice text; status is shown in the notice style only while it still equals it
 	// draft is the message being composed, nil when there is none; sending
 	// is set while it is being delivered and saving while it is being saved
 	// to Drafts. The composer popup edits draft.
@@ -389,7 +390,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	}
 	if m.statusErr || (m.notice != "" && m.status == m.notice) {
-		m.status, m.statusErr, m.notice = "", false, ""
+		m.clearError()
+		m.notice = ""
 	}
 	if m.showPicker {
 		return m.handlePickerKey(msg)
@@ -762,7 +764,17 @@ func (m *Model) setNotice(s string) {
 // setError shows err in the status line. Only its text is shown, which
 // never includes passwords (see secret and imap).
 func (m *Model) setError(err error) {
-	m.status, m.statusErr = err.Error(), true
+	m.status, m.statusErr, m.refreshErrID = err.Error(), true, 0
+}
+
+// setRefreshError is setError for a background refresh of account id, so a
+// later clean refresh of that account can clear it automatically.
+func (m *Model) setRefreshError(id int, err error) {
+	m.status, m.statusErr, m.refreshErrID = err.Error(), true, id
+}
+
+func (m *Model) clearError() {
+	m.status, m.statusErr, m.refreshErrID = "", false, 0
 }
 
 // fitLines cuts content to w columns and h lines so a pane never grows.

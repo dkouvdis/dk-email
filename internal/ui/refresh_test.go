@@ -115,6 +115,45 @@ func TestRefresh_FailureShowsAndNextTickRetries(t *testing.T) {
 	if !strings.Contains(plain(m), "Brand new") {
 		t.Errorf("the next tick didn't retry:\n%s", plain(m))
 	}
+	if m.statusErr {
+		t.Errorf("status = %q (err %v), want the recovered refresh error cleared", m.status, m.statusErr)
+	}
+}
+
+func TestRefresh_ClearsOnlyRecoveredAccountRefreshError(t *testing.T) {
+	f := newFixture()
+	m := started(t, f, 160, 30)
+	next, _ := m.Update(tea.BlurMsg{})
+	m = next.(Model)
+
+	// Personal fails on a tick; Work succeeds in the same round without wiping Personal's error.
+	f.personal.Fail(mailtest.MethodFolders, errors.New("connection reset by peer"))
+	m = tickSettled(t, m)
+	if !m.statusErr || !strings.Contains(m.status, "refresh Personal: connection reset by peer") {
+		t.Fatalf("status = %q (err %v), want Personal's refresh error", m.status, m.statusErr)
+	}
+
+	// A scoped refresh of Work alone also leaves Personal's error on screen.
+	scoped, cmd := m.refreshSoon(1)
+	m = settle(t, scoped, cmd)
+	if !m.statusErr || !strings.Contains(m.status, "refresh Personal: connection reset by peer") {
+		t.Fatalf("status = %q (err %v), want Personal's error kept after Work refreshed", m.status, m.statusErr)
+	}
+
+	// Once Personal recovers, the error clears and a new-mail notice can appear.
+	f.personal.Fail(mailtest.MethodFolders, nil)
+	f.personal.AddMessage("INBOX", msg("Zed", "Morning", fixedNow, false, "z1"))
+	m = tickSettled(t, m)
+	if m.statusErr || m.status != "New mail: 1 new in Personal" {
+		t.Errorf("status = %q (err %v), want the refresh error cleared and new mail announced", m.status, m.statusErr)
+	}
+
+	// A non-refresh error stays until a key press even after a clean tick.
+	m.setError(errors.New("archive: MOVE refused"))
+	m = tickSettled(t, m)
+	if !m.statusErr || m.status != "archive: MOVE refused" {
+		t.Errorf("status = %q (err %v), want non-refresh error kept across ticks", m.status, m.statusErr)
+	}
 }
 
 func TestRefresh_ResultsDuringAWriteAreDropped(t *testing.T) {

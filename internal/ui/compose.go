@@ -323,7 +323,7 @@ func (m Model) handleDraftSaved(msg draftSavedMsg) (tea.Model, tea.Cmd) {
 	case errors.Is(msg.err, mail.ErrDraftSaved):
 		// Saved, so there's nothing to retry.
 		m.closeDraft()
-		m.status, m.statusErr = capitalize(msg.err.Error()), true
+		m.setError(errors.New(capitalize(msg.err.Error())))
 	case errors.Is(msg.err, context.Canceled) && m.composing():
 		m.draft.pop.SetBusy("")
 		m.status, m.statusErr = statusSaveCancelled, false
@@ -364,7 +364,7 @@ func (m Model) handleSent(msg sentMsg) (tea.Model, tea.Cmd) {
 	case errors.Is(msg.err, mail.ErrAfterDelivery):
 		// Delivered, so there's nothing to retry.
 		m.closeDraft()
-		m.status, m.statusErr = capitalize(msg.err.Error()), true
+		m.setError(errors.New(capitalize(msg.err.Error())))
 	case !m.composing():
 		m.setError(msg.err)
 		return m, nil

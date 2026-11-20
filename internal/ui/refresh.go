@@ -148,31 +148,37 @@ func (m Model) handleRefresh(msg refreshMsg) (Model, tea.Cmd) {
 	}
 	stale := m.refresh.dirty || m.writes != m.refresh.writes
 	name := m.accts[msg.account].Name
+	id := m.ids[msg.account]
 
 	if msg.foldersErr == nil && !stale {
 		// Only a non-stale round has every recorded move done on the server;
 		// a skipped round keeps the baseline, so the next one counts the gap.
-		id := m.ids[msg.account]
 		if n := m.inbox.Observe(id, msg.folders, msg.inboxFrom, msg.inboxCount); n > 0 {
 			m.log.Debug("inbox arrivals", "account", name, "new", n)
 			m.refresh.newMail[id] += n
 		}
 	}
 
+	openHere := msg.folder != "" && m.open.account == msg.account && m.open.folder == msg.folder && !m.open.loading && !m.searching()
+	if !stale && msg.foldersErr == nil && (!openHere || msg.sumsErr == nil || errors.Is(msg.sumsErr, mail.ErrFolderChanged)) {
+		if m.statusErr && m.refreshErrID == id {
+			m.clearError()
+		}
+	}
+
 	switch {
 	case msg.foldersErr != nil:
-		m.setError(fmt.Errorf("refresh %s: %w", name, msg.foldersErr))
+		m.setRefreshError(id, fmt.Errorf("refresh %s: %w", name, msg.foldersErr))
 	case !stale:
 		m.side = m.side.SetFolders(msg.account, msg.folders, nil)
 	}
 
-	openHere := msg.folder != "" && m.open.account == msg.account && m.open.folder == msg.folder && !m.open.loading && !m.searching()
 	switch {
 	case !openHere:
 	case errors.Is(msg.sumsErr, mail.ErrFolderChanged):
 		m, cmd = m.reloadChanged(msg.account, msg.folder)
 	case msg.sumsErr != nil:
-		m.setError(fmt.Errorf("refresh %s/%s: %w", name, m.open.label, msg.sumsErr))
+		m.setRefreshError(id, fmt.Errorf("refresh %s/%s: %w", name, m.open.label, msg.sumsErr))
 	case !stale:
 		m.list = m.list.Merge(msg.summaries)
 	}
