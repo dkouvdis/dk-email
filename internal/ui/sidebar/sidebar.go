@@ -462,6 +462,10 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		m.ensureVisible()
 		return m, nil
 	}
+	if n, ok := AccountKey(msg); ok {
+		m.jumpToAccount(n)
+		return m, nil
+	}
 	sel := m.selectable()
 	if len(sel) == 0 {
 		return m, nil
@@ -488,6 +492,42 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	m.cursor = sel[min(max(i, 0), len(sel)-1)]
 	m.ensureVisible()
 	return m, nil
+}
+
+// AccountKey reports the account index for a digit key: 1 is the first
+// account, up to 9.
+func AccountKey(msg tea.KeyPressMsg) (int, bool) {
+	if len(msg.Text) != 1 || msg.Mod != 0 || msg.Text[0] < '1' || msg.Text[0] > '9' {
+		return 0, false
+	}
+	return int(msg.Text[0] - '1'), true
+}
+
+// jumpToAccount moves the cursor to account i's INBOX, or its first folder
+// if it has none, or its name if it failed to connect. An account that
+// doesn't exist, or is still connecting, leaves the cursor where it is.
+func (m *Model) jumpToAccount(i int) {
+	if i < 0 || i >= len(m.accounts) {
+		return
+	}
+	var first *ref
+	for _, r := range m.selectable() {
+		if r.account != i {
+			continue
+		}
+		if r.folder != "" && m.Role(i, r.folder) == mail.RoleInbox {
+			m.cursor = r
+			m.ensureVisible()
+			return
+		}
+		if first == nil {
+			first = &r
+		}
+	}
+	if first != nil {
+		m.cursor = *first
+		m.ensureVisible()
+	}
 }
 
 // selectable lists the folders the cursor can be on: those matching the

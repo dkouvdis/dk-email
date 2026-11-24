@@ -19,6 +19,7 @@ type KeyMap struct {
 	Forward, Compose       key.Binding
 	OpenAttachment         key.Binding
 	Picker, Filter, Search key.Binding
+	JumpAccount            key.Binding
 	Connect, EditAccount   key.Binding
 	ToggleView, Help, Back key.Binding
 	Quit, ForceQuit        key.Binding
@@ -52,6 +53,7 @@ func DefaultKeyMap() KeyMap {
 		OpenAttachment: b([]string{"o"}, "o", "open attachment"),
 		Picker:         b([]string{"a"}, "a", "accounts"),
 		Filter:         b([]string{"/"}, "/", "filter folder names"),
+		JumpAccount:    b([]string{"1", "2", "3", "4", "5", "6", "7", "8", "9"}, "1-9", "account inbox"),
 		Search:         b([]string{"/"}, "/", "search folder"),
 		Connect:        b([]string{"A"}, "A", "connect account"),
 		EditAccount:    b([]string{"E"}, "E", "edit account"),
@@ -97,7 +99,7 @@ func (k KeyMap) HelpSections() []popup.Section {
 			help("esc", "close, or save / discard"),
 			help("ctrl+c", "quit now"),
 		}},
-		{Title: "Accounts & view", Keys: []key.Binding{k.Picker, k.Filter, k.Connect, k.EditAccount, k.ToggleView}},
+		{Title: "Accounts & view", Keys: []key.Binding{k.Picker, k.Filter, k.JumpAccount, k.Connect, k.EditAccount, k.ToggleView}},
 		{Title: "General", Keys: []key.Binding{k.Help, k.Back, k.Quit, k.ForceQuit}},
 	}
 }
@@ -117,7 +119,7 @@ func (k KeyMap) hints(focus Pane, reading bool, kind Kind) []key.Binding {
 	case PaneList:
 		keys = append(keys, k.Expand, k.ToggleRead, k.Star, k.Archive, k.Delete, k.Move, k.Reply, k.Forward, k.Compose, k.Search)
 	case PaneSidebar:
-		keys = append(keys, key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "filter")))
+		keys = append(keys, key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "filter")), k.JumpAccount)
 	}
 	if kind == KindNarrow {
 		keys = append(keys, k.NextPane)

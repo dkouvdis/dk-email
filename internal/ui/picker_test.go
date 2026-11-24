@@ -199,3 +199,33 @@ func TestFolderFilter_KeyIsInHelpAndSidebarHints(t *testing.T) {
 		t.Errorf("help popup doesn't list the folder filter:\n%s", plain(m))
 	}
 }
+
+func TestPicker_DigitJumpsToAccountInbox(t *testing.T) {
+	f := newFixture()
+	m := started(t, f, 70, 30)
+
+	for _, k := range []string{"a", "j", "j", "2"} {
+		m = pressSettled(t, m, k)
+	}
+	if p, _ := m.picker.Selected(); p.account != 1 || p.folder != "INBOX" {
+		t.Fatalf("2 put the cursor on %+v, want Work's INBOX", p)
+	}
+	m = pressSettled(t, m, "1")
+	if p, _ := m.picker.Selected(); p.account != 0 || p.folder != "INBOX" {
+		t.Fatalf("1 put the cursor on %+v, want Personal's INBOX", p)
+	}
+	m = pressSettled(t, m, "9") // no ninth account
+	if p, _ := m.picker.Selected(); p.account != 0 || p.folder != "INBOX" {
+		t.Fatalf("9 moved the cursor to %+v", p)
+	}
+	if !m.showPicker {
+		t.Fatal("a digit closed the picker")
+	}
+
+	// While filtering, digits are text.
+	m = pressSettled(t, m, "/")
+	m = pressSettled(t, m, "2")
+	if m.picker.Filtering() == false || !strings.Contains(plain(m), "/ 2") {
+		t.Errorf("2 wasn't typed into the filter:\n%s", plain(m))
+	}
+}

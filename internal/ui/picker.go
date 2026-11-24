@@ -89,6 +89,11 @@ func (m Model) openMovePicker(targets []mail.Summary) (Model, tea.Cmd) {
 }
 
 func (m Model) handlePickerKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	// In the folder picker, 1–9 move to that account's INBOX.
+	if n, ok := sidebar.AccountKey(msg); ok && !m.picker.Filtering() && m.moveTargets == nil && !m.pickingAttachment {
+		m.picker.JumpToGroup(n, func(p pick) bool { return m.side.Role(p.account, p.folder) == mail.RoleInbox })
+		return m, nil
+	}
 	var r popup.Result
 	m.picker, r = m.picker.Update(msg)
 	targets, attaching := m.moveTargets, m.pickingAttachment

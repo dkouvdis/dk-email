@@ -602,3 +602,35 @@ func TestInboxUnread(t *testing.T) {
 		t.Errorf("InboxUnread() = %d, want 17", got)
 	}
 }
+
+func TestUpdate_DigitJumpsToAccountInbox(t *testing.T) {
+	m := New(theme.Default(), []string{"Personal", "Work", "Broken", "Pending"})
+	m = m.SetFolders(0, gmailFolders(), nil)
+	m = m.SetFolders(1, []mail.Folder{{Name: "Archive", Delimiter: "/"}, {Name: "INBOX", Delimiter: "/", Role: mail.RoleInbox}}, nil)
+	m = m.SetFolders(2, nil, errors.New("login failed"))
+	m = m.SetOpen(0, "Receipts")
+
+	steps := []struct {
+		key     string
+		account int
+		folder  string
+	}{
+		{"2", 1, "INBOX"},
+		{"1", 0, "INBOX"},
+		{"3", 2, ""}, // failed: its name
+		{"4", 2, ""}, // still connecting: nothing to jump to
+		{"9", 2, ""}, // no such account
+	}
+	for _, s := range steps {
+		m, _ = m.Update(press(s.key))
+		if a, f := m.Cursor(); a != s.account || f != s.folder {
+			t.Errorf("after %s cursor = %d/%q, want %d/%q", s.key, a, f, s.account, s.folder)
+		}
+	}
+
+	m, _ = m.Update(press("/"))
+	m = typeKeys(m, "2")
+	if !m.Filtering() || m.filter.Value() != "2" {
+		t.Errorf("2 wasn't typed into the filter: %q", m.filter.Value())
+	}
+}

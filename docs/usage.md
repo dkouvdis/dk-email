@@ -95,6 +95,9 @@ focused pane has a highlighted border, and the keys act on it.
 - **`a`** goes to a folder. In the narrow layout it closes any popup and puts
   focus on the sidebar. In the list layout, where there is no sidebar, it opens
   a **Go to folder** picker with every account's folders. Pick one with `enter`.
+- **`1`–`9`** in the sidebar or the Go to folder picker move the cursor to that
+  account's Inbox (`1` is the first account), ready for `enter`. While a `/`
+  filter is open, digits are typed into it instead.
 - **`/`** filters folders by name when the sidebar (or a folder picker) has
   focus, and searches the open folder when the thread list has focus. See
   [Searching](search.md).

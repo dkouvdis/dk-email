@@ -183,6 +183,29 @@ func (p Picker[T]) Selected() (T, bool) {
 	return p.groups[r.group].Items[r.item].Value, true
 }
 
+// JumpToGroup moves the cursor to the first item in group g for which home
+// is true, else to the group's first selectable item. A group that doesn't
+// exist or has nothing selectable leaves the cursor where it is.
+func (p *Picker[T]) JumpToGroup(g int, home func(T) bool) {
+	first := -1
+	for i, r := range p.refs {
+		if r.group != g {
+			continue
+		}
+		if home(p.groups[r.group].Items[r.item].Value) {
+			first = i
+			break
+		}
+		if first < 0 {
+			first = i
+		}
+	}
+	if first >= 0 {
+		p.cursor = first
+		p.scrollToCursor()
+	}
+}
+
 // Update handles a key. While filtering, keys type into the filter, ↑/↓
 // move between matches, enter chooses and esc clears the filter; otherwise
 // / starts a filter and esc closes.
